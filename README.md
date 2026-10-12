@@ -85,6 +85,10 @@ php artisan reverb:start        # WebSockets on :8080 (second terminal)
 For `REVERB_APP_ID / KEY / SECRET`, any random strings work locally
 (e.g. `php -r "echo bin2hex(random_bytes(16));"`).
 
+Keep `reverb:start` running while you're live: it's what makes a popup tap show on the clean
+screen at once. Without it the app still works, but the clean screen only checks for changes
+every second.
+
 Local demo login (seeded only when `APP_ENV=local`): `demo@livesell.test` / `livesell-demo`.
 
 ### 3. Frontend (`frontend/`)
@@ -94,7 +98,7 @@ cd frontend
 nvm use                         # Node 22.13.1
 npm ci
 cp .env.example .env            # set VITE_REVERB_APP_KEY = backend REVERB_APP_KEY
-npm run dev                     # http://localhost:5173 (proxies /api, /sanctum, /storage)
+npm run dev                     # http://localhost:5173 (proxies /api, /sanctum, /storage, Reverb)
 npm run dev:lan                 # over HTTPS on localhost and your LAN IP (https://<your-ip>:5173)
 ```
 
@@ -157,6 +161,11 @@ How it stays safe: the browser only ever gets a one-time ticket (60 s). The rela
 holds `RELAY_SECRET`, swaps it with Laravel for the server and key and hands them to FFmpeg;
 the key is never sent to the browser or shown in errors. Chrome or Edge on a computer is
 required (tab sharing). A bigger clean-screen window gives a sharper live.
+
+**Delay on the platform.** Viewers always see the live a few seconds late: that's the
+platform's own player buffer, not the app. To shorten it, choose **Low latency** in Facebook
+Live Producer (Settings → Stream latency) and **Ultra low-latency** in YouTube Studio
+(Stream settings → Stream latency) before going live. TikTok has no such setting.
 
 ### Checks
 

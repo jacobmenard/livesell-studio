@@ -36,7 +36,8 @@ export function pickMimeType(isSupported: (type: string) => boolean): string | n
   return MIME_TYPES.find(isSupported) ?? null
 }
 
-const CHUNK_MS = 1000
+// Small chunks keep the relay (and so the platform) close behind the picture.
+const CHUNK_MS = 250
 // If sending to the relay backs up this far (≈ 10 s of video), stop rather than fall ever further behind.
 const MAX_BUFFERED_BYTES = 12 * 1024 * 1024
 

@@ -62,8 +62,9 @@ class AppServiceProvider extends ServiceProvider
         // Popup taps and slider moves while live (the editor already debounces these).
         RateLimiter::for('live', fn (Request $request) => Limit::perMinute(600)->by($request->user()?->id ?: $request->ip()));
 
-        // Clean screens poll as a fallback when the WebSocket drops.
-        RateLimiter::for('output', fn (Request $request) => Limit::perMinute(120)->by($request->ip()));
+        // Clean screens poll every second as a fallback when the WebSocket drops; several
+        // screens can share one IP (a shop's Wi-Fi), so allow a few at once.
+        RateLimiter::for('output', fn (Request $request) => Limit::perMinute(300)->by($request->ip()));
 
         // The local relay claiming streaming tickets (one per "Go live").
         RateLimiter::for('relay', fn (Request $request) => Limit::perMinute(30)->by($request->ip()));

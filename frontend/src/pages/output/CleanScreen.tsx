@@ -13,7 +13,8 @@ import { useStreamAudio } from '../../stage/useStreamAudio'
 import { useCamera } from '../../stage/useCamera'
 import { VideoLayer } from '../../stage/VideoLayer'
 
-const POLL_MS = 3000
+// Only while the WebSocket is down (normally popups arrive over it at once).
+const POLL_MS = 1000
 
 export interface FeedSource {
   /** Loads the current picture (and the private channel to follow). */

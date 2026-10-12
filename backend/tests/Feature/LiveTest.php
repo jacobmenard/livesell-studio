@@ -64,6 +64,36 @@ class LiveTest extends TestCase
         });
     }
 
+    public function test_without_reverb_keys_a_popup_tap_does_not_wait_on_a_websocket(): void
+    {
+        config(['broadcasting.connections.reverb.key' => null]);
+        Event::fake([SceneUpdated::class]);
+        $me = User::factory()->create();
+        $setup = $this->setupFor($me);
+
+        $this->actingAs($me)->putJson("/api/setups/{$setup->id}/scene", $this->scene([$this->off10()]))
+            ->assertOk()
+            ->assertJsonPath('meta.delivered', false);
+
+        Event::assertNotDispatched(SceneUpdated::class);
+    }
+
+    public function test_after_reverb_fails_the_next_taps_skip_it_for_a_while(): void
+    {
+        // Nothing listens on the test Reverb port, so the first send fails.
+        $me = User::factory()->create();
+        $setup = $this->setupFor($me);
+        $this->actingAs($me)->putJson("/api/setups/{$setup->id}/scene", $this->scene())->assertJsonPath('meta.delivered', false);
+
+        Event::fake([SceneUpdated::class]);
+        $this->putJson("/api/setups/{$setup->id}/scene", $this->scene([$this->off10()]))->assertOk()->assertJsonPath('meta.delivered', false);
+        Event::assertNotDispatched(SceneUpdated::class);
+
+        $this->travel(16)->seconds();
+        $this->putJson("/api/setups/{$setup->id}/scene", $this->scene())->assertJsonPath('meta.delivered', true);
+        Event::assertDispatched(SceneUpdated::class);
+    }
+
     public function test_scene_updates_also_reach_the_active_output_link(): void
     {
         Event::fake([SceneUpdated::class]);

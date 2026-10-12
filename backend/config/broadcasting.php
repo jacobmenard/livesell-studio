@@ -21,9 +21,10 @@ return [
                 'useTLS' => env('REVERB_SCHEME', 'https') === 'https',
             ],
             'client_options' => [
-                // Fail fast if Reverb is down; the clean screen falls back to polling.
-                'timeout' => 3,
-                'connect_timeout' => 2,
+                // Fail fast if Reverb is down (LiveRelay then skips it for a while); the clean
+                // screen falls back to polling. Reverb runs next to the app, so 1 s is plenty.
+                'timeout' => 2,
+                'connect_timeout' => 1,
             ],
         ],
 

@@ -13,10 +13,12 @@ export function createEcho(authEndpoint: string, extraAuthBody: Record<string, s
   const key = import.meta.env.VITE_REVERB_APP_KEY as string | undefined
   if (!key) return null
 
-  const scheme = (import.meta.env.VITE_REVERB_SCHEME as string | undefined) ?? 'https'
-  // Empty means "the host this page was opened on", so the app also works by LAN IP.
-  const host = (import.meta.env.VITE_REVERB_HOST as string | undefined) || window.location.hostname
-  const port = Number(import.meta.env.VITE_REVERB_PORT ?? (scheme === 'https' ? 443 : 80))
+  // Each one left empty means "same as this page": in development the Vite server passes
+  // /app/* on to Reverb, so the socket works by localhost, LAN IP and over https alike.
+  const page = window.location
+  const scheme = (import.meta.env.VITE_REVERB_SCHEME as string | undefined) || page.protocol.replace(':', '')
+  const host = (import.meta.env.VITE_REVERB_HOST as string | undefined) || page.hostname
+  const port = Number((import.meta.env.VITE_REVERB_PORT as string | undefined) || page.port || (scheme === 'https' ? 443 : 80))
 
   return new Echo({
     broadcaster: 'reverb',
