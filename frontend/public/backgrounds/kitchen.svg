@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <pattern id="tile" width="80" height="80" patternUnits="userSpaceOnUse"><rect width="80" height="80" fill="#e8dccb"/><path d="M0 0h80v80" fill="none" stroke="#c9b9a1" stroke-width="4"/></pattern>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8a4f37"/><stop offset="1" stop-color="#5c3324"/></linearGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall)"/>
+  <rect y="420" width="1920" height="380" fill="url(#tile)"/>
+  <g fill="#3a2418"><rect x="100" y="230" width="640" height="18"/><rect x="1180" y="230" width="640" height="18"/></g>
+  <g>
+    <rect x="130" y="150" width="70" height="80" rx="10" fill="#f4f1ea"/><rect x="220" y="130" width="60" height="100" rx="10" fill="#c6f36b" opacity=".85"/>
+    <rect x="300" y="160" width="80" height="70" rx="10" fill="#f5c542"/><rect x="400" y="140" width="60" height="90" rx="10" fill="#f4f1ea"/>
+    <circle cx="540" cy="190" r="40" fill="#4f7a45"/><rect x="520" y="200" width="40" height="30" fill="#b5653a"/>
+    <rect x="1220" y="140" width="70" height="90" rx="10" fill="#ff8a6b"/><rect x="1310" y="160" width="80" height="70" rx="10" fill="#f4f1ea"/>
+    <rect x="1410" y="130" width="60" height="100" rx="10" fill="#8ab4ff" opacity=".8"/><rect x="1490" y="150" width="70" height="80" rx="10" fill="#f5c542"/>
+  </g>
+  <g stroke="#2a1a12" stroke-width="6" fill="none"><path d="M820 0v300M960 0v330M1100 0v290"/></g>
+  <g fill="#2a1a12"><circle cx="820" cy="340" r="44"/><circle cx="960" cy="370" r="50"/><circle cx="1100" cy="330" r="40"/></g>
+  <g fill="#6b4a3a"><circle cx="820" cy="340" r="32"/><circle cx="960" cy="370" r="38"/><circle cx="1100" cy="330" r="28"/></g>
+  <rect y="800" width="1920" height="40" fill="#f4f1ea"/>
+  <rect y="840" width="1920" height="240" fill="#3a2418"/>
+  <g fill="#2a1a12" opacity=".6"><rect x="200" y="880" width="420" height="160" rx="8"/><rect x="1300" y="880" width="420" height="160" rx="8"/></g>
+</svg>

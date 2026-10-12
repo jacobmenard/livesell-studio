@@ -1,0 +1,491 @@
+@import 'tailwindcss';
+
+/*
+  NegosyoWork Studio theme tokens: iOS-style system grays with the brand blue. Dark is the
+  default; light follows the device unless the seller picked a theme (html[data-theme]).
+  The video stage, popups and the clean screen never use these tokens: viewers always see
+  the same picture.
+*/
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #1c1c1e;
+  --surface-2: #2c2c2e;
+  --raised: #3a3a3c;
+  --field: #111113;
+  --line: #38383a;
+  --line-strong: #48484a;
+  --line-hover: #636366;
+  --text: #ffffff;
+  --text-2: #d1d1d6;
+  --muted: #98989f;
+  --link: #4d9bff;
+  --link-hover: #7ab4ff;
+  --focus: #4d9bff;
+  --select: #4d9bff;
+  --tint: rgb(77 155 255 / 0.18);
+  --tint-hover: rgb(77 155 255 / 0.26);
+  --segment-track: #2c2c2e;
+  --segment-on: #636366;
+  --segment-on-text: #ffffff;
+  --inverse-bg: #ffffff;
+  --inverse-fg: #000000;
+  --track-off: #39393d;
+  --success-text: #27d978;
+  --danger-bg: #3b1214;
+  --danger-text: #ff6961;
+  --danger-line: #ff453a;
+  --danger-solid: #d92d20;
+  --on-danger: #ffffff;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    color-scheme: light;
+    --bg: #f2f2f7;
+    --surface: #ffffff;
+    --surface-2: #f2f2f7;
+    --raised: #e5e5ea;
+    --field: #f2f2f7;
+    --line: #e5e5ea;
+    --line-strong: #d1d1d6;
+    --line-hover: #c7c7cc;
+    --text: #000000;
+    --text-2: #3c3c43;
+    --muted: #6c6c70;
+    --link: #0b63ce;
+    --link-hover: #084fa6;
+    --focus: #0b63ce;
+    --select: #0b63ce;
+    --tint: rgb(11 99 206 / 0.1);
+    --tint-hover: rgb(11 99 206 / 0.16);
+    --segment-track: #e9e9eb;
+    --segment-on: #ffffff;
+    --segment-on-text: #000000;
+    --inverse-bg: #062b63;
+    --inverse-fg: #ffffff;
+    --track-off: #e9e9eb;
+    --success-text: #0f7a3e;
+    --danger-bg: #ffe5e3;
+    --danger-text: #c4170c;
+    --danger-line: #ff3b30;
+    --danger-solid: #d92d20;
+    --on-danger: #ffffff;
+  }
+}
+
+:root[data-theme='light'] {
+  color-scheme: light;
+  --bg: #f2f2f7;
+  --surface: #ffffff;
+  --surface-2: #f2f2f7;
+  --raised: #e5e5ea;
+  --field: #f2f2f7;
+  --line: #e5e5ea;
+  --line-strong: #d1d1d6;
+  --line-hover: #c7c7cc;
+  --text: #000000;
+  --text-2: #3c3c43;
+  --muted: #6c6c70;
+  --link: #0b63ce;
+  --link-hover: #084fa6;
+  --focus: #0b63ce;
+  --select: #0b63ce;
+  --tint: rgb(11 99 206 / 0.1);
+  --tint-hover: rgb(11 99 206 / 0.16);
+  --segment-track: #e9e9eb;
+  --segment-on: #ffffff;
+  --segment-on-text: #000000;
+  --inverse-bg: #062b63;
+  --inverse-fg: #ffffff;
+  --track-off: #e9e9eb;
+  --success-text: #0f7a3e;
+  --danger-bg: #ffe5e3;
+  --danger-text: #c4170c;
+  --danger-line: #ff3b30;
+  --danger-solid: #d92d20;
+  --on-danger: #ffffff;
+}
+
+/* Tailwind utilities that read the tokens above: bg-surface, text-muted, border-line … */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-raised: var(--raised);
+  --color-field: var(--field);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-line-hover: var(--line-hover);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-muted: var(--muted);
+  --color-link: var(--link);
+  --color-link-hover: var(--link-hover);
+  --color-focus: var(--focus);
+  --color-select: var(--select);
+  --color-tint: var(--tint);
+  --color-tint-hover: var(--tint-hover);
+  --color-segment-track: var(--segment-track);
+  --color-segment-on: var(--segment-on);
+  --color-segment-on-text: var(--segment-on-text);
+  --color-success-text: var(--success-text);
+  --color-inverse-bg: var(--inverse-bg);
+  --color-inverse-fg: var(--inverse-fg);
+  --color-track-off: var(--track-off);
+  --color-danger-bg: var(--danger-bg);
+  --color-danger-text: var(--danger-text);
+  --color-danger-line: var(--danger-line);
+  --color-danger-solid: var(--danger-solid);
+  --color-on-danger: var(--on-danger);
+}
+
+/* Brand colors (fixed in both themes). */
+@theme {
+  /* Main brand: headers, page banners. */
+  --color-navy: #062b63;
+  /* Primary buttons, links, focus rings. */
+  --color-primary: #0b63ce;
+  /* Availability / success (fills and dots; text uses --success-text). */
+  --color-success: #27d978;
+  /* Sample popup art on the sign-in showcase and template badges. */
+  --color-ink: #0d0c10;
+  --color-cream: #f4f1ea;
+  --color-promo: #f5c542;
+  --color-sky: #8ab4ff;
+
+  /* The iPhone system font (SF Pro) on Apple devices, the platform UI font elsewhere. */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  html,
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+
+  /* On the navy brand bars, blue rings and links would disappear: use white. */
+  .on-brand :focus-visible {
+    outline-color: #ffffff;
+  }
+
+  .on-brand a {
+    color: #ffffff;
+  }
+
+  a {
+    color: var(--link);
+  }
+
+  a:hover {
+    color: var(--link-hover);
+  }
+
+  input[type='range'] {
+    accent-color: var(--select);
+    width: 100%;
+  }
+}
+
+/* The clean screen has no app chrome: transparent so OBS can layer it. */
+html.clean-screen,
+html.clean-screen body {
+  background: transparent !important;
+  overflow: hidden;
+  cursor: none;
+}
+
+/* Placeholder stripes behind preview art. */
+.ph-stripes {
+  background-image: repeating-linear-gradient(135deg, rgb(255 255 255 / 0.05) 0 1px, transparent 1px 14px);
+}
+
+.checker {
+  background-color: #2a2730;
+  background-image: repeating-conic-gradient(#34303b 0% 25%, transparent 0% 50%);
+  background-size: 24px 24px;
+}
+
+/* ---- Popup entrances ---------------------------------------------------- */
+.a-pop {
+  animation: ls-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.a-slide {
+  animation: ls-slide 0.4s ease-out both;
+}
+.a-bounce {
+  animation: ls-bounce 0.9s ease both;
+}
+@keyframes ls-pop {
+  from {
+    transform: scale(0);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+@keyframes ls-slide {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@keyframes ls-bounce {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  70% {
+    transform: scale(0.94);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* ---- Effects (em-based so they scale with the popup) ------------------- */
+.fx-fwa {
+  animation: ls-fwa 1.3s cubic-bezier(0.12, 0.75, 0.3, 1) both;
+}
+.fx-fwb {
+  animation: ls-fwb 1.3s cubic-bezier(0.12, 0.75, 0.3, 1) both;
+}
+@keyframes ls-fwa {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-2.8em) scale(0.35);
+    opacity: 0;
+  }
+}
+@keyframes ls-fwb {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-1.9em) scale(0.35);
+    opacity: 0;
+  }
+}
+.fx-cfa {
+  animation: ls-cfa 2s linear both;
+}
+.fx-cfb {
+  animation: ls-cfb 2s linear both;
+}
+@keyframes ls-cfa {
+  0% {
+    transform: translateY(0) rotate(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(7em) rotate(540deg);
+    opacity: 0;
+  }
+}
+@keyframes ls-cfb {
+  0% {
+    transform: translateY(0) rotate(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0.8em, 7em) rotate(-480deg);
+    opacity: 0;
+  }
+}
+.fx-apl {
+  animation: ls-apl 1.6s ease-out both;
+}
+@keyframes ls-apl {
+  0% {
+    transform: translateY(0) scale(0.4);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-0.4em) scale(1);
+    opacity: 1;
+  }
+  35% {
+    transform: translateY(-1.2em) rotate(-14deg);
+  }
+  55% {
+    transform: translateY(-2em) rotate(14deg);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-3.6em) rotate(0);
+    opacity: 0;
+  }
+}
+.fx-spk {
+  animation: ls-spk 1.2s ease-in-out both;
+}
+@keyframes ls-spk {
+  0% {
+    transform: scale(0) rotate(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1) rotate(90deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0) rotate(180deg);
+    opacity: 0;
+  }
+}
+.fx-hrt {
+  animation: ls-hrt 2s ease-out both;
+}
+@keyframes ls-hrt {
+  0% {
+    transform: translateY(0) scale(0.3);
+    opacity: 0;
+  }
+  15% {
+    transform: translateY(-0.5em) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translate(0.4em, -2.2em);
+  }
+  80% {
+    opacity: 0.9;
+  }
+  100% {
+    transform: translate(-0.3em, -4.5em) scale(0.8);
+    opacity: 0;
+  }
+}
+.fx-loop .fx {
+  animation-iteration-count: infinite;
+}
+.fx-flag {
+  animation: ls-flag 1.4s ease-in-out infinite alternate;
+}
+@keyframes ls-flag {
+  from {
+    transform: rotate(-9deg);
+  }
+  to {
+    transform: rotate(9deg);
+  }
+}
+.fx-drop {
+  animation: ls-drop 0.5s ease-out both;
+}
+@keyframes ls-drop {
+  from {
+    transform: translateY(-1em);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.skeleton {
+  background-color: var(--surface-2);
+  animation: ls-skel 1.2s ease-in-out infinite alternate;
+}
+@keyframes ls-skel {
+  to {
+    background-color: var(--raised);
+  }
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: ls-spin 0.8s linear infinite;
+}
+@keyframes ls-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Viewers and sellers who asked for less motion get none. */
+@media (prefers-reduced-motion: reduce) {
+  .a-pop,
+  .a-slide,
+  .a-bounce,
+  .fx,
+  .fx-flag,
+  .fx-drop,
+  .skeleton {
+    animation: none;
+  }
+  .fx {
+    opacity: 0;
+  }
+  .spinner {
+    animation-duration: 2.4s;
+  }
+}

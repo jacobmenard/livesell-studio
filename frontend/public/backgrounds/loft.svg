@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5a4c36"/><stop offset="1" stop-color="#3a3124"/></linearGradient>
+    <linearGradient id="light" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f6e7c4" stop-opacity=".55"/><stop offset="1" stop-color="#f6e7c4" stop-opacity="0"/></linearGradient>
+    <pattern id="brick" width="120" height="60" patternUnits="userSpaceOnUse"><rect width="120" height="60" fill="none"/><path d="M0 30h120M60 0v30M0 30v30M120 30v30" stroke="#000" stroke-opacity=".12" stroke-width="3"/></pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall)"/>
+  <rect width="1920" height="900" fill="url(#brick)"/>
+  <g transform="translate(120 140)">
+    <rect width="520" height="620" rx="6" fill="#20303a"/>
+    <rect x="16" y="16" width="488" height="588" fill="#a9c3c9" opacity=".55"/>
+    <path d="M260 16v588M16 212h488M16 408h488" stroke="#20303a" stroke-width="14"/>
+    <rect x="16" y="16" width="488" height="588" fill="url(#light)"/>
+  </g>
+  <g fill="#1d1a14">
+    <path d="M960 0v120"/><rect x="957" y="0" width="6" height="150"/><path d="M920 150h80l-18 60h-44z"/>
+    <rect x="537" y="0" width="6" height="110"/><path d="M500 110h80l-18 60h-44z"/>
+    <rect x="1377" y="0" width="6" height="130"/><path d="M1340 130h80l-18 60h-44z"/>
+  </g>
+  <g fill="#ffd98a" opacity=".85"><ellipse cx="960" cy="212" rx="18" ry="8"/><ellipse cx="540" cy="172" rx="18" ry="8"/><ellipse cx="1380" cy="192" rx="18" ry="8"/></g>
+  <rect y="900" width="1920" height="180" fill="#2a2219"/>
+  <path d="M0 900h1920" stroke="#000" stroke-opacity=".3" stroke-width="6"/>
+  <g transform="translate(1540 560)">
+    <path d="M60 340h120l-14-120h-92z" fill="#b5653a"/>
+    <path d="M120 230c-80-60-110-170-60-230 10 90 40 120 60 160 10-90 40-150 90-180-30 80-20 150-30 250z" fill="#4f7a45"/>
+    <path d="M118 230c40-50 110-60 150-40-60 10-100 30-150 60z" fill="#3f6638"/>
+  </g>
+  <g transform="translate(1180 620)"><rect width="300" height="20" fill="#1d1a14"/><rect x="20" y="-90" width="60" height="90" fill="#c9a46b"/><rect x="100" y="-120" width="40" height="120" fill="#6b8f8a"/><circle cx="210" cy="-40" r="40" fill="#d8cdb5"/></g>
+</svg>

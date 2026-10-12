@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#352a5a"/><stop offset="1" stop-color="#1e1838"/></linearGradient>
+    <pattern id="tags" width="240" height="240" patternUnits="userSpaceOnUse">
+      <g opacity=".09" transform="translate(70 70) scale(2)"><path d="M20 6h18a4 4 0 0 1 4 4v18a4 4 0 0 1-1.2 2.8L26.8 44.8a4 4 0 0 1-5.6 0L3.2 26.8a4 4 0 0 1 0-5.6L17.2 7.2A4 4 0 0 1 20 6z" fill="#f4f1ea"/></g>
+    </pattern>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall)"/>
+  <rect width="1920" height="1080" fill="url(#tags)"/>
+  <rect y="0" width="1920" height="22" fill="#ff5a36"/>
+  <path d="M0 1080L560 520l90 90-470 470z" fill="#ff5a36" opacity=".18"/>
+  <path d="M1920 0L1400 520l-90-90L1760 0z" fill="#f5c542" opacity=".14"/>
+  <rect y="930" width="1920" height="150" fill="#140f26"/>
+</svg>

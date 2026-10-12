@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <radialGradient id="soft" cx=".5" cy=".38" r=".75"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e2dccf"/></radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#soft)"/>
+  <path d="M0 860c480 40 1440 40 1920 0v220H0z" fill="#d9d2c4"/>
+  <path d="M0 860c480 40 1440 40 1920 0" stroke="#cfc6b6" stroke-width="4" fill="none"/>
+</svg>

@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f4262"/><stop offset="1" stop-color="#1e2a40"/></linearGradient>
+    <radialGradient id="spot" cx=".5" cy="0" r=".8"><stop offset="0" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#wall)"/>
+  <rect width="1920" height="1080" fill="url(#spot)"/>
+  <path d="M0 160h1920" stroke="#fff" stroke-opacity=".06" stroke-width="4"/>
+  <g stroke="#c9b48a" stroke-width="10" fill="none" stroke-linecap="round"><path d="M80 300h740M80 300v560M820 300v560"/><path d="M1100 300h740M1100 300v560M1840 300v560"/></g>
+  <g>
+    <g transform="translate(140 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v300H0z" fill="#ff8a6b"/></g>
+    <g transform="translate(270 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v360H0z" fill="#f4f1ea"/></g>
+    <g transform="translate(400 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v280H0z" fill="#f5c542"/></g>
+    <g transform="translate(530 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v400H0z" fill="#8ab4ff"/></g>
+    <g transform="translate(660 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v320H0z" fill="#c6f36b"/></g>
+    <g transform="translate(1160 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v340H0z" fill="#f2a3b8"/></g>
+    <g transform="translate(1290 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v300H0z" fill="#0d0c10"/></g>
+    <g transform="translate(1420 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v380H0z" fill="#ff5a36"/></g>
+    <g transform="translate(1550 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v290H0z" fill="#b9a3ff"/></g>
+    <g transform="translate(1680 300)"><path d="M30 0c0-14 14-18 20-10" stroke="#ddd" stroke-width="4" fill="none"/><path d="M0 30l50-22 50 22v350H0z" fill="#e9e4da"/></g>
+  </g>
+  <g fill="#c9b48a"><rect x="860" y="120" width="200" height="12" rx="6"/><circle cx="960" cy="80" r="40" fill="#ffe6a8" opacity=".5"/></g>
+  <rect y="900" width="1920" height="180" fill="#16202f"/>
+  <path d="M0 900h1920" stroke="#000" stroke-opacity=".35" stroke-width="6"/>
+</svg>

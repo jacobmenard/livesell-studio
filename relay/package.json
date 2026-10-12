@@ -1,0 +1,17 @@
+{
+  "name": "negosyowork-studio-relay",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Streams the NegosyoWork Studio clean screen to Facebook / YouTube over RTMP(S) with FFmpeg.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.9"
+  },
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "ws": "^8.20.0"
+  }
+}
