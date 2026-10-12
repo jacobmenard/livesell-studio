@@ -33,10 +33,24 @@ function cardPosition({ rect, vw, vh }: Layout): CSSProperties {
  * A step-by-step walkthrough: dims the page, highlights one element at a time and explains
  * it in a card. The page can't be clicked meanwhile (so nothing changes under the tour).
  * Esc skips; the arrow keys move between steps.
+ *
+ * With `offerDontShowAgain`, the card has a "Don't show this again" box (ticked by default);
+ * closing the tour in any way reports whether it was ticked.
  */
-export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: () => void }) {
+export function Walkthrough({
+  steps,
+  offerDontShowAgain = false,
+  onClose: close,
+}: {
+  steps: TourStep[]
+  offerDontShowAgain?: boolean
+  onClose: (dontShowAgain: boolean) => void
+}) {
   const [index, setIndex] = useState(0)
   const [layout, setLayout] = useState<Layout | null>(null)
+  const [dontShowAgain, setDontShowAgain] = useState(true)
+  const onClose = useCallback(() => close(offerDontShowAgain && dontShowAgain), [close, offerDontShowAgain, dontShowAgain])
+  const checkboxId = useId()
   const primary = useRef<HTMLButtonElement>(null)
   const card = useRef<HTMLDivElement>(null)
   const titleId = useId()
@@ -45,11 +59,16 @@ export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: ()
   const target = step.target
   const last = index === steps.length - 1
 
+  // Moving keeps focus on the main button (Back disappears on the first step).
   const next = useCallback(() => {
-    if (last) onClose()
-    else setIndex((i) => i + 1)
+    if (last) return onClose()
+    setIndex((i) => i + 1)
+    primary.current?.focus({ preventScroll: true })
   }, [last, onClose])
-  const back = useCallback(() => setIndex((i) => Math.max(0, i - 1)), [])
+  const back = useCallback(() => {
+    setIndex((i) => Math.max(0, i - 1))
+    primary.current?.focus({ preventScroll: true })
+  }, [])
 
   // Bring the step's element into view and follow it while the page scrolls or resizes.
   useEffect(() => {
@@ -71,11 +90,11 @@ export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: ()
     }
   }, [target])
 
-  // Focus the main button once the card shows and on every step; give focus back on close.
-  const shown = layout !== null
-  useEffect(() => {
-    primary.current?.focus({ preventScroll: true })
-  }, [index, shown])
+  // Focus the main button when the card first shows; give focus back on close.
+  const focusPrimary = useCallback((el: HTMLButtonElement | null) => {
+    primary.current = el
+    el?.focus({ preventScroll: true })
+  }, [])
   useEffect(() => {
     const before = document.activeElement as HTMLElement | null
     return () => before?.focus({ preventScroll: true })
@@ -84,10 +103,10 @@ export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: ()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Tab') {
-        // Keep keyboard focus on the card's buttons while it's open.
-        const buttons = Array.from(card.current?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? [])
+        // Keep keyboard focus on the card's controls while it's open.
+        const buttons = Array.from(card.current?.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled)') ?? [])
         if (buttons.length === 0) return
-        const at = buttons.indexOf(document.activeElement as HTMLButtonElement)
+        const at = buttons.indexOf(document.activeElement as HTMLElement)
         const to = e.shiftKey ? (at <= 0 ? buttons.length - 1 : at - 1) : at === buttons.length - 1 ? 0 : at + 1
         buttons[to].focus()
       } else if (e.key === 'Escape') onClose()
@@ -143,6 +162,20 @@ export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: ()
         <p id={bodyId} className="m-0 text-sm text-text-2">
           {step.body}
         </p>
+        {offerDontShowAgain && (
+          <div className="flex items-center gap-2.5">
+            <input
+              id={checkboxId}
+              type="checkbox"
+              checked={dontShowAgain}
+              onChange={(e) => setDontShowAgain(e.target.checked)}
+              className="h-5 w-5 shrink-0 cursor-pointer rounded accent-primary"
+            />
+            <label htmlFor={checkboxId} className="cursor-pointer text-[13px] text-text-2">
+              Don’t show this again
+            </label>
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2 pt-1">
           {!last && (
             <Button size="sm" variant="ghost" onClick={onClose}>
@@ -155,7 +188,7 @@ export function Walkthrough({ steps, onClose }: { steps: TourStep[]; onClose: ()
               Back
             </Button>
           )}
-          <Button ref={primary} size="sm" variant="primary" onClick={next}>
+          <Button ref={focusPrimary} size="sm" variant="primary" onClick={next}>
             {last ? 'Got it' : index === 0 ? 'Show me' : 'Next'}
           </Button>
         </div>

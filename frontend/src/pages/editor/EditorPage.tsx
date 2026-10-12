@@ -596,7 +596,7 @@ function Editor({ initial }: { initial: SetupFull }) {
         </aside>
       </div>
 
-      {tour.open && <Walkthrough steps={EDITOR_TOUR} onClose={tour.close} />}
+      {tour.open && <Walkthrough steps={EDITOR_TOUR} offerDontShowAgain={tour.offerDontShowAgain} onClose={tour.close} />}
 
       {blocker.state === 'blocked' && (
         <div role="dialog" aria-modal="true" aria-labelledby="leave-h" className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4">

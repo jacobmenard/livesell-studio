@@ -266,7 +266,7 @@ export function DashboardPage() {
           </ul>
         )}
       </main>
-      {tour.open && tourSteps.length > 0 && <Walkthrough steps={tourSteps} onClose={tour.close} />}
+      {tour.open && tourSteps.length > 0 && <Walkthrough steps={tourSteps} offerDontShowAgain={tour.offerDontShowAgain} onClose={tour.close} />}
     </div>
   )
 }
