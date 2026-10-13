@@ -130,8 +130,10 @@ export function CleanScreen({ source, broadcast }: { source: FeedSource; broadca
     autoStart: scene !== null && !seeThrough && !blocked,
     audio: scene?.camera.audio ?? false,
   })
-  // The camera is off in see-through mode, so this only plays when the picture is shown.
-  useStreamAudio(camera.stream)
+  // For OBS / TikTok LIVE Studio the window plays the camera's sound so they capture it (the
+  // camera is off in see-through mode). Streaming straight mixes it into the live instead:
+  // playing it out loud too is what made the mic hear itself (an echo).
+  useStreamAudio(broadcast ? null : camera.stream)
 
   // Turned-off link or deleted setup, or the plan's live limit is reached (this screen comes
   // on by itself once another live ends): tell whoever set it up.
@@ -148,7 +150,7 @@ export function CleanScreen({ source, broadcast }: { source: FeedSource; broadca
   return (
     <main aria-label="Live output" className="flex h-screen w-screen items-center justify-center overflow-hidden">
       {broadcast && !preview && !isBroadcasting(live.status.state) && (
-        <BroadcastStart platform={platformLabel(broadcast.platform)} status={live.status} onStart={live.start} />
+        <BroadcastStart platform={platformLabel(broadcast.platform)} status={live.status} onStart={() => live.start(camera.stream)} />
       )}
       <StageFrame orientation={scene.orientation} fill frameRef={stageRef}>
         {!seeThrough && (
@@ -198,8 +200,8 @@ function BroadcastStart({ platform, status, onStart }: { platform: string; statu
         </h1>
         {status.state === 'error' && <Alert>{status.message}</Alert>}
         <p className="m-0 text-sm text-text-2">
-          Chrome will ask to share this tab: keep <strong>Also share tab audio</strong> on, then choose <strong>Share</strong>. This card disappears before anything goes
-          live. Keep this window open while you’re live.
+          Chrome will ask to share this tab: keep <strong>Also share tab audio</strong> on (that carries your sound effects; your camera’s sound is added
+          separately), then choose <strong>Share</strong>. This card disappears before anything goes live. Keep this window open while you’re live.
         </p>
         <Button variant="primary" size="lg" onClick={onStart}>
           {status.state === 'idle' ? 'Start streaming' : 'Start streaming again'}

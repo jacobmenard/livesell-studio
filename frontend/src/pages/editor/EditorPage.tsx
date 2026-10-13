@@ -308,6 +308,19 @@ function Editor({ initial }: { initial: SetupFull }) {
     }
   }
 
+  const removeBackground = async (mediaId: number) => {
+    setErrors((e) => ({ ...e, background: '' }))
+    try {
+      await media.remove(mediaId)
+      // A setup using it goes back to its built-in background (the server did the same for saved setups).
+      const detach = (d: SetupDocument) => (d.background.media_id === mediaId ? { ...d, background: { ...d.background, media_id: null } } : d)
+      setDoc(detach)
+      setSaved(detach)
+    } catch (e) {
+      setErrors((x) => ({ ...x, background: errorMessage(e, "That photo couldn't be removed.") }))
+    }
+  }
+
   // Foreground images have their own library, apart from popup images; a new one shows straight away.
   const uploadForeground = async (file: File) => {
     setErrors((e) => ({ ...e, foreground: '' }))
@@ -560,6 +573,7 @@ function Editor({ initial }: { initial: SetupFull }) {
               onChange={patchBackground}
               media={media.items}
               onUpload={uploadBackground}
+              onRemove={removeBackground}
               uploading={media.uploading === 'background'}
               error={errors.background}
             />

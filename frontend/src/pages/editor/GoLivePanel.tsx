@@ -447,7 +447,8 @@ function BroadcastControls({
   const state = live?.status.state ?? 'idle'
   const liveLabel = live ? platformLabel(live.platform) : label
   const text = state === 'error' ? (live?.status.message ?? '') : BROADCAST_TEXT[state](liveLabel)
-  const note = state === 'live' ? live?.status.message : ''
+  // Live without sound, or the platform asked to wait and the relay is trying again.
+  const note = state === 'live' || state === 'connecting' ? live?.status.message : ''
 
   return (
     <div className="flex flex-col gap-2 border-t border-line pt-3.5">

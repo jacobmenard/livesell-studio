@@ -1,16 +1,20 @@
 import type { ImageSegmenter } from '@mediapipe/tasks-vision'
 import type { BackgroundMode } from '../lib/types'
 import { ChromaKeyer } from './chroma'
+import { Enhancer, isNeutralLook, lookAsCssFilter, sameLook, type CameraLook } from './enhance'
 import { coverCrop, maskAlpha, placeCamera, type CameraPlacement } from './geometry'
 import { loadSegmenter } from './segmenter'
+
+/** A camera frame ready to draw: the video itself, the green-screen key, or the enhanced frame. */
+type Frame = HTMLVideoElement | HTMLCanvasElement
 
 export interface CompositorSettings {
   width: number
   height: number
   mode: BackgroundMode
   mirror: boolean
-  /** 0–100, 50 = unchanged. */
-  brightness: number
+  /** Brightness, contrast, saturation, warmth and face smoothing (see enhance.ts). */
+  look: CameraLook
   /** −100–100: 0 fills the stage, above zooms in, below zooms out (see placeCamera). */
   zoom: number
   keyColor: [number, number, number]
@@ -44,6 +48,10 @@ export class Compositor {
   private segmenterState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle'
   private chroma: ChromaKeyer | null = null
   private chromaFailed = false
+  private enhancer: Enhancer | null = null
+  private enhancerFailed = false
+  private enhancedTime = -1
+  private enhancedLook: CameraLook | null = null
   private lastVideoTime = -1
   private lastTimestamp = 0
   private frame = 0
@@ -115,6 +123,7 @@ export class Compositor {
     this.disposed = true
     cancelAnimationFrame(this.frame)
     this.chroma?.dispose()
+    this.enhancer?.dispose()
   }
 
   private loadSegmentation(): void {
@@ -173,7 +182,10 @@ export class Compositor {
     if (!live || !video) return
 
     const place = placeCamera(video.videoWidth, video.videoHeight, W, H, s.zoom)
-    const brightness = `brightness(${(0.5 + s.brightness / 100).toFixed(2)})`
+    // Green screen keys first (so the look can't shift the key colour), then the look is
+    // applied once; everything below draws that frame. Segmentation still reads the video.
+    const keyed = s.mode === 'green' ? (this.chroma?.render(video, s.keyColor, s.similarity, s.smoothness) ?? null) : null
+    const { frame, filter } = this.withLook(keyed ?? video, video, s.look)
 
     ctx.save()
     if (s.mirror) {
@@ -184,40 +196,64 @@ export class Compositor {
     switch (s.mode) {
       case 'none':
         // Zoomed out past the stage edges: fill around the camera with a soft copy of it.
-        if (place.dst[2] < W || place.dst[3] < H) this.drawBlurredRoom(video, W, H, brightness, 0)
-        ctx.filter = brightness
-        ctx.drawImage(video, ...place.src, ...place.dst)
+        if (place.dst[2] < W || place.dst[3] < H) this.drawBlurredRoom(frame, video, W, H, filter, 0)
+        ctx.filter = filter
+        ctx.drawImage(frame, ...place.src, ...place.dst)
         break
       case 'blur':
-        this.drawBlurredRoom(video, W, H, brightness, s.zoom)
-        if (this.updateMask(video)) this.drawPerson(video, place, W, H, brightness)
+        this.drawBlurredRoom(frame, video, W, H, filter, s.zoom)
+        if (this.updateMask(video)) this.drawPerson(frame, video, place, W, H, filter)
         break
       case 'image':
         if (this.updateMask(video)) {
-          this.drawPerson(video, place, W, H, brightness)
+          this.drawPerson(frame, video, place, W, H, filter)
         } else {
           // Removal still loading or unavailable: never hide the seller.
-          ctx.filter = brightness
-          ctx.drawImage(video, ...place.src, ...place.dst)
+          ctx.filter = filter
+          ctx.drawImage(frame, ...place.src, ...place.dst)
         }
         break
-      case 'green': {
-        const keyed = this.chroma?.render(video, s.keyColor, s.similarity, s.smoothness)
-        ctx.filter = brightness
-        ctx.drawImage(keyed ?? video, ...place.src, ...place.dst)
+      case 'green':
+        ctx.filter = filter
+        ctx.drawImage(frame, ...place.src, ...place.dst)
         break
-      }
     }
     ctx.restore()
   }
 
+  /**
+   * The frame with the seller's look applied on the GPU, re-rendered only for a new camera
+   * frame or new settings (the stage redraws at 60 fps, cameras send 30). Without WebGL the
+   * basic adjustments come back as a canvas filter instead.
+   */
+  private withLook(source: Frame, video: HTMLVideoElement, look: CameraLook): { frame: Frame; filter: string } {
+    if (isNeutralLook(look)) return { frame: source, filter: 'none' }
+    if (!this.enhancer && !this.enhancerFailed) {
+      try {
+        this.enhancer = new Enhancer()
+      } catch (error) {
+        console.warn('[stage] camera look falls back to basic filters', error)
+        this.enhancerFailed = true
+      }
+    }
+    if (!this.enhancer) return { frame: source, filter: lookAsCssFilter(look) }
+
+    const fresh = source === video && video.currentTime === this.enhancedTime && this.enhancedLook !== null && sameLook(look, this.enhancedLook)
+    if (!fresh) {
+      this.enhancer.render(source, video.videoWidth, video.videoHeight, look)
+      this.enhancedTime = video.currentTime
+      this.enhancedLook = look
+    }
+    return { frame: this.enhancer.canvas, filter: 'none' }
+  }
+
   /** The camera softly blurred across the whole stage (Blur mode, and the fill around a zoomed-out camera). */
-  private drawBlurredRoom(video: HTMLVideoElement, W: number, H: number, brightness: string, zoom: number): void {
+  private drawBlurredRoom(frame: Frame, video: HTMLVideoElement, W: number, H: number, filter: string, zoom: number): void {
     const { ctx } = this
-    ctx.filter = `blur(${Math.max(4, Math.round(W / 90))}px) ${brightness}`
+    ctx.filter = `blur(${Math.max(4, Math.round(W / 90))}px)${filter === 'none' ? '' : ` ${filter}`}`
     // Overscan slightly so the blur doesn't show soft dark edges.
     const pad = W * 0.04
-    ctx.drawImage(video, ...coverCrop(video.videoWidth, video.videoHeight, W, H, zoom), -pad, -pad, W + pad * 2, H + pad * 2)
+    ctx.drawImage(frame, ...coverCrop(video.videoWidth, video.videoHeight, W, H, zoom), -pad, -pad, W + pad * 2, H + pad * 2)
     ctx.filter = 'none'
   }
 
@@ -260,12 +296,12 @@ export class Compositor {
   }
 
   /** The seller cut out with the latest mask, drawn onto the main canvas. */
-  private drawPerson(video: HTMLVideoElement, { src, dst }: CameraPlacement, W: number, H: number, brightness: string): void {
+  private drawPerson(frame: Frame, video: HTMLVideoElement, { src, dst }: CameraPlacement, W: number, H: number, filter: string): void {
     const p = this.personCtx
     p.globalCompositeOperation = 'source-over'
     p.clearRect(0, 0, W, H)
-    p.filter = brightness
-    p.drawImage(video, ...src, ...dst)
+    p.filter = filter
+    p.drawImage(frame, ...src, ...dst)
     p.filter = 'none'
     p.globalCompositeOperation = 'destination-in'
     const sx = this.mask.width / video.videoWidth

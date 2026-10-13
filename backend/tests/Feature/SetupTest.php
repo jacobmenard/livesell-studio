@@ -214,6 +214,30 @@ class SetupTest extends TestCase
         $this->putJson("/api/setups/{$setup->id}", $doc)->assertUnprocessable()->assertJsonValidationErrors('camera.zoom');
     }
 
+    public function test_the_camera_look_is_saved_and_older_setups_show_unchanged(): void
+    {
+        $me = User::factory()->create();
+        $setup = $this->blank($me);
+        $this->actingAs($me);
+
+        // A setup saved before the look existed reads back neutral.
+        $setup->forceFill(['camera' => ['source' => 'camera', 'device_label' => null, 'mirror' => false, 'brightness' => 50, 'zoom' => 0, 'audio' => true]])->save();
+        $doc = $this->document($setup);
+        $this->assertSame([50, 50, 50, 0], [$doc['camera']['contrast'], $doc['camera']['saturation'], $doc['camera']['warmth'], $doc['camera']['smoothing']]);
+
+        $doc['camera'] = array_merge($doc['camera'], ['brightness' => 56, 'contrast' => 47, 'saturation' => 52, 'warmth' => 66, 'smoothing' => 65]);
+        $this->putJson("/api/setups/{$setup->id}", $doc)
+            ->assertOk()
+            ->assertJsonPath('data.camera.warmth', 66)
+            ->assertJsonPath('data.camera.smoothing', 65);
+
+        foreach (['contrast', 'saturation', 'warmth', 'smoothing'] as $key) {
+            $bad = $doc;
+            $bad['camera'][$key] = 101;
+            $this->putJson("/api/setups/{$setup->id}", $bad)->assertUnprocessable()->assertJsonValidationErrors("camera.{$key}");
+        }
+    }
+
     public function test_popups_can_be_any_size_within_the_limits(): void
     {
         $me = User::factory()->create();

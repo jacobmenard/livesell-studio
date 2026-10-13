@@ -79,6 +79,38 @@ class MediaAndDestinationTest extends TestCase
         $this->assertDatabaseMissing('setup_popups', ['key' => 'img-1']);
     }
 
+    public function test_deleting_a_background_photo_puts_setups_back_on_their_built_in_background(): void
+    {
+        $me = User::factory()->create();
+        $this->actingAs($me);
+        $photo = $this->post('/api/media', ['kind' => 'background', 'file' => UploadedFile::fake()->image('shop.jpg', 640, 360)])->assertCreated()->json('data.id');
+        $keep = $this->post('/api/media', ['kind' => 'background', 'file' => UploadedFile::fake()->image('other.jpg', 640, 360)])->json('data.id');
+
+        $writer = app(SetupWriter::class);
+        $using = $writer->createBlank($me);
+        $usingBg = array_merge($using->background, ['mode' => 'image', 'preset' => 'kitchen', 'media_id' => $photo]);
+        $using->forceFill(['background' => $usingBg, 'scene' => array_merge($using->scene, ['background' => $usingBg])])->save();
+        $other = $writer->createBlank($me);
+        $other->forceFill(['background' => array_merge($other->background, ['media_id' => $keep])])->save();
+        $editedAt = $using->fresh()->updated_at;
+
+        $this->travel(5)->minutes();
+        $this->deleteJson("/api/media/{$photo}")->assertNoContent();
+
+        $using = $using->fresh();
+        $this->assertNull($using->background['media_id']);
+        $this->assertSame('kitchen', $using->background['preset'], 'it keeps its built-in background');
+        $this->assertNull($using->scene['background']['media_id']);
+        $this->assertTrue($using->updated_at->equalTo($editedAt), 'not counted as an edit');
+        $this->assertSame($keep, $other->fresh()->background['media_id'], 'setups using another photo are untouched');
+
+        // The setup still saves (it no longer points at a missing photo).
+        $data = $this->getJson("/api/setups/{$using->id}")->assertOk()->json('data');
+        $doc = collect($data)->only(['name', 'orientation', 'resolution', 'camera', 'background', 'sound_settings', 'output_settings'])->all();
+        $doc['popups'] = array_map(fn ($p) => array_diff_key($p, ['media_url' => true]), $data['popups']);
+        $this->putJson("/api/setups/{$using->id}", $doc)->assertOk()->assertJsonPath('data.background.media_id', null);
+    }
+
     public function test_a_setup_cannot_point_at_someone_elses_upload(): void
     {
         $other = User::factory()->create();

@@ -15,7 +15,12 @@ final class SetupDefaults
             'source' => 'camera',
             'device_label' => null,
             'mirror' => false,
+            // The camera's look, 0–100: 50 leaves the picture unchanged, smoothing 0 is off.
             'brightness' => 50,
+            'contrast' => 50,
+            'saturation' => 50,
+            'warmth' => 50,
+            'smoothing' => 0,
             'zoom' => 0,
             // Send the camera's own sound (or the default microphone) with the clean screen.
             'audio' => true,
@@ -75,19 +80,13 @@ final class SetupDefaults
         array $popups = [],
         ?array $foreground = null,
     ): array {
-        $camera ??= self::camera();
+        // Settings added later fall back to their defaults for setups saved before them.
+        $camera = SetupWriter::onlyKeys($camera ?? [], self::camera());
 
         return [
             'orientation' => $orientation,
             'see_through' => $seeThrough,
-            'camera' => [
-                'source' => $camera['source'],
-                'device_label' => $camera['device_label'],
-                'mirror' => $camera['mirror'],
-                'brightness' => $camera['brightness'],
-                'zoom' => $camera['zoom'],
-                'audio' => $camera['audio'] ?? true,
-            ],
+            'camera' => $camera,
             'background' => $background ?? self::background(),
             'foreground' => $foreground ?? self::foreground(),
             'popups' => $popups,

@@ -31,7 +31,7 @@ const doc = (popups: PopupConfig[]): SetupDocument => ({
   name: 'Saturday sale',
   orientation: 'portrait',
   resolution: '1080p',
-  camera: { source: 'camera', device_label: null, mirror: false, brightness: 50, zoom: 0, audio: true },
+  camera: { source: 'camera', device_label: null, mirror: false, brightness: 50, contrast: 50, saturation: 50, warmth: 50, smoothing: 0, zoom: 0, audio: true },
   background: { mode: 'image', preset: 'rack', media_id: 7, key_color: 'green', similarity: 42, smoothness: 18 },
   foreground: { enabled: true, media_id: 9, dock: 'top' },
   sound_settings: { volume: 70, to_stream: true, monitor: true },

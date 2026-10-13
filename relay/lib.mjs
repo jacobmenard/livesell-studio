@@ -72,6 +72,25 @@ export function redact(text, secrets) {
   return secrets.filter((s) => typeof s === 'string' && s.length > 0).reduce((out, s) => out.split(s).join('••••'), String(text))
 }
 
+// The platform refused or dropped the connection (wording differs between FFmpeg builds:
+// "Input/output error" or "I/O error", and a TLS alert when an rtmps server hangs up).
+const CONNECTION_ERROR = /Input\/output error|I\/O error|TLS fatal alert|Error opening output|Connection refused|Connection reset|Connection timed out|Broken pipe|End of file|Server returned|Failed to update header|Cannot open connection/i
+
+/**
+ * Whether FFmpeg stopped because the platform wouldn't open the stream (worth a retry
+ * before going live), rather than a problem on this computer.
+ */
+export function isConnectionRefusal(lines) {
+  const text = lines.join('\n')
+  return CONNECTION_ERROR.test(text) && !/Protocol not found|Unknown protocol/i.test(text)
+}
+
+/** Shown while the relay waits to try the platform again. */
+export function retryMessage(platform) {
+  const name = PLATFORM_NAMES[platform] ?? 'The streaming server'
+  return `${name} didn’t accept the stream yet (it can take a few seconds after a live ends). Trying again…`
+}
+
 /** FFmpeg's last error lines (already redacted) turned into something a seller can act on. */
 export function explainFfmpegError(lines, platform) {
   const text = lines.join('\n')
@@ -82,8 +101,9 @@ export function explainFfmpegError(lines, platform) {
   if (/Invalid data found when processing input|EBML header parsing failed/i.test(text)) {
     return 'FFmpeg couldn’t read the video from the browser. Start streaming again.'
   }
-  if (/Input\/output error|Connection refused|Connection reset|Broken pipe|End of file|Server returned|Failed to update header|Cannot open connection/i.test(text)) {
-    return `${name} closed the connection. Check the server URL and that the stream key is current (some keys only work for one live).`
+  if (CONNECTION_ERROR.test(text)) {
+    const where = platform === 'facebook' ? ' (in Live Producer, turn on “Use a persistent stream key” so it stops changing)' : ''
+    return `${name} didn’t accept the stream. If you just ended a live, wait about 30 seconds and start again. If it keeps happening, copy the current stream key from ${name}${where}, save it in Go live and try again.`
   }
   return lines.at(-1) ? `FFmpeg stopped: ${lines.at(-1)}` : 'FFmpeg stopped unexpectedly. Start streaming again.'
 }

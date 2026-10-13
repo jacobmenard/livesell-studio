@@ -1,6 +1,7 @@
 import { Icon } from '../../components/Icon'
 import { Button, Panel, Segmented, Switch, cx } from '../../components/ui'
 import type { CameraSettings, Orientation, Resolution } from '../../lib/types'
+import { LOOK_PRESETS, sameLook, type CameraLook } from '../../stage/enhance'
 import { MIN_ZOOM } from '../../stage/geometry'
 import { AUDIO_MESSAGES, CAMERA_MESSAGES, type AudioStatus, type CameraDevice, type CameraStatus } from '../../stage/useCamera'
 
@@ -133,10 +134,7 @@ export function CameraPanel({
           ]}
         />
       </div>
-      <label className="flex flex-col gap-1 text-[13px] text-muted">
-        Brightness
-        <input type="range" min={0} max={100} value={camera.brightness} onChange={(e) => onCamera({ brightness: Number(e.target.value) })} />
-      </label>
+      <CameraLookControls camera={camera} onCamera={onCamera} />
       <label className="flex flex-col gap-1 text-[13px] text-muted">
         Zoom
         <input
@@ -164,5 +162,68 @@ export function CameraPanel({
         )}
       </div>
     </Panel>
+  )
+}
+
+const LOOK_SLIDERS: { key: keyof CameraLook; label: string; low: string; high: string; hint?: string }[] = [
+  { key: 'brightness', label: 'Brightness', low: 'Darker', high: 'Brighter' },
+  { key: 'contrast', label: 'Contrast', low: 'Softer', high: 'Punchier' },
+  { key: 'saturation', label: 'Color', low: 'Muted', high: 'Vivid' },
+  { key: 'warmth', label: 'Warmth', low: 'Cooler', high: 'Warmer' },
+  { key: 'smoothing', label: 'Face enhance', low: 'Off', high: 'Strong', hint: 'Evens out skin and adds a soft glow. Eyes, hair and your products stay sharp.' },
+]
+
+/** A 0–100 slider shown around its neutral middle: 50 → "0", 62 → "+12", 40 → "-10". */
+const signedFromMiddle = (value: number) => (value > 50 ? `+${value - 50}` : String(value - 50))
+
+/** Quick looks and fine-tuning sliders for the camera picture (what viewers see). */
+function CameraLookControls({ camera, onCamera }: { camera: CameraSettings; onCamera: (patch: Partial<CameraSettings>) => void }) {
+  const look: CameraLook = { brightness: camera.brightness, contrast: camera.contrast, saturation: camera.saturation, warmth: camera.warmth, smoothing: camera.smoothing }
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] text-muted">Camera look</span>
+        <div role="group" aria-label="Quick looks" className="flex flex-wrap gap-1.5">
+          {LOOK_PRESETS.map((p) => {
+            const on = sameLook(look, p.look)
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={on}
+                onClick={() => onCamera(p.look)}
+                className={cx(
+                  'min-h-9 rounded-full border-0 px-3.5 text-[13px] font-semibold transition-colors duration-150 motion-reduce:transition-none',
+                  on ? 'bg-primary text-white' : 'bg-tint text-link hover:bg-tint-hover',
+                )}
+              >
+                {p.label}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+      {LOOK_SLIDERS.map((s) => (
+        <label key={s.key} className="flex flex-col gap-1 text-[13px] text-muted">
+          <span className="flex items-baseline justify-between gap-2">
+            <span>{s.label}</span>
+            <span className="text-xs tabular-nums">{s.key === 'smoothing' ? look.smoothing : signedFromMiddle(look[s.key])}</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={look[s.key]}
+            aria-valuetext={`${s.label} ${look[s.key]} of 100`}
+            onChange={(e) => onCamera({ [s.key]: Number(e.target.value) })}
+          />
+          <span className="flex justify-between text-[11px]" aria-hidden="true">
+            <span>{s.low}</span>
+            <span>{s.high}</span>
+          </span>
+          {s.hint && <span className="text-xs">{s.hint}</span>}
+        </label>
+      ))}
+    </div>
   )
 }

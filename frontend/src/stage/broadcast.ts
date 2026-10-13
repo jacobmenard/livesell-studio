@@ -55,6 +55,11 @@ export interface BroadcastOptions extends BroadcastTarget {
   orientation: Orientation
   /** The stage element: the shared tab is cropped to it, so nothing else on the page goes live. */
   stage: HTMLElement
+  /**
+   * The camera's sound. It's mixed straight into the live, never played out loud: a mic
+   * that hears its own playback is what makes an echo.
+   */
+  mic: MediaStream | null
   onStatus: (status: BroadcastStatus) => void
 }
 
@@ -67,7 +72,7 @@ export function startBroadcast(options: BroadcastOptions): () => void {
   let capture: MediaStream | null = null
   let socket: WebSocket | null = null
   let recorder: MediaRecorder | null = null
-  let silence: AudioContext | null = null
+  let mixer: AudioContext | null = null
 
   const report = (state: BroadcastState, message = '') => {
     if (finished) return
@@ -78,7 +83,7 @@ export function startBroadcast(options: BroadcastOptions): () => void {
   const release = () => {
     if (recorder && recorder.state !== 'inactive') recorder.stop()
     capture?.getTracks().forEach((t) => t.stop())
-    void silence?.close()
+    void mixer?.close()
     if (socket && socket.readyState <= WebSocket.OPEN) socket.close(1000)
   }
 
@@ -109,7 +114,9 @@ export function startBroadcast(options: BroadcastOptions): () => void {
     try {
       capture = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 30, max: 30 } },
-        audio: { suppressLocalAudioPlayback: false } as MediaTrackConstraints,
+        // The tab carries only the sound effects, and they don't also play out loud here
+        // (the seller hears them from the editor's "Hear it myself"), so the mic can't pick them up again.
+        audio: { suppressLocalAudioPlayback: true } as MediaTrackConstraints,
         preferCurrentTab: true,
         selfBrowserSurface: 'include',
         surfaceSwitching: 'exclude',
@@ -138,14 +145,21 @@ export function startBroadcast(options: BroadcastOptions): () => void {
       }
     }
 
-    const tracks: MediaStreamTrack[] = [video, ...capture.getAudioTracks()]
-    const withSound = tracks.length > 1
-    if (!withSound) {
-      // Tab audio wasn't shared: send silence, since platforms expect a sound track.
-      silence = new AudioContext()
-      tracks.push(silence.createMediaStreamDestination().stream.getAudioTracks()[0])
+    // One sound track for the live: the camera's sound plus the tab's sound effects, mixed here.
+    // With neither it's silence, since platforms expect a sound track.
+    const effects = capture.getAudioTracks()
+    const voice = options.mic?.getAudioTracks().filter((t) => t.readyState === 'live') ?? []
+    mixer = new AudioContext()
+    void mixer.resume()
+    const bus = mixer.createMediaStreamDestination()
+    for (const sound of [effects, voice]) {
+      if (sound.length > 0) mixer.createMediaStreamSource(new MediaStream(sound)).connect(bus)
     }
-    const media = new MediaStream(tracks)
+    let soundNote = ''
+    if (effects.length === 0) {
+      soundNote = voice.length > 0 ? 'Your sound effects won’t be heard on the live: tab audio wasn’t shared.' : 'You’re live without sound: tab audio wasn’t shared.'
+    }
+    const media = new MediaStream([video, ...bus.stream.getAudioTracks()])
 
     let ticket: string
     try {
@@ -188,7 +202,9 @@ export function startBroadcast(options: BroadcastOptions): () => void {
       }
       if (message.type !== 'status') return
       if (message.state === 'ready' && !recorder && !finished) record()
-      else if (message.state === 'live') report('live', withSound ? '' : 'You’re live without sound: tab audio wasn’t shared.')
+      // The platform refused the stream for now; the relay keeps the recording and tries again.
+      else if (message.state === 'connecting' && !finished) report('connecting', message.message ?? '')
+      else if (message.state === 'live') report('live', soundNote)
       else if (message.state === 'error') fail(message.message || 'Streaming stopped.')
       else if (message.state === 'ended') stop()
     }

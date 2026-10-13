@@ -54,11 +54,15 @@ export function useBroadcast(target: BroadcastTarget | undefined, orientation: O
 
   useEffect(() => () => stopRef.current?.(), [])
 
-  const start = useCallback(() => {
-    const stage = stageRef.current
-    if (!target || !orientation || !stage || isBroadcasting(statusRef.current.state)) return
-    stopRef.current = startBroadcast({ ...target, orientation, stage, onStatus: setStatus })
-  }, [orientation, stageRef, target])
+  /** `mic` is the camera's sound, mixed straight into the live (see BroadcastOptions). */
+  const start = useCallback(
+    (mic: MediaStream | null) => {
+      const stage = stageRef.current
+      if (!target || !orientation || !stage || isBroadcasting(statusRef.current.state)) return
+      stopRef.current = startBroadcast({ ...target, orientation, stage, mic, onStatus: setStatus })
+    },
+    [orientation, stageRef, target],
+  )
 
   return { status, start }
 }

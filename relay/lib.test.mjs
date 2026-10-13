@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { explainFfmpegError, ffmpegArgs, outputFormat, redact, streamTarget } from './lib.mjs'
+import { explainFfmpegError, ffmpegArgs, isConnectionRefusal, outputFormat, redact, retryMessage, streamTarget } from './lib.mjs'
 
 describe('streamTarget', () => {
   it('appends the key to a server URL that ends with a slash (Facebook)', () => {
@@ -49,7 +49,21 @@ describe('redact', () => {
 
 describe('explainFfmpegError', () => {
   it('explains a refused connection in the platform’s name', () => {
-    assert.match(explainFfmpegError(['rtmps://x/rtmp/••••: Input/output error'], 'facebook'), /^Facebook closed the connection/)
+    assert.match(explainFfmpegError(['rtmps://x/rtmp/••••: Input/output error'], 'facebook'), /^Facebook didn’t accept the stream/)
+    assert.match(explainFfmpegError(['rtmps://x/rtmp/••••: Input/output error'], 'facebook'), /persistent stream key/)
+    assert.doesNotMatch(explainFfmpegError(['rtmp://x/live2/••••: Input/output error'], 'youtube'), /Live Producer/)
+  })
+
+  // Exactly what FFmpeg 7 printed when Facebook refused a reconnect right after a live.
+  const facebookRefusal = [
+    '[tls @ 000001dd241ace40] A TLS fatal alert has been received.',
+    '[out#0/flv @ 000001dd241b5040] Error opening output rtmps://live-api-s.facebook.com:443/rtmp/••••: I/O error',
+    'Error opening output file rtmps://live-api-s.facebook.com:443/rtmp/••••.',
+    'Error opening output files: I/O error',
+  ]
+
+  it('understands newer FFmpeg wording ("I/O error", TLS alert)', () => {
+    assert.match(explainFfmpegError(facebookRefusal, 'facebook'), /^Facebook didn’t accept the stream/)
   })
 
   it('points at a missing rtmps build', () => {
@@ -58,5 +72,17 @@ describe('explainFfmpegError', () => {
 
   it('falls back to the last line', () => {
     assert.equal(explainFfmpegError(['something odd'], 'custom'), 'FFmpeg stopped: something odd')
+  })
+
+  it('treats a refused connection as worth retrying, but not a broken FFmpeg or bad input', () => {
+    assert.equal(isConnectionRefusal(facebookRefusal), true)
+    assert.equal(isConnectionRefusal(['rtmp://x: Connection refused']), true)
+    assert.equal(isConnectionRefusal(['rtmps://x: Protocol not found']), false)
+    assert.equal(isConnectionRefusal(['pipe:0: Invalid data found when processing input']), false)
+    assert.equal(isConnectionRefusal([]), false)
+  })
+
+  it('says it is trying again in the platform’s name', () => {
+    assert.match(retryMessage('facebook'), /^Facebook didn’t accept the stream yet.*Trying again/)
   })
 })

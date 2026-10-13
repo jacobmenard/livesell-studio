@@ -154,7 +154,13 @@ export interface CameraSettings {
   source: 'camera' | 'phone'
   device_label: string | null
   mirror: boolean
+  /** The camera's look (0–100; 50 = unchanged, smoothing 0 = off). */
   brightness: number
+  contrast: number
+  saturation: number
+  warmth: number
+  /** Face enhance: evens out skin and adds a soft glow. */
+  smoothing: number
   zoom: number
   /** Send the camera's own sound (or the default microphone) with the clean screen. */
   audio: boolean

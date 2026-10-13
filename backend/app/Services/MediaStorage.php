@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Media;
+use App\Models\Setup;
 use App\Models\SetupPopup;
 use App\Models\User;
 use GdImage;
@@ -92,16 +93,53 @@ final class MediaStorage
         return $media;
     }
 
-    /** Removes the record (and popups showing it) first, then the file once that is committed. */
+    /**
+     * Removes the record first (and everything using it: popups showing it, setups with it as
+     * their background or foreground), then the file once that is committed.
+     */
     public function delete(Media $media): void
     {
         DB::transaction(function () use ($media): void {
             SetupPopup::query()->where('media_id', $media->id)->delete();
             SetupPopup::query()->where('sound', 'media:'.$media->id)->update(['sound' => null]);
+            if (in_array($media->kind, ['background', 'foreground'], true)) {
+                $this->detachFromSetups($media);
+            }
             $media->delete();
         });
 
         Storage::disk($media->disk)->delete($media->path);
+    }
+
+    /**
+     * Setups that used this photo go back to their built-in background (the preset they
+     * keep), or have their foreground turned off, in their settings and live picture alike.
+     * Otherwise they'd point at a missing photo and saving them would be refused.
+     */
+    private function detachFromSetups(Media $media): void
+    {
+        $part = $media->kind; // "background" or "foreground", the setup's column and scene key
+        $clear = fn (array $settings): array => $part === 'foreground'
+            ? array_merge($settings, ['media_id' => null, 'enabled' => false])
+            : array_merge($settings, ['media_id' => null]);
+        $uses = fn (?array $settings): bool => (int) ($settings['media_id'] ?? 0) === $media->id;
+
+        Setup::query()->where('user_id', $media->user_id)->get()->each(function (Setup $setup) use ($part, $clear, $uses): void {
+            $changes = [];
+            if ($uses($setup->{$part})) {
+                $changes[$part] = $clear($setup->{$part});
+            }
+            $scene = $setup->scene;
+            if (is_array($scene) && $uses($scene[$part] ?? null)) {
+                $scene[$part] = $clear($scene[$part]);
+                $changes['scene'] = $scene;
+            }
+            if ($changes !== []) {
+                // Not an edit by the seller, so "last edited" stays as it was.
+                $setup->timestamps = false;
+                $setup->forceFill($changes)->save();
+            }
+        });
     }
 
     /**

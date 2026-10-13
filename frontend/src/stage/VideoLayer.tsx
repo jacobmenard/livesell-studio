@@ -8,7 +8,7 @@ interface VideoLayerProps {
   stream: MediaStream | null
   orientation: Orientation
   resolution: Resolution
-  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'zoom'>
+  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing' | 'zoom'>
   background: BackgroundSettings
   /** URL of the seller's own background photo, when one is picked. */
   backgroundUrl: string | null
@@ -88,6 +88,8 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
   const key = (KEY_COLORS.find((k) => k.id === background.key_color) ?? KEY_COLORS[0]).rgb
   // A zoom-out saved in portrait doesn't apply after switching the setup to landscape.
   const zoom = Math.max(camera.zoom, MIN_ZOOM[orientation])
+  // A picture from before these settings existed shows unchanged.
+  const { brightness = 50, contrast = 50, saturation = 50, warmth = 50, smoothing = 0 } = camera
 
   useEffect(() => {
     compositorRef.current?.update({
@@ -95,14 +97,14 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
       height,
       mode: background.mode,
       mirror: camera.mirror,
-      brightness: camera.brightness,
+      look: { brightness, contrast, saturation, warmth, smoothing },
       zoom,
       keyColor: key,
       similarity: background.similarity,
       smoothness: background.smoothness,
       tone: backgroundUrl ? '#17151C' : preset.tone,
     })
-  }, [width, height, background.mode, camera.mirror, camera.brightness, zoom, key, background.similarity, background.smoothness, backgroundUrl, preset.tone])
+  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, zoom, key, background.similarity, background.smoothness, backgroundUrl, preset.tone])
 
   return <canvas ref={canvasRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
 }

@@ -94,6 +94,27 @@ class LiveTest extends TestCase
         Event::assertDispatched(SceneUpdated::class);
     }
 
+    public function test_the_clean_screen_gets_the_camera_look_and_older_pictures_show_unchanged(): void
+    {
+        Event::fake([SceneUpdated::class]);
+        $me = User::factory()->create();
+        $setup = $this->setupFor($me);
+        $this->actingAs($me);
+
+        // A picture sent by an editor from before the look existed.
+        $this->putJson("/api/setups/{$setup->id}/scene", $this->scene())->assertOk()
+            ->assertJsonPath('data.camera.contrast', 50)
+            ->assertJsonPath('data.camera.smoothing', 0);
+
+        $scene = $this->scene();
+        $scene['camera'] += ['contrast' => 47, 'saturation' => 52, 'warmth' => 66, 'smoothing' => 65];
+        $this->putJson("/api/setups/{$setup->id}/scene", $scene)->assertOk();
+
+        $this->getJson("/api/setups/{$setup->id}/scene")->assertOk()
+            ->assertJsonPath('data.camera.warmth', 66)
+            ->assertJsonPath('data.camera.smoothing', 65);
+    }
+
     public function test_scene_updates_also_reach_the_active_output_link(): void
     {
         Event::fake([SceneUpdated::class]);
