@@ -1,9 +1,14 @@
-import type { ImageSegmenter } from '@mediapipe/tasks-vision'
+import type { FaceLandmarker, ImageSegmenter, NormalizedLandmark } from '@mediapipe/tasks-vision'
 import type { BackgroundMode } from '../lib/types'
 import { ChromaKeyer } from './chroma'
 import { Enhancer, isNeutralLook, lookAsCssFilter, sameLook, type CameraLook } from './enhance'
+import { drawFaceEffect, poseFromPoints, smoothPose, type FaceEffectId, type FacePose } from './faceEffects'
+import { loadFaceTracker } from './faceTracker'
 import { coverCrop, maskAlpha, placeCamera, type CameraPlacement } from './geometry'
 import { loadSegmenter } from './segmenter'
+
+/** Camera frames without a face before an effect disappears (brief misses don't flicker it). */
+const FACE_GRACE_FRAMES = 6
 
 /** A camera frame ready to draw: the video itself, the green-screen key, or the enhanced frame. */
 type Frame = HTMLVideoElement | HTMLCanvasElement
@@ -15,6 +20,8 @@ export interface CompositorSettings {
   mirror: boolean
   /** Brightness, contrast, saturation, warmth and face smoothing (see enhance.ts). */
   look: CameraLook
+  /** A face-tracked effect drawn over the camera (see faceEffects.ts). */
+  faceEffect: FaceEffectId
   /** −100–100: 0 fills the stage, above zooms in, below zooms out (see placeCamera). */
   zoom: number
   keyColor: [number, number, number]
@@ -24,8 +31,14 @@ export interface CompositorSettings {
   tone: string
 }
 
-/** What the seller should know about background removal (never shown to viewers). */
-export type CompositorStatus = 'ok' | 'loading-segmentation' | 'segmentation-unavailable' | 'chroma-unavailable'
+/** What the seller should know about background removal and face effects (never shown to viewers). */
+export type CompositorStatus =
+  | 'ok'
+  | 'loading-segmentation'
+  | 'segmentation-unavailable'
+  | 'chroma-unavailable'
+  | 'loading-face-tracking'
+  | 'face-tracking-unavailable'
 
 /**
  * Draws the camera with its background treatment into a canvas, every frame:
@@ -52,6 +65,12 @@ export class Compositor {
   private enhancerFailed = false
   private enhancedTime = -1
   private enhancedLook: CameraLook | null = null
+  private faceTracker: FaceLandmarker | null = null
+  private faceState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle'
+  private faceVideoTime = -1
+  private faceTimestamp = 0
+  private pose: FacePose | null = null
+  private framesWithoutFace = 0
   private lastVideoTime = -1
   private lastTimestamp = 0
   private frame = 0
@@ -76,6 +95,8 @@ export class Compositor {
     this.video = video
     this.hasMask = false
     this.lastVideoTime = -1
+    this.faceVideoTime = -1
+    this.pose = null
   }
 
   setBackground(image: HTMLImageElement | null): void {
@@ -101,6 +122,9 @@ export class Compositor {
       } catch {
         this.chromaFailed = true
       }
+    }
+    if (settings.faceEffect !== 'none' && this.faceState === 'idle') {
+      this.loadFaceTracking()
     }
     this.refreshStatus()
   }
@@ -143,6 +167,23 @@ export class Compositor {
       })
   }
 
+  private loadFaceTracking(): void {
+    this.faceState = 'loading'
+    this.refreshStatus()
+    loadFaceTracker()
+      .then((tracker) => {
+        if (this.disposed) return
+        this.faceTracker = tracker
+        this.faceState = 'ready'
+        this.refreshStatus()
+      })
+      .catch((error) => {
+        console.warn('[stage] face effects unavailable', error)
+        this.faceState = 'failed'
+        this.refreshStatus()
+      })
+  }
+
   private refreshStatus(): void {
     const mode = this.settings?.mode
     let next: CompositorStatus = 'ok'
@@ -151,6 +192,11 @@ export class Compositor {
       if (this.segmenterState === 'failed') next = 'segmentation-unavailable'
     } else if (mode === 'green' && this.chromaFailed) {
       next = 'chroma-unavailable'
+    }
+    // Background news comes first; face effects only when there is none.
+    if (next === 'ok' && this.settings && this.settings.faceEffect !== 'none') {
+      if (this.faceState === 'loading') next = 'loading-face-tracking'
+      if (this.faceState === 'failed') next = 'face-tracking-unavailable'
     }
     if (next !== this.status) {
       this.status = next
@@ -219,6 +265,53 @@ export class Compositor {
         break
     }
     ctx.restore()
+
+    // 3. The face effect on top (drawn unmirrored, so emoji and text don't come out backwards).
+    if (s.faceEffect !== 'none') {
+      const pose = this.trackFace(video, place, W, s.mirror)
+      if (pose) drawFaceEffect(ctx, s.faceEffect, pose, performance.now() / 1000)
+    }
+  }
+
+  /**
+   * Finds the face once per new camera frame and maps it onto the stage exactly where the
+   * camera is drawn (same crop, zoom and mirroring). Keeps the last pose for a few frames
+   * so a brief miss doesn't make the effect flicker.
+   */
+  private trackFace(video: HTMLVideoElement, { src, dst }: CameraPlacement, W: number, mirror: boolean): FacePose | null {
+    if (!this.faceTracker) return null
+    if (video.currentTime === this.faceVideoTime) return this.pose
+    this.faceVideoTime = video.currentTime
+    // MediaPipe needs strictly increasing timestamps (per task).
+    const now = Math.max(performance.now(), this.faceTimestamp + 1)
+    this.faceTimestamp = now
+
+    let landmarks: NormalizedLandmark[] | undefined
+    try {
+      landmarks = this.faceTracker.detectForVideo(video, now).faceLandmarks[0]
+    } catch (error) {
+      console.warn('[stage] face tracking stopped', error)
+      this.faceTracker = null
+      this.faceState = 'failed'
+      this.refreshStatus()
+      return null
+    }
+
+    const [sx, sy, sw, sh] = src
+    const [dx, dy, dw, dh] = dst
+    const toStage = (l: NormalizedLandmark) => {
+      const x = dx + ((l.x * video.videoWidth - sx) * dw) / sw
+      return { x: mirror ? W - x : x, y: dy + ((l.y * video.videoHeight - sy) * dh) / sh }
+    }
+    const found = landmarks ? poseFromPoints((i) => (landmarks[i] ? toStage(landmarks[i]) : undefined)) : null
+
+    if (found) {
+      this.pose = smoothPose(this.pose, found)
+      this.framesWithoutFace = 0
+    } else if (++this.framesWithoutFace > FACE_GRACE_FRAMES) {
+      this.pose = null
+    }
+    return this.pose
   }
 
   /**

@@ -21,6 +21,8 @@ final class SetupDefaults
             'saturation' => 50,
             'warmth' => 50,
             'smoothing' => 0,
+            // A face-tracked effect on the camera (Catalog::FACE_EFFECTS).
+            'effect' => 'none',
             'zoom' => 0,
             // Send the camera's own sound (or the default microphone) with the clean screen.
             'audio' => true,

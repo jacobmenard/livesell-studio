@@ -2,13 +2,14 @@ import { useEffect, useRef } from 'react'
 import type { BackgroundSettings, CameraSettings, Orientation, Resolution } from '../lib/types'
 import { BACKGROUND_BY_ID, KEY_COLORS } from './catalog'
 import { Compositor, type CompositorStatus } from './compositor'
+import { isFaceEffect } from './faceEffects'
 import { MIN_ZOOM, outputSize } from './geometry'
 
 interface VideoLayerProps {
   stream: MediaStream | null
   orientation: Orientation
   resolution: Resolution
-  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing' | 'zoom'>
+  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing' | 'effect' | 'zoom'>
   background: BackgroundSettings
   /** URL of the seller's own background photo, when one is picked. */
   backgroundUrl: string | null
@@ -90,6 +91,8 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
   const zoom = Math.max(camera.zoom, MIN_ZOOM[orientation])
   // A picture from before these settings existed shows unchanged.
   const { brightness = 50, contrast = 50, saturation = 50, warmth = 50, smoothing = 0 } = camera
+  // An unknown effect (e.g. from a newer app version) shows nothing rather than breaking.
+  const faceEffect = camera.effect && isFaceEffect(camera.effect) ? camera.effect : 'none'
 
   useEffect(() => {
     compositorRef.current?.update({
@@ -98,13 +101,14 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
       mode: background.mode,
       mirror: camera.mirror,
       look: { brightness, contrast, saturation, warmth, smoothing },
+      faceEffect,
       zoom,
       keyColor: key,
       similarity: background.similarity,
       smoothness: background.smoothness,
       tone: backgroundUrl ? '#17151C' : preset.tone,
     })
-  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, zoom, key, background.similarity, background.smoothness, backgroundUrl, preset.tone])
+  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, faceEffect, zoom, key, background.similarity, background.smoothness, backgroundUrl, preset.tone])
 
   return <canvas ref={canvasRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
 }

@@ -79,7 +79,7 @@ final class PopupRules
 
         return [
             "{$p}orientation" => ['required', Rule::in(Catalog::ORIENTATIONS)],
-            "{$p}camera" => ['required', 'array:source,device_label,mirror,brightness,contrast,saturation,warmth,smoothing,zoom,audio'],
+            "{$p}camera" => ['required', 'array:source,device_label,mirror,brightness,contrast,saturation,warmth,smoothing,effect,zoom,audio'],
             "{$p}camera.source" => ['required', Rule::in(Catalog::CAMERA_SOURCES)],
             "{$p}camera.device_label" => ['nullable', 'string', 'max:120', self::PLAIN_TEXT],
             "{$p}camera.mirror" => ['required', 'boolean'],
@@ -89,6 +89,7 @@ final class PopupRules
             "{$p}camera.saturation" => ['sometimes', 'integer', 'between:0,100'],
             "{$p}camera.warmth" => ['sometimes', 'integer', 'between:0,100'],
             "{$p}camera.smoothing" => ['sometimes', 'integer', 'between:0,100'],
+            "{$p}camera.effect" => ['sometimes', Rule::in(Catalog::FACE_EFFECTS)],
             // Below 0 zooms out (portrait only in the editor; landscape ignores it).
             "{$p}camera.zoom" => ['required', 'integer', 'between:-100,100'],
             // Optional so editors opened before camera sound existed can still save.

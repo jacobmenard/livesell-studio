@@ -112,7 +112,23 @@ class LiveTest extends TestCase
 
         $this->getJson("/api/setups/{$setup->id}/scene")->assertOk()
             ->assertJsonPath('data.camera.warmth', 66)
-            ->assertJsonPath('data.camera.smoothing', 65);
+            ->assertJsonPath('data.camera.smoothing', 65)
+            ->assertJsonPath('data.camera.effect', 'none');
+    }
+
+    public function test_a_face_effect_goes_live_and_unknown_ones_are_refused(): void
+    {
+        Event::fake([SceneUpdated::class]);
+        $me = User::factory()->create();
+        $setup = $this->setupFor($me);
+        $this->actingAs($me);
+
+        $scene = $this->scene();
+        $scene['camera']['effect'] = 'flower-crown';
+        $this->putJson("/api/setups/{$setup->id}/scene", $scene)->assertOk()->assertJsonPath('data.camera.effect', 'flower-crown');
+
+        $scene['camera']['effect'] = 'laser-eyes';
+        $this->putJson("/api/setups/{$setup->id}/scene", $scene)->assertUnprocessable()->assertJsonValidationErrors('camera.effect');
     }
 
     public function test_scene_updates_also_reach_the_active_output_link(): void

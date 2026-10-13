@@ -4,6 +4,33 @@ export type Orientation = 'landscape' | 'portrait'
 export type Resolution = '720p' | '1080p'
 export type ThemePref = 'light' | 'dark' | 'system'
 
+/** Face-tracked camera effects (drawn by src/stage/faceEffects.ts; same list as the API's Catalog). */
+export type FaceEffectId =
+  | 'none'
+  | 'flower-crown'
+  | 'butterflies'
+  | 'puppy'
+  | 'bunny'
+  | 'kitty'
+  | 'bear'
+  | 'heart-eyes'
+  | 'star-eyes'
+  | 'money-eyes'
+  | 'shades'
+  | 'crown'
+  | 'halo'
+  | 'devil'
+  | 'blush'
+  | 'sparkles'
+  | 'love-hearts'
+  | 'crying'
+  | 'clown'
+  | 'mustache'
+  | 'piggy'
+  | 'cowboy'
+  | 'party'
+  | 'rainbow'
+
 export type PresetPopupId = 'off10' | 'live' | 'free' | 'b1t1' | 'ship' | 'flash' | 'last' | 'sold' | 'new'
 export type PopupKind = 'preset' | 'text' | 'image'
 export type TextColor = 'yellow' | 'coral' | 'blue' | 'white'
@@ -161,6 +188,8 @@ export interface CameraSettings {
   warmth: number
   /** Face enhance: evens out skin and adds a soft glow. */
   smoothing: number
+  /** A face-tracked effect (flower crown, puppy ears…), or "none". */
+  effect: FaceEffectId
   zoom: number
   /** Send the camera's own sound (or the default microphone) with the clean screen. */
   audio: boolean

@@ -1,14 +1,28 @@
 import { Icon } from '../../components/Icon'
 import { Button, Panel, Segmented, Switch, cx } from '../../components/ui'
 import type { CameraSettings, Orientation, Resolution } from '../../lib/types'
-import { LOOK_PRESETS, sameLook, type CameraLook } from '../../stage/enhance'
+import { LOOK_PRESETS, isNeutralLook, sameLook, type CameraLook } from '../../stage/enhance'
+import { FACE_EFFECTS } from '../../stage/faceEffects'
 import { MIN_ZOOM } from '../../stage/geometry'
 import { AUDIO_MESSAGES, CAMERA_MESSAGES, type AudioStatus, type CameraDevice, type CameraStatus } from '../../stage/useCamera'
+
+/** The Camera step's own tabs, so each part fits on screen without scrolling. */
+export type CameraSection = 'camera' | 'frame' | 'look' | 'effects' | 'sound'
+
+const SECTIONS: { id: CameraSection; label: string; hint: string }[] = [
+  { id: 'camera', label: 'Camera', hint: 'Pick your camera and turn it on.' },
+  { id: 'frame', label: 'Frame', hint: 'Shape, quality and how close the camera is.' },
+  { id: 'look', label: 'Look', hint: 'Make your picture brighter, warmer or smoother.' },
+  { id: 'effects', label: 'Effects', hint: 'Fun stickers that follow your face.' },
+  { id: 'sound', label: 'Sound', hint: 'Choose whether your camera’s sound goes live.' },
+]
 
 export function CameraPanel({
   camera,
   orientation,
   resolution,
+  section,
+  onSection,
   onCamera,
   onOrientation,
   onResolution,
@@ -24,6 +38,8 @@ export function CameraPanel({
   camera: CameraSettings
   orientation: Orientation
   resolution: Resolution
+  section: CameraSection
+  onSection: (section: CameraSection) => void
   onCamera: (patch: Partial<CameraSettings>) => void
   onOrientation: (o: Orientation) => void
   onResolution: (r: Resolution) => void
@@ -38,9 +54,144 @@ export function CameraPanel({
 }) {
   const live = status === 'live'
   const phone = camera.source === 'phone'
+  const look: CameraLook = { brightness: camera.brightness, contrast: camera.contrast, saturation: camera.saturation, warmth: camera.warmth, smoothing: camera.smoothing }
+  // A dot on a tab that has something switched on, so it's easy to find again.
+  const active: Partial<Record<CameraSection, boolean>> = { look: !isNeutralLook(look), effects: camera.effect !== 'none' }
+  const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]
 
   return (
     <Panel title="Camera" headingId="cam-h">
+      <div className="flex flex-col gap-1.5">
+        <Segmented
+          label="Camera settings"
+          size="sm"
+          columns={SECTIONS.length}
+          value={current.id}
+          onChange={onSection}
+          options={SECTIONS.map((s) => ({
+            id: s.id,
+            label: (
+              <span className="inline-flex items-center gap-1">
+                {s.label}
+                {active[s.id] && (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
+                    <span className="sr-only">(on)</span>
+                  </>
+                )}
+              </span>
+            ),
+          }))}
+        />
+        <p className="m-0 text-[13px] text-muted">{current.hint}</p>
+      </div>
+
+      {current.id === 'camera' && (
+        <CameraSource
+          camera={camera}
+          phone={phone}
+          live={live}
+          status={status}
+          devices={devices}
+          deviceId={deviceId}
+          onCamera={onCamera}
+          onSelectDevice={onSelectDevice}
+          onStart={onStart}
+          onStop={onStop}
+        />
+      )}
+
+      {current.id === 'frame' && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-muted">Shape</span>
+            <Segmented
+              label="Shape"
+              value={orientation}
+              onChange={onOrientation}
+              options={[
+                { id: 'landscape', label: 'Landscape 16:9' },
+                { id: 'portrait', label: 'Portrait 9:16' },
+              ]}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-[13px] text-muted">Quality</span>
+            <Segmented
+              label="Quality"
+              value={resolution}
+              onChange={onResolution}
+              options={[
+                { id: '720p', label: '720p' },
+                { id: '1080p', label: '1080p' },
+              ]}
+            />
+          </div>
+          <label className="flex flex-col gap-1 text-[13px] text-muted">
+            Zoom
+            <input
+              type="range"
+              min={MIN_ZOOM[orientation]}
+              max={100}
+              value={Math.max(camera.zoom, MIN_ZOOM[orientation])}
+              onChange={(e) => onCamera({ zoom: Number(e.target.value) })}
+            />
+            {orientation === 'portrait' && <span className="text-xs">Slide left to zoom out and show more of your camera; the middle fills the screen.</span>}
+          </label>
+          <Switch checked={camera.mirror} onChange={(v) => onCamera({ mirror: v })} label="Mirror camera" />
+        </>
+      )}
+
+      {current.id === 'look' && <CameraLookControls look={look} onCamera={onCamera} />}
+
+      {current.id === 'effects' && <FaceEffectPicker value={camera.effect} onChange={(effect) => onCamera({ effect })} />}
+
+      {current.id === 'sound' && (
+        <div className="flex flex-col gap-1.5">
+          <Switch
+            checked={camera.audio}
+            onChange={(v) => onCamera({ audio: v })}
+            label="Send camera sound to the live"
+            description="Your camera’s microphone or HDMI sound, otherwise your computer’s microphone. Turn off if your live app already adds your mic."
+          />
+          {camera.audio && live && (
+            <p role="status" className={cx('m-0 text-[13px]', audioStatus === 'live' ? 'text-select' : 'text-danger-text')}>
+              {audioStatus === 'live' ? `Sound from ${micLabel ?? 'your microphone'}.` : audioStatus !== 'off' && AUDIO_MESSAGES[audioStatus]}
+            </p>
+          )}
+          {camera.audio && !live && <p className="m-0 text-[13px] text-muted">Turn the camera on (Camera tab) to check which microphone is used.</p>}
+        </div>
+      )}
+    </Panel>
+  )
+}
+
+/** Which camera to use, and turning it on and off. */
+function CameraSource({
+  camera,
+  phone,
+  live,
+  status,
+  devices,
+  deviceId,
+  onCamera,
+  onSelectDevice,
+  onStart,
+  onStop,
+}: {
+  camera: CameraSettings
+  phone: boolean
+  live: boolean
+  status: CameraStatus
+  devices: CameraDevice[]
+  deviceId: string | null
+  onCamera: (patch: Partial<CameraSettings>) => void
+  onSelectDevice: (id: string) => void
+  onStart: () => void
+  onStop: () => void
+}) {
+  return (
+    <>
       <div role="radiogroup" aria-label="Camera source" className="flex flex-col gap-2">
         {(
           [
@@ -109,59 +260,7 @@ export function CameraPanel({
           {CAMERA_MESSAGES[status]}
         </p>
       </div>
-
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted">Shape</span>
-        <Segmented
-          label="Shape"
-          value={orientation}
-          onChange={onOrientation}
-          options={[
-            { id: 'landscape', label: 'Landscape 16:9' },
-            { id: 'portrait', label: 'Portrait 9:16' },
-          ]}
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted">Quality</span>
-        <Segmented
-          label="Quality"
-          value={resolution}
-          onChange={onResolution}
-          options={[
-            { id: '720p', label: '720p' },
-            { id: '1080p', label: '1080p' },
-          ]}
-        />
-      </div>
-      <CameraLookControls camera={camera} onCamera={onCamera} />
-      <label className="flex flex-col gap-1 text-[13px] text-muted">
-        Zoom
-        <input
-          type="range"
-          min={MIN_ZOOM[orientation]}
-          max={100}
-          value={Math.max(camera.zoom, MIN_ZOOM[orientation])}
-          onChange={(e) => onCamera({ zoom: Number(e.target.value) })}
-        />
-        {orientation === 'portrait' && <span className="text-xs">Slide left to zoom out and show more of your camera; the middle fills the screen.</span>}
-      </label>
-      <Switch checked={camera.mirror} onChange={(v) => onCamera({ mirror: v })} label="Mirror camera" />
-
-      <div className="flex flex-col gap-1.5">
-        <Switch
-          checked={camera.audio}
-          onChange={(v) => onCamera({ audio: v })}
-          label="Send camera sound to the live"
-          description="Your camera’s microphone or HDMI sound, otherwise your computer’s microphone. Turn off if your live app already adds your mic."
-        />
-        {camera.audio && live && (
-          <p role="status" className={cx('m-0 text-[13px]', audioStatus === 'live' ? 'text-select' : 'text-danger-text')}>
-            {audioStatus === 'live' ? `Sound from ${micLabel ?? 'your microphone'}.` : audioStatus !== 'off' && AUDIO_MESSAGES[audioStatus]}
-          </p>
-        )}
-      </div>
-    </Panel>
+    </>
   )
 }
 
@@ -177,12 +276,11 @@ const LOOK_SLIDERS: { key: keyof CameraLook; label: string; low: string; high: s
 const signedFromMiddle = (value: number) => (value > 50 ? `+${value - 50}` : String(value - 50))
 
 /** Quick looks and fine-tuning sliders for the camera picture (what viewers see). */
-function CameraLookControls({ camera, onCamera }: { camera: CameraSettings; onCamera: (patch: Partial<CameraSettings>) => void }) {
-  const look: CameraLook = { brightness: camera.brightness, contrast: camera.contrast, saturation: camera.saturation, warmth: camera.warmth, smoothing: camera.smoothing }
+function CameraLookControls({ look, onCamera }: { look: CameraLook; onCamera: (patch: Partial<CameraSettings>) => void }) {
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted">Camera look</span>
+        <span className="text-[13px] text-muted">Quick looks</span>
         <div role="group" aria-label="Quick looks" className="flex flex-wrap gap-1.5">
           {LOOK_PRESETS.map((p) => {
             const on = sameLook(look, p.look)
@@ -224,6 +322,37 @@ function CameraLookControls({ camera, onCamera }: { camera: CameraSettings; onCa
           {s.hint && <span className="text-xs">{s.hint}</span>}
         </label>
       ))}
+    </div>
+  )
+}
+
+/** Face-tracked effects (flower crown, puppy ears…), shown on the preview and the live. */
+function FaceEffectPicker({ value, onChange }: { value: CameraSettings['effect']; onChange: (effect: CameraSettings['effect']) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div role="group" aria-label="Face effects" className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+        {FACE_EFFECTS.map((e) => {
+          const on = e.id === value
+          return (
+            <button
+              key={e.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onChange(e.id)}
+              className={cx(
+                'flex min-h-[68px] flex-col items-center justify-center gap-1 rounded-xl border-2 px-1 py-1.5 text-[11px] leading-tight font-semibold transition-[transform,border-color,background-color] duration-150 active:scale-95 motion-reduce:transition-none',
+                on ? 'border-select bg-tint text-text' : 'border-transparent bg-field text-text-2 hover:text-text',
+              )}
+            >
+              <span aria-hidden="true" className="text-[22px] leading-none">
+                {e.icon}
+              </span>
+              {e.label}
+            </button>
+          )
+        })}
+      </div>
+      <span className="text-xs text-muted">Follows your face on the preview and the live. Face the camera in good light for the best tracking.</span>
     </div>
   )
 }

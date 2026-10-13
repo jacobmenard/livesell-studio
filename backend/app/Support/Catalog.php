@@ -75,6 +75,13 @@ final class Catalog
 
     public const CAMERA_SOURCES = ['camera', 'phone'];
 
+    /** Face-tracked camera effects (frontend src/stage/faceEffects.ts). */
+    public const FACE_EFFECTS = [
+        'none', 'flower-crown', 'butterflies', 'puppy', 'bunny', 'kitty', 'bear', 'heart-eyes', 'star-eyes',
+        'money-eyes', 'shades', 'crown', 'halo', 'devil', 'blush', 'sparkles', 'love-hearts', 'crying',
+        'clown', 'mustache', 'piggy', 'cowboy', 'party', 'rainbow',
+    ];
+
     public const OUTPUT_METHODS = ['window', 'rtmp', 'vcam'];
 
     public const THEMES = ['light', 'dark', 'system'];

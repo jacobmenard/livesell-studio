@@ -19,9 +19,9 @@ import { useTour } from '../../tour/useTour'
 import { Walkthrough } from '../../tour/Walkthrough'
 import { BackgroundPanel } from './BackgroundPanel'
 import { ForegroundPanel } from './ForegroundPanel'
-import { CameraPanel } from './CameraPanel'
+import { CameraPanel, type CameraSection } from './CameraPanel'
 import { GoLivePanel } from './GoLivePanel'
-import { PopupsPanel } from './PopupsPanel'
+import { PopupsPanel, type PopupSection } from './PopupsPanel'
 import { OnScreenBar, PreviewPanel } from './PreviewPanel'
 import { SoundBoard, soundPads, type Pad } from './SoundBoard'
 
@@ -113,6 +113,9 @@ function Editor({ initial }: { initial: SetupFull }) {
   const [active, setActive] = useState<ActivePopup[]>(() => activeFromSetup(initial))
   const [selectedKey, setSelectedKey] = useState<string | null>(() => initial.scene.popups.at(-1)?.key ?? 'off10')
   const [tab, setTab] = useState<Tab>('popups')
+  // The Camera step's own tab, kept while the seller visits other steps.
+  const [cameraSection, setCameraSection] = useState<CameraSection>('camera')
+  const [popupSection, setPopupSection] = useState<PopupSection>('show')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [playing, setPlaying] = useState<SoundRef | null>(null)
@@ -162,6 +165,8 @@ function Editor({ initial }: { initial: SetupFull }) {
   const selectFromPreview = useCallback((key: string) => {
     setSelectedKey(key)
     setTab('popups')
+    // Clicked on the preview to move or resize it: show what's picked, not the Add form.
+    setPopupSection((s) => (s === 'add' ? 'place' : s))
   }, [])
 
   // ---- sounds --------------------------------------------------------------
@@ -258,6 +263,8 @@ function Editor({ initial }: { initial: SetupFull }) {
     }
     setDoc((d) => ({ ...d, popups: [...d.popups, popup] }))
     setSelectedKey(key)
+    // Back to the grid, where the new popup is picked and ready to show.
+    setPopupSection('show')
     return undefined
   }
 
@@ -287,6 +294,7 @@ function Editor({ initial }: { initial: SetupFull }) {
       }
       setDoc((d) => ({ ...d, popups: [...d.popups, popup] }))
       setSelectedKey(key)
+      setPopupSection('show')
     } catch (e) {
       setErrors((x) => ({ ...x, popup: (e as Error).message }))
     }
@@ -296,6 +304,7 @@ function Editor({ initial }: { initial: SetupFull }) {
     hide(key)
     setDoc((d) => ({ ...d, popups: d.popups.filter((p) => p.key !== key) }))
     setSelectedKey('off10')
+    setPopupSection('show')
   }
 
   const uploadBackground = async (file: File) => {
@@ -544,6 +553,8 @@ function Editor({ initial }: { initial: SetupFull }) {
               camera={doc.camera}
               orientation={doc.orientation}
               resolution={doc.resolution}
+              section={cameraSection}
+              onSection={setCameraSection}
               onCamera={patchCamera}
               onOrientation={(orientation) => patchDoc({ orientation })}
               onResolution={(resolution) => patchDoc({ resolution })}
@@ -583,6 +594,8 @@ function Editor({ initial }: { initial: SetupFull }) {
               popups={doc.popups}
               activeKeys={activeKeys}
               selectedKey={selectedKey}
+              section={popupSection}
+              onSection={setPopupSection}
               onSelect={setSelectedKey}
               onToggle={toggle}
               onChange={patchPopup}

@@ -6,10 +6,26 @@ import { AUTO_HIDES, DISPLAY_FONT, EFFECTS, ENTRANCES, MAX_TEXT_LENGTH, POPUP_SI
 import { isFreelyPlaced, popupText, resolveLook } from '../../stage/look'
 import type { Pad } from './SoundBoard'
 
+/** The Popups step's own tabs, so each part fits on screen without scrolling. */
+export type PopupSection = 'show' | 'add' | 'place' | 'effect' | 'sound'
+
+const SECTIONS: { id: PopupSection; label: string; hint: string }[] = [
+  { id: 'show', label: 'Popups', hint: 'Tap Show to put a popup on your live. Tap a popup to pick it for editing.' },
+  { id: 'add', label: 'Add', hint: 'Make your own text popup or upload a picture.' },
+  { id: 'place', label: 'Place', hint: 'Where the popup shows, how big it is, and how it comes in.' },
+  { id: 'effect', label: 'Effect', hint: 'Fireworks, confetti and more, and when it hides by itself.' },
+  { id: 'sound', label: 'Sound', hint: 'A sound that plays when the popup shows.' },
+]
+
+/** Tabs that change the popup picked in the grid. */
+const EDIT_SECTIONS: PopupSection[] = ['place', 'effect', 'sound']
+
 export function PopupsPanel({
   popups,
   activeKeys,
   selectedKey,
+  section,
+  onSection,
   onSelect,
   onToggle,
   onChange,
@@ -24,6 +40,8 @@ export function PopupsPanel({
   popups: PopupConfig[]
   activeKeys: Set<string>
   selectedKey: string | null
+  section: PopupSection
+  onSection: (section: PopupSection) => void
   onSelect: (key: string) => void
   onToggle: (key: string) => void
   onChange: (key: string, patch: Partial<PopupConfig>) => void
@@ -35,11 +53,152 @@ export function PopupsPanel({
   media: MediaItem[]
   pads: Pad[]
 }) {
+  const urls = new Map(media.map((m) => [m.id, m.url]))
+  const selected = popups.find((p) => p.key === selectedKey) ?? null
+  const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]
+  // A dot on a tab that has something set for the picked popup.
+  const active: Partial<Record<PopupSection, boolean>> = { effect: !!selected && selected.effect !== 'none', sound: !!selected?.sound }
+
+  return (
+    <Panel title="Popups" headingId="pop-h">
+      <div className="flex flex-col gap-1.5">
+        <Segmented
+          label="Popup settings"
+          size="sm"
+          columns={SECTIONS.length}
+          value={current.id}
+          onChange={onSection}
+          options={SECTIONS.map((s) => ({
+            id: s.id,
+            label: (
+              <span className="inline-flex items-center gap-1">
+                {s.label}
+                {active[s.id] && (
+                  <>
+                    <span className="h-1.5 w-1.5 rounded-full bg-success" aria-hidden="true" />
+                    <span className="sr-only">(on)</span>
+                  </>
+                )}
+              </span>
+            ),
+          }))}
+        />
+        <p className="m-0 text-[13px] text-muted">{current.hint}</p>
+      </div>
+
+      {current.id === 'show' && (
+        <>
+          <PopupGrid popups={popups} activeKeys={activeKeys} selectedKey={selectedKey} urls={urls} onSelect={onSelect} onToggle={onToggle} />
+          {selected && (
+            <p className="m-0 text-[13px] text-muted">
+              Picked: <strong className="text-text">{popupText(selected)}</strong>. Change it in{' '}
+              {EDIT_SECTIONS.map((id, i) => (
+                <span key={id}>
+                  {i > 0 && (i === EDIT_SECTIONS.length - 1 ? ' or ' : ', ')}
+                  <button type="button" onClick={() => onSection(id)} className="border-0 bg-transparent p-0 font-semibold text-link">
+                    {SECTIONS.find((s) => s.id === id)?.label}
+                  </button>
+                </span>
+              ))}
+              .
+            </p>
+          )}
+        </>
+      )}
+
+      {current.id === 'add' && <AddPopup onAddText={onAddText} onUploadImage={onUploadImage} uploading={uploading} error={error} />}
+
+      {EDIT_SECTIONS.includes(current.id) &&
+        (selected ? (
+          <>
+            <EditingBar
+              popup={selected}
+              url={selected.media_id ? urls.get(selected.media_id) : undefined}
+              on={activeKeys.has(selected.key)}
+              onToggle={() => onToggle(selected.key)}
+              onRemove={() => onRemove(selected.key)}
+              onPickAnother={() => onSection('show')}
+            />
+            {current.id === 'place' && <PlaceControls popup={selected} on={activeKeys.has(selected.key)} onChange={(patch) => onChange(selected.key, patch)} />}
+            {current.id === 'effect' && <EffectControls popup={selected} onChange={(patch) => onChange(selected.key, patch)} />}
+            {current.id === 'sound' && <SoundControls popup={selected} pads={pads} onChange={(patch) => onChange(selected.key, patch)} />}
+          </>
+        ) : (
+          <div className="flex flex-col items-start gap-2 rounded-xl bg-surface-2 p-3.5">
+            <p className="m-0 text-sm text-text-2">Pick a popup first, then change it here.</p>
+            <Button size="sm" variant="primary" onClick={() => onSection('show')}>
+              Pick a popup
+            </Button>
+          </div>
+        ))}
+    </Panel>
+  )
+}
+
+function PopupGrid({
+  popups,
+  activeKeys,
+  selectedKey,
+  urls,
+  onSelect,
+  onToggle,
+}: {
+  popups: PopupConfig[]
+  activeKeys: Set<string>
+  selectedKey: string | null
+  urls: Map<number, string>
+  onSelect: (key: string) => void
+  onToggle: (key: string) => void
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2.5">
+      {popups.map((p) => {
+        const on = activeKeys.has(p.key)
+        const isSelected = p.key === selectedKey
+        const name = popupText(p)
+        return (
+          <div key={p.key} className={cx('flex flex-col overflow-hidden rounded-[14px] border-2 bg-field', isSelected ? 'border-select' : 'border-line')}>
+            <button
+              type="button"
+              aria-pressed={isSelected}
+              onClick={() => onSelect(p.key)}
+              aria-label={`Edit ${name}`}
+              className="relative grid h-[78px] place-items-center border-0 bg-transparent p-1.5 text-text"
+            >
+              <MiniPopup popup={p} url={p.media_id ? urls.get(p.media_id) : undefined} />
+              {p.effect !== 'none' && <span className="absolute top-1.5 left-1.5 rounded-[5px] bg-raised px-1.5 py-px text-[10px] font-semibold text-text">{effectLabel(p.effect)}</span>}
+              {on && <span className="absolute top-1.5 right-1.5 rounded-[5px] bg-success px-1.5 py-px font-mono text-[10px] tracking-[0.06em] text-navy">ON</span>}
+            </button>
+            <button
+              type="button"
+              onClick={() => onToggle(p.key)}
+              aria-label={`${on ? 'Hide' : 'Show'} ${name}`}
+              className={cx('min-h-[34px] border-0 border-t border-line text-xs font-semibold', on ? 'bg-success text-navy' : 'bg-surface text-text')}
+            >
+              {on ? 'Hide' : 'Show'}
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** A text popup or an uploaded picture; the new popup is then picked in the grid. */
+function AddPopup({
+  onAddText,
+  onUploadImage,
+  uploading,
+  error,
+}: {
+  onAddText: (text: string, color: TextColor) => string | undefined
+  onUploadImage: (file: File) => void
+  uploading: boolean
+  error: string
+}) {
   const [draft, setDraft] = useState('')
   const [color, setColor] = useState<TextColor>('yellow')
   const [draftError, setDraftError] = useState('')
-  const urls = new Map(media.map((m) => [m.id, m.url]))
-  const selected = popups.find((p) => p.key === selectedKey) ?? null
 
   const addText = (e: FormEvent) => {
     e.preventDefault()
@@ -53,41 +212,8 @@ export function PopupsPanel({
   }
 
   return (
-    <Panel title="Popups" subtitle="Pick one to edit. Show puts it on your live." headingId="pop-h">
-      <div className="grid grid-cols-3 gap-2.5">
-        {popups.map((p) => {
-          const on = activeKeys.has(p.key)
-          const isSelected = p.key === selectedKey
-          const name = popupText(p)
-          return (
-            <div key={p.key} className={cx('flex flex-col overflow-hidden rounded-[14px] border-2 bg-field', isSelected ? 'border-select' : 'border-line')}>
-              <button
-                type="button"
-                aria-pressed={isSelected}
-                onClick={() => onSelect(p.key)}
-                aria-label={`Edit ${name}`}
-                className="relative grid h-[78px] place-items-center border-0 bg-transparent p-1.5 text-text"
-              >
-                <MiniPopup popup={p} url={p.media_id ? urls.get(p.media_id) : undefined} />
-                {p.effect !== 'none' && <span className="absolute top-1.5 left-1.5 rounded-[5px] bg-raised px-1.5 py-px text-[10px] font-semibold text-text">{effectLabel(p.effect)}</span>}
-                {on && <span className="absolute top-1.5 right-1.5 rounded-[5px] bg-success px-1.5 py-px font-mono text-[10px] tracking-[0.06em] text-navy">ON</span>}
-              </button>
-              <button
-                type="button"
-                onClick={() => onToggle(p.key)}
-                aria-label={`${on ? 'Hide' : 'Show'} ${name}`}
-                className={cx('min-h-[34px] border-0 border-t border-line text-xs font-semibold', on ? 'bg-success text-navy' : 'bg-surface text-text')}
-              >
-                {on ? 'Hide' : 'Show'}
-              </button>
-            </div>
-          )
-        })}
-        <UploadTile label="Upload image" hint="PNG with see-through background works best" accept={ACCEPT.image} onFile={onUploadImage} busy={uploading} className="min-h-28" />
-      </div>
-      {error && <Alert>{error}</Alert>}
-
-      <form onSubmit={addText} className="flex flex-col gap-2 border-t border-line pt-3.5">
+    <>
+      <form onSubmit={addText} className="flex flex-col gap-2">
         <label htmlFor="custom-text" className="text-[13px] text-muted">
           Make a text popup
         </label>
@@ -103,7 +229,7 @@ export function PopupsPanel({
             aria-describedby={draftError ? 'custom-text-err' : undefined}
             className="min-h-11 min-w-0 flex-1 rounded-xl border border-line-strong bg-field px-3 text-text placeholder:text-muted"
           />
-          <Button type="submit" className="bg-surface-2">
+          <Button type="submit" variant="primary">
             Add
           </Button>
         </div>
@@ -112,6 +238,7 @@ export function PopupsPanel({
             {draftError}
           </p>
         )}
+        <span className="text-[13px] text-muted">Color</span>
         <div role="group" aria-label="Popup color" className="flex gap-2">
           {TEXT_COLORS.map((c) => (
             <button
@@ -127,77 +254,60 @@ export function PopupsPanel({
         </div>
       </form>
 
-      {selected && (
-        <PopupEditor
-          popup={selected}
-          on={activeKeys.has(selected.key)}
-          pads={pads}
-          onChange={(patch) => onChange(selected.key, patch)}
-          onToggle={() => onToggle(selected.key)}
-          onRemove={() => onRemove(selected.key)}
-        />
-      )}
-    </Panel>
+      <div className="flex flex-col gap-2 border-t border-line pt-3.5">
+        <span className="text-[13px] text-muted">Or use a picture</span>
+        <UploadTile label="Upload image" hint="PNG with see-through background works best" accept={ACCEPT.image} onFile={onUploadImage} busy={uploading} className="min-h-24" />
+        {error && <Alert>{error}</Alert>}
+      </div>
+    </>
   )
 }
 
-function MiniPopup({ popup, url }: { popup: PopupConfig; url?: string }) {
-  if (popup.kind === 'image') {
-    return url ? <img src={url} alt="" className="max-h-16 max-w-full" /> : <span className="text-xs text-muted">Missing image</span>
-  }
-  const look = resolveLook(popup)
-  const circle = look.shape === 'circle'
-  return (
-    <span
-      className="grid max-w-full place-items-center overflow-hidden leading-none font-extrabold whitespace-nowrap"
-      style={{
-        fontSize: 12,
-        fontFamily: DISPLAY_FONT,
-        backgroundColor: look.bg,
-        color: look.fg,
-        border: look.border,
-        borderRadius: look.shape === 'tag' ? '0.28em' : 999,
-        padding: circle ? 0 : '0.42em 0.8em',
-        width: circle ? '3.2em' : 'auto',
-        height: circle ? '3.2em' : 'auto',
-        transform: `rotate(${look.rot})`,
-      }}
-    >
-      {look.text}
-    </span>
-  )
-}
-
-function PopupEditor({
+/** Which popup the Place / Effect / Sound tabs are changing, with Show / Hide at hand. */
+function EditingBar({
   popup,
+  url,
   on,
-  pads,
-  onChange,
   onToggle,
   onRemove,
+  onPickAnother,
 }: {
   popup: PopupConfig
+  url?: string
   on: boolean
-  pads: Pad[]
-  onChange: (patch: Partial<PopupConfig>) => void
   onToggle: () => void
   onRemove: () => void
+  onPickAnother: () => void
 }) {
-  const name = popupText(popup)
   const custom = popup.kind !== 'preset'
-  const moved = isFreelyPlaced(popup)
-
   return (
-    <div className="flex flex-col gap-3.5 border-t border-line pt-3.5">
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="m-0 text-base font-semibold">Editing: {name}</h3>
-        {custom && (
-          <Button size="sm" className="text-danger-text" onClick={onRemove}>
-            Delete
-          </Button>
-        )}
-      </div>
+    <div className="flex flex-wrap items-center gap-2.5 rounded-xl bg-surface-2 p-2.5">
+      <span className="grid h-16 w-24 shrink-0 place-items-center overflow-hidden rounded-lg bg-field p-1">
+        <MiniPopup popup={popup} url={url} />
+      </span>
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="text-xs text-muted">Editing</span>
+        <span className="truncate text-sm font-semibold">{popupText(popup)}</span>
+        <button type="button" onClick={onPickAnother} className="self-start border-0 bg-transparent p-0 text-xs font-semibold text-link">
+          Pick another
+        </button>
+      </span>
+      <Button size="sm" variant={on ? 'secondary' : 'primary'} onClick={onToggle}>
+        {on ? 'Hide' : 'Show'}
+      </Button>
+      {custom && (
+        <Button size="sm" variant="ghost" className="text-danger-text" onClick={onRemove}>
+          Delete
+        </Button>
+      )}
+    </div>
+  )
+}
 
+function PlaceControls({ popup, on, onChange }: { popup: PopupConfig; on: boolean; onChange: (patch: Partial<PopupConfig>) => void }) {
+  const moved = isFreelyPlaced(popup)
+  return (
+    <>
       <div className="flex flex-wrap gap-4">
         <div className="flex flex-col gap-1.5">
           <span className="text-[13px] text-muted">{moved ? 'Position: moved by hand' : 'Position'}</span>
@@ -220,32 +330,36 @@ function PopupEditor({
             })}
           </div>
         </div>
-        <div className="flex flex-[1_1_180px] flex-col gap-2.5">
-          <div className="flex flex-col gap-1.5">
-            <div className="flex items-center justify-between gap-2 text-[13px] text-muted">
-              <span>Size</span>
-              <span className="flex items-center gap-2">
-                <span className="font-semibold text-text">{popup.size}%</span>
-                {popup.size !== POPUP_SIZE.default && (
-                  <button type="button" onClick={() => onChange({ size: POPUP_SIZE.default })} className="border-0 bg-transparent p-0 text-xs font-semibold text-link">
-                    Reset
-                  </button>
-                )}
-              </span>
-            </div>
-            <p className="m-0 text-xs text-muted">
-              {on
-                ? 'Drag it on the preview to move it; drag a corner to resize, up to the full screen width. Or click it and use the arrow keys and + / −.'
-                : 'Show it on screen, then drag it on the preview to move it and drag a corner to resize.'}
-            </p>
+        <div className="flex flex-[1_1_180px] flex-col gap-1.5">
+          <div className="flex items-center justify-between gap-2 text-[13px] text-muted">
+            <span>Size</span>
+            <span className="flex items-center gap-2">
+              <span className="font-semibold text-text">{popup.size}%</span>
+              {popup.size !== POPUP_SIZE.default && (
+                <button type="button" onClick={() => onChange({ size: POPUP_SIZE.default })} className="border-0 bg-transparent p-0 text-xs font-semibold text-link">
+                  Reset
+                </button>
+              )}
+            </span>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <span className="text-[13px] text-muted">Entrance</span>
-            <Segmented label="Entrance animation" size="sm" value={popup.entrance} onChange={(v) => onChange({ entrance: v })} options={ENTRANCES} />
-          </div>
+          <p className="m-0 text-xs text-muted">
+            {on
+              ? 'Drag it on the preview to move it; drag a corner to resize, up to the full screen width. Or click it and use the arrow keys and + / −.'
+              : 'Show it on screen, then drag it on the preview to move it and drag a corner to resize.'}
+          </p>
         </div>
       </div>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[13px] text-muted">How it comes in</span>
+        <Segmented label="Entrance animation" size="sm" value={popup.entrance} onChange={(v) => onChange({ entrance: v })} options={ENTRANCES} />
+      </div>
+    </>
+  )
+}
 
+function EffectControls({ popup, onChange }: { popup: PopupConfig; onChange: (patch: Partial<PopupConfig>) => void }) {
+  return (
+    <>
       <div className="flex flex-col gap-2">
         <span className="text-[13px] text-muted">Effect</span>
         <div role="group" aria-label="Effect" className="flex flex-wrap gap-1.5">
@@ -278,35 +392,61 @@ function PopupEditor({
           />
         )}
       </div>
-
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] text-muted">Hide by itself after</span>
         <Segmented label="Auto hide" size="sm" value={popup.auto_hide} onChange={(v) => onChange({ auto_hide: v })} options={AUTO_HIDES} />
       </div>
+    </>
+  )
+}
 
-      <div className="flex flex-col gap-1.5">
-        <span className="text-[13px] text-muted">Play a sound when it shows</span>
-        <div role="group" aria-label="Sound when popup shows" className="flex flex-wrap gap-1.5">
-          {[{ id: null as SoundRef | null, label: 'No sound' }, ...pads.map((p) => ({ id: p.id as SoundRef | null, label: p.label }))].map((s) => {
-            const isOn = s.id === popup.sound
-            return (
-              <button
-                key={s.id ?? 'none'}
-                type="button"
-                aria-pressed={isOn}
-                onClick={() => onChange({ sound: s.id })}
-                className={cx('min-h-[34px] rounded-full border px-3 text-[13px] font-semibold', isOn ? 'border-inverse-bg bg-inverse-bg text-inverse-fg' : 'border-line-strong bg-transparent text-text')}
-              >
-                {s.label}
-              </button>
-            )
-          })}
-        </div>
+function SoundControls({ popup, pads, onChange }: { popup: PopupConfig; pads: Pad[]; onChange: (patch: Partial<PopupConfig>) => void }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] text-muted">Play a sound when it shows</span>
+      <div role="group" aria-label="Sound when popup shows" className="flex flex-wrap gap-1.5">
+        {[{ id: null as SoundRef | null, label: 'No sound' }, ...pads.map((p) => ({ id: p.id as SoundRef | null, label: p.label }))].map((s) => {
+          const isOn = s.id === popup.sound
+          return (
+            <button
+              key={s.id ?? 'none'}
+              type="button"
+              aria-pressed={isOn}
+              onClick={() => onChange({ sound: s.id })}
+              className={cx('min-h-[34px] rounded-full border px-3 text-[13px] font-semibold', isOn ? 'border-inverse-bg bg-inverse-bg text-inverse-fg' : 'border-line-strong bg-transparent text-text')}
+            >
+              {s.label}
+            </button>
+          )
+        })}
       </div>
-
-      <Button variant={on ? 'secondary' : 'primary'} size="lg" onClick={onToggle}>
-        {on ? 'Hide from screen' : 'Show on screen'}
-      </Button>
     </div>
+  )
+}
+
+function MiniPopup({ popup, url }: { popup: PopupConfig; url?: string }) {
+  if (popup.kind === 'image') {
+    return url ? <img src={url} alt="" className="max-h-16 max-w-full" /> : <span className="text-xs text-muted">Missing image</span>
+  }
+  const look = resolveLook(popup)
+  const circle = look.shape === 'circle'
+  return (
+    <span
+      className="grid max-w-full place-items-center overflow-hidden leading-none font-extrabold whitespace-nowrap"
+      style={{
+        fontSize: 12,
+        fontFamily: DISPLAY_FONT,
+        backgroundColor: look.bg,
+        color: look.fg,
+        border: look.border,
+        borderRadius: look.shape === 'tag' ? '0.28em' : 999,
+        padding: circle ? 0 : '0.42em 0.8em',
+        width: circle ? '3.2em' : 'auto',
+        height: circle ? '3.2em' : 'auto',
+        transform: `rotate(${look.rot})`,
+      }}
+    >
+      {look.text}
+    </span>
   )
 }

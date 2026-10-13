@@ -13,6 +13,8 @@ const COMPOSITOR_NOTES: Partial<Record<CompositorStatus, string>> = {
   'loading-segmentation': 'Getting background removal ready…',
   'segmentation-unavailable': "Background removal couldn't start in this browser, so viewers see your real room. Try Chrome or Edge, or use Green screen.",
   'chroma-unavailable': "Green screen needs WebGL, which this browser has turned off. Viewers see your camera as is.",
+  'loading-face-tracking': 'Getting face effects ready…',
+  'face-tracking-unavailable': "Face effects couldn't start in this browser, so viewers see your camera without them. Try Chrome or Edge.",
 }
 
 export function PreviewPanel({

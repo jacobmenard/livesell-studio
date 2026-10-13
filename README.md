@@ -230,8 +230,8 @@ npm test                        # node --test
   `SANCTUM_STATEFUL_DOMAINS`, `FRONTEND_URL`, `SESSION_SECURE_COOKIE=true`.
 - Run `php artisan reverb:start` under a process manager behind TLS; set
   `REVERB_ALLOWED_ORIGINS` to your domain and the `VITE_REVERB_*` values to match.
-- Self-host the segmentation model (`selfie_segmenter.tflite`) and set
-  `VITE_SEGMENTER_MODEL_URL`; MediaPipe's WebAssembly runtime is already served from
+- Self-host the segmentation model (`selfie_segmenter.tflite`) and the face model
+  (`face_landmarker.task`), and set `VITE_SEGMENTER_MODEL_URL` and `VITE_FACE_MODEL_URL`; MediaPipe's WebAssembly runtime is already served from
   `/mediapipe/wasm`.
 - Replace the synthesized placeholder sounds with licensed recordings
   (`SOUND_FILES` in `frontend/src/stage/sounds.ts`). Check platform rules on sounds like
