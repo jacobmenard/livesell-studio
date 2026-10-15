@@ -397,12 +397,13 @@ function highlighter(ctx: Ctx, face: FacePose, alpha: number): void {
   glow(ctx, midpoint(midpoint(face.eyeLeft, face.eyeRight), face.nose, 0.45), face.width * 0.05, 'rgba(255,245,235,1)', alpha * 0.8, 1.8, face.angle)
 }
 
-/** Light in the eyes: a soft glow around each iris and a bright catchlight. */
-function eyeLight(ctx: Ctx, face: FacePose, color: string, strength: number, spread: number): void {
+/** Light in the eyes: a soft glow around each iris and, unless turned off, a bright catchlight. */
+function eyeLight(ctx: Ctx, face: FacePose, color: string, strength: number, spread: number, catchlight = true): void {
   const r = face.irisRadius
   const up = faceUp(face)
   for (const eye of [face.eyeLeft, face.eyeRight]) {
     glow(ctx, eye, r * spread, color, strength)
+    if (!catchlight) continue
     // Catchlight up and to one side, like a ring light reflected in the eye.
     const spot = { x: eye.x + (up.x - up.y) * r * 0.35, y: eye.y + (up.y + up.x) * r * 0.35 }
     ctx.save()
@@ -453,7 +454,8 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
       const below = { x: eye.x - up.x * face.width * 0.065, y: eye.y - up.y * face.width * 0.065 }
       glow(ctx, below, face.width * 0.075, 'rgba(255,238,225,1)', 0.22, 0.45, face.angle)
     }
-    eyeLight(ctx, face, 'rgba(255,255,255,1)', 0.5, 2.6)
+    // Just a soft brightening: no white dot.
+    eyeLight(ctx, face, 'rgba(255,255,255,1)', 0.2, 2.2, false)
   },
 
   'glow-eyes': (ctx, face, t) => {

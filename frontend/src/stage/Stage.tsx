@@ -64,19 +64,28 @@ export function StageFrame({
   )
 }
 
-export type ResizeCorner = 'nw' | 'ne' | 'sw' | 'se'
+/** A resize handle: a corner, or the middle of an edge (n = top, e = right, s = bottom, w = left). */
+export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w'
 
-const CORNERS: { id: ResizeCorner; style: CSSProperties; cursor: string }[] = [
-  { id: 'nw', style: { left: -7, top: -7 }, cursor: 'nwse-resize' },
-  { id: 'ne', style: { right: -7, top: -7 }, cursor: 'nesw-resize' },
-  { id: 'sw', style: { left: -7, bottom: -7 }, cursor: 'nesw-resize' },
-  { id: 'se', style: { right: -7, bottom: -7 }, cursor: 'nwse-resize' },
+const CORNER = 16
+const EDGE_LONG = 22
+const EDGE_SHORT = 10
+// Corners are squares on the box's corners; edges are short bars centred on each side.
+const HANDLES: { id: ResizeHandle; style: CSSProperties; cursor: string }[] = [
+  { id: 'nw', style: { left: -CORNER / 2, top: -CORNER / 2, width: CORNER, height: CORNER }, cursor: 'nwse-resize' },
+  { id: 'ne', style: { right: -CORNER / 2, top: -CORNER / 2, width: CORNER, height: CORNER }, cursor: 'nesw-resize' },
+  { id: 'sw', style: { left: -CORNER / 2, bottom: -CORNER / 2, width: CORNER, height: CORNER }, cursor: 'nesw-resize' },
+  { id: 'se', style: { right: -CORNER / 2, bottom: -CORNER / 2, width: CORNER, height: CORNER }, cursor: 'nwse-resize' },
+  { id: 'n', style: { left: '50%', top: -EDGE_SHORT / 2, width: EDGE_LONG, height: EDGE_SHORT, marginLeft: -EDGE_LONG / 2 }, cursor: 'ns-resize' },
+  { id: 's', style: { left: '50%', bottom: -EDGE_SHORT / 2, width: EDGE_LONG, height: EDGE_SHORT, marginLeft: -EDGE_LONG / 2 }, cursor: 'ns-resize' },
+  { id: 'w', style: { top: '50%', left: -EDGE_SHORT / 2, width: EDGE_SHORT, height: EDGE_LONG, marginTop: -EDGE_LONG / 2 }, cursor: 'ew-resize' },
+  { id: 'e', style: { top: '50%', right: -EDGE_SHORT / 2, width: EDGE_SHORT, height: EDGE_LONG, marginTop: -EDGE_LONG / 2 }, cursor: 'ew-resize' },
 ]
 
-/** Editor-only: lets the seller drag a popup on the preview and resize it from its corners. */
+/** Editor-only: lets the seller drag a popup on the preview and resize it from its corners and edges. */
 export interface PopupEditing {
   selected: boolean
-  onPointerDown: (event: ReactPointerEvent<HTMLElement>, mode: 'move' | ResizeCorner) => void
+  onPointerDown: (event: ReactPointerEvent<HTMLElement>, mode: 'move' | ResizeHandle) => void
   onKeyDown: (event: ReactKeyboardEvent<HTMLElement>) => void
 }
 
@@ -100,7 +109,7 @@ export const PopupView = memo(function PopupView({
         'data-popup': popup.key,
         role: 'button',
         tabIndex: 0,
-        'aria-label': `${look.text}: drag to move, drag a corner to resize. Arrow keys move it, plus and minus resize it.`,
+        'aria-label': `${look.text}: drag to move, drag a corner or edge to resize. Arrow keys move it, plus and minus resize it.`,
         'aria-pressed': editing.selected,
         onPointerDown: (e: ReactPointerEvent<HTMLElement>) => editing.onPointerDown(e, 'move'),
         onKeyDown: editing.onKeyDown,
@@ -115,6 +124,9 @@ export const PopupView = memo(function PopupView({
         top: look.top,
         left: look.left,
         transform: `translate(${look.tx}, ${look.ty})`,
+        // Its own width wherever it sits: otherwise the browser only allows the room between its
+        // left edge and the stage's right edge, and squeezes pictures placed near an edge.
+        width: 'max-content',
         zIndex: editing?.selected ? 3 : 2,
         ...(editing && { cursor: 'move', touchAction: 'none', userSelect: 'none', outline: 'none' }),
       }}
@@ -123,15 +135,15 @@ export const PopupView = memo(function PopupView({
       {editing?.selected && (
         <>
           <div aria-hidden="true" style={{ position: 'absolute', inset: -4, border: '2px dashed #FF6B57', borderRadius: 6, pointerEvents: 'none', zIndex: 2 }} />
-          {CORNERS.map((c) => (
+          {HANDLES.map((h) => (
             <span
-              key={c.id}
+              key={h.id}
               aria-hidden="true"
               onPointerDown={(e) => {
                 e.stopPropagation()
-                editing.onPointerDown(e, c.id)
+                editing.onPointerDown(e, h.id)
               }}
-              style={{ position: 'absolute', width: 14, height: 14, borderRadius: 4, background: '#FFFFFF', border: '2px solid #FF6B57', boxSizing: 'border-box', cursor: c.cursor, zIndex: 3, ...c.style }}
+              style={{ position: 'absolute', borderRadius: 4, background: '#FFFFFF', border: '2px solid #FF6B57', boxSizing: 'border-box', cursor: h.cursor, zIndex: 3, touchAction: 'none', ...h.style }}
             />
           ))}
         </>
@@ -139,7 +151,8 @@ export const PopupView = memo(function PopupView({
       <div className={entrance} style={{ position: 'relative', zIndex: 1 }}>
         {look.kind === 'image' ? (
           look.imageUrl ? (
-            <img src={look.imageUrl} alt={look.text} draggable={false} style={{ display: 'block', height: `calc(var(--u) * ${look.imageU})`, width: 'auto' }} />
+            // maxWidth none: the base styles cap images at their box's width, which squeezed them.
+            <img src={look.imageUrl} alt={look.text} draggable={false} style={{ display: 'block', height: `calc(var(--u) * ${look.imageU})`, width: 'auto', maxWidth: 'none' }} />
           ) : null
         ) : (
           <div

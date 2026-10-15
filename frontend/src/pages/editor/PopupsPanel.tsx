@@ -344,8 +344,8 @@ function PlaceControls({ popup, on, onChange }: { popup: PopupConfig; on: boolea
           </div>
           <p className="m-0 text-xs text-muted">
             {on
-              ? 'Drag it on the preview to move it; drag a corner to resize, up to the full screen width. Or click it and use the arrow keys and + / −.'
-              : 'Show it on screen, then drag it on the preview to move it and drag a corner to resize.'}
+              ? 'Drag it on the preview to move it; drag a corner or a side to resize, up to the full screen width. Or click it and use the arrow keys and + / −.'
+              : 'Show it on screen, then drag it on the preview to move it and drag a corner or a side to resize.'}
           </p>
         </div>
       </div>

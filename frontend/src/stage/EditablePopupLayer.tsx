@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type KeyboardEvent, type PointerEvent } from 'react'
 import type { PopupLook } from '../lib/types'
 import { POPUP_SIZE } from './catalog'
-import { PopupView, type ResizeCorner } from './Stage'
+import { PopupView, type ResizeHandle } from './Stage'
 
 type EditablePopup = PopupLook & { shown_at?: number }
 
@@ -73,15 +73,46 @@ interface Drag extends Measured {
   mode: 'move' | 'resize'
   startX: number
   startY: number
-  startDistance: number
+  /** Resizing: the point that stays still (the opposite corner or edge) and the grabbed handle. */
+  anchorX: number
+  anchorY: number
+  handleX: number
+  handleY: number
   moved: boolean
 }
 
 /**
- * The editor preview's popups: drag one to move it anywhere, drag a corner to resize it
- * (evenly, around its centre) up to the full screen width, or use the arrow keys and + / −
- * once it's selected. Popups stay on screen. The clean screen and thumbnails
- * keep using the plain PopupLayer.
+ * Where a resize handle sits on a box, and the opposite point that stays still while it's
+ * dragged: the opposite corner, or the middle of the opposite edge.
+ */
+export function resizeAnchor(handle: ResizeHandle, box: { left: number; top: number; right: number; bottom: number }) {
+  const midX = (box.left + box.right) / 2
+  const midY = (box.top + box.bottom) / 2
+  const pick = (low: number, high: number, mid: number, lowKey: string, highKey: string) =>
+    handle.includes(lowKey) ? [low, high] : handle.includes(highKey) ? [high, low] : [mid, mid]
+  const [handleX, anchorX] = pick(box.left, box.right, midX, 'w', 'e')
+  const [handleY, anchorY] = pick(box.top, box.bottom, midY, 'n', 's')
+  return { handleX, handleY, anchorX, anchorY }
+}
+
+/**
+ * How much bigger a box gets when its handle is dragged to (x, y), keeping the anchor still.
+ * Popups scale evenly (pictures never stretch): a side handle follows the pointer across,
+ * a top or bottom handle follows it up and down, a corner follows it along the diagonal.
+ */
+export function resizeScale(d: { anchorX: number; anchorY: number; handleX: number; handleY: number }, x: number, y: number): number {
+  const vx = d.handleX - d.anchorX
+  const vy = d.handleY - d.anchorY
+  const length = vx * vx + vy * vy
+  if (length === 0) return 1
+  return ((x - d.anchorX) * vx + (y - d.anchorY) * vy) / length
+}
+
+/**
+ * The editor preview's popups: drag one to move it anywhere, drag a corner or an edge to
+ * resize it (evenly, with the opposite side staying put) up to the full screen width, or use
+ * the arrow keys and + / − once it's selected. Popups stay on screen. The clean screen and
+ * thumbnails keep using the plain PopupLayer.
  */
 export function EditablePopupLayer({
   popups,
@@ -114,10 +145,13 @@ export function EditablePopupLayer({
         onChangeRef.current(d.key, placeOnStage(d, d.centerX + dx, d.centerY + dy, d.size))
         return
       }
-      // Grows around the centre (pinned, so a grid-spot popup becomes freely placed), up to the full screen width.
-      const distance = Math.hypot(event.clientX - d.centerX, event.clientY - d.centerY)
-      const size = clampPopupSize((d.size * distance) / d.startDistance, d.maxSize)
-      onChangeRef.current(d.key, { size, ...placeOnStage(d, d.centerX, d.centerY, size) })
+      // The opposite corner or edge stays put (so a grid-spot popup becomes freely placed),
+      // up to the full screen width.
+      const size = clampPopupSize(d.size * Math.max(0.05, resizeScale(d, event.clientX, event.clientY)), d.maxSize)
+      const scale = size / d.size
+      const centerX = d.anchorX + (d.centerX - d.anchorX) * scale
+      const centerY = d.anchorY + (d.centerY - d.anchorY) * scale
+      onChangeRef.current(d.key, { size, ...placeOnStage(d, centerX, centerY, size) })
     }
     const end = () => {
       drag.current = null
@@ -133,7 +167,7 @@ export function EditablePopupLayer({
   }, [])
 
   const begin = useCallback(
-    (event: PointerEvent<HTMLElement>, popup: EditablePopup, mode: 'move' | ResizeCorner) => {
+    (event: PointerEvent<HTMLElement>, popup: EditablePopup, mode: 'move' | ResizeHandle) => {
       if (event.button !== 0) return
       onSelect(popup.key)
       const root = event.currentTarget.closest<HTMLElement>('[data-popup]')
@@ -142,13 +176,16 @@ export function EditablePopupLayer({
       // No text selection or image ghost while dragging; keep keyboard focus on the popup.
       event.preventDefault()
       root.focus({ preventScroll: true })
+      const halfWidth = measured.boxWidth / 2
+      const halfHeight = measured.boxHeight / 2
+      const box = { left: measured.centerX - halfWidth, right: measured.centerX + halfWidth, top: measured.centerY - halfHeight, bottom: measured.centerY + halfHeight }
       drag.current = {
         ...measured,
+        ...(mode === 'move' ? { anchorX: 0, anchorY: 0, handleX: 0, handleY: 0 } : resizeAnchor(mode, box)),
         key: popup.key,
         mode: mode === 'move' ? 'move' : 'resize',
         startX: event.clientX,
         startY: event.clientY,
-        startDistance: Math.max(8, Math.hypot(event.clientX - measured.centerX, event.clientY - measured.centerY)),
         moved: false,
       }
     },
