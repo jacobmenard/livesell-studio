@@ -7,6 +7,10 @@ export type ThemePref = 'light' | 'dark' | 'system'
 /** Face-tracked camera effects (drawn by src/stage/faceEffects.ts; same list as the API's Catalog). */
 export type FaceEffectId =
   | 'none'
+  | 'glam'
+  | 'natural-makeup'
+  | 'fresh-face'
+  | 'glow-eyes'
   | 'flower-crown'
   | 'butterflies'
   | 'puppy'

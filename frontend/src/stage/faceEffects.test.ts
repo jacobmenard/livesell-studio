@@ -58,6 +58,28 @@ describe('face effects', () => {
     })).toBeNull()
   })
 
+  it('reads lip and eyelid outlines for makeup, all or nothing, with eyelids on the right side', () => {
+    const base = points()
+    // Without outline points: makeup has nothing to draw, but the face is still usable.
+    const bare = poseFromPoints(base)!
+    expect(bare.lipsOuter).toEqual([])
+    expect(bare.lidLeft).toEqual([])
+    expect(bare.irisRadius).toBeGreaterThan(0)
+
+    const extra = new Map<number, Point>()
+    LANDMARKS.lipsOuter.forEach((i, n) => extra.set(i, { x: 470 + n * 3, y: 460 }))
+    LANDMARKS.lidA.forEach((i, n) => extra.set(i, { x: 520 + n * 4, y: 365 })) // irisA is at x 540 (screen right)
+    LANDMARKS.lidB.forEach((i, n) => extra.set(i, { x: 480 - n * 4, y: 365 }))
+    const withOutlines = poseFromPoints((i) => extra.get(i) ?? base(i))!
+    expect(withOutlines.lipsOuter).toHaveLength(LANDMARKS.lipsOuter.length)
+    expect(withOutlines.lidRight[0].x).toBe(520)
+    expect(withOutlines.lidLeft[0].x).toBe(480)
+
+    // One missing lip point: no lip outline rather than a broken shape.
+    const gappy = poseFromPoints((i) => (i === LANDMARKS.lipsOuter[3] ? undefined : (extra.get(i) ?? base(i))))!
+    expect(gappy.lipsOuter).toEqual([])
+  })
+
   it('smooths small moves but jumps to a face that moved far', () => {
     const a = poseFromPoints(points())!
     const nudged = { ...a, nose: { x: a.nose.x + 10, y: a.nose.y }, width: 210 }

@@ -77,7 +77,7 @@ final class Catalog
 
     /** Face-tracked camera effects (frontend src/stage/faceEffects.ts). */
     public const FACE_EFFECTS = [
-        'none', 'flower-crown', 'butterflies', 'puppy', 'bunny', 'kitty', 'bear', 'heart-eyes', 'star-eyes',
+        'none', 'glam', 'natural-makeup', 'fresh-face', 'glow-eyes', 'flower-crown', 'butterflies', 'puppy', 'bunny', 'kitty', 'bear', 'heart-eyes', 'star-eyes',
         'money-eyes', 'shades', 'crown', 'halo', 'devil', 'blush', 'sparkles', 'love-hearts', 'crying',
         'clown', 'mustache', 'piggy', 'cowboy', 'party', 'rainbow',
     ];

@@ -12,6 +12,10 @@ export type { FaceEffectId }
 
 export const FACE_EFFECTS: { id: FaceEffectId; label: string; icon: string }[] = [
   { id: 'none', label: 'None', icon: '🚫' },
+  { id: 'glam', label: 'Glam makeup', icon: '💄' },
+  { id: 'natural-makeup', label: 'Natural makeup', icon: '💋' },
+  { id: 'fresh-face', label: 'Fresh face', icon: '🌟' },
+  { id: 'glow-eyes', label: 'Glowing eyes', icon: '👁️' },
   { id: 'flower-crown', label: 'Flower crown', icon: '🌸' },
   { id: 'butterflies', label: 'Butterflies', icon: '🦋' },
   { id: 'puppy', label: 'Puppy', icon: '🐶' },
@@ -65,6 +69,14 @@ export interface FacePose {
   angle: number
   /** 0 = closed, about 0.15+ = wide open. */
   mouthOpen: number
+  /** Lip outlines for makeup, outer and inner (empty when the tracker didn't give them). */
+  lipsOuter: Point[]
+  lipsInner: Point[]
+  /** Upper eyelids, from the outer corner to the inner one. */
+  lidLeft: Point[]
+  lidRight: Point[]
+  /** Iris radius, in stage pixels. */
+  irisRadius: number
 }
 
 /** MediaPipe face-mesh points used here (478-point model; 468 and 473 are the irises). */
@@ -82,6 +94,14 @@ export const LANDMARKS = {
   irisB: 473,
   eyeA: [33, 133],
   eyeB: [362, 263],
+  // Iris edges (left and right of each iris), for its size.
+  irisEdgeA: [469, 471],
+  irisEdgeB: [474, 476],
+  lipsOuter: [61, 185, 40, 39, 37, 0, 267, 269, 270, 409, 291, 375, 321, 405, 314, 17, 84, 181, 91, 146],
+  lipsInner: [78, 191, 80, 81, 82, 13, 312, 311, 310, 415, 308, 324, 318, 402, 317, 14, 87, 178, 88, 95],
+  // Upper eyelids, outer corner first: A goes with irisA, B with irisB.
+  lidA: [33, 246, 161, 160, 159, 158, 157, 173, 133],
+  lidB: [263, 466, 388, 387, 386, 385, 384, 398, 362],
 } as const
 
 /**
@@ -112,8 +132,19 @@ export function poseFromPoints(p: (i: number) => Point | undefined): FacePose | 
   const width = Math.hypot(edgeB.x - edgeA.x, edgeB.y - edgeA.y)
   const height = Math.hypot(chin.x - top.x, chin.y - top.y)
   if (width < 8 || height < 8) return null
-  const [eyeLeft, eyeRight] = eyeA.x <= eyeB.x ? [eyeA, eyeB] : [eyeB, eyeA]
+  const aIsLeft = eyeA.x <= eyeB.x
+  const [eyeLeft, eyeRight] = aIsLeft ? [eyeA, eyeB] : [eyeB, eyeA]
   const [cheekLeft, cheekRight] = cheekA.x <= cheekB.x ? [cheekA, cheekB] : [cheekB, cheekA]
+
+  // Outlines are all-or-nothing: a partial one would draw a broken shape.
+  const outline = (indices: readonly number[]): Point[] => {
+    const pts = indices.map((i) => p(i))
+    return pts.every((pt): pt is Point => pt !== undefined) ? pts : []
+  }
+  const lidA = outline(LANDMARKS.lidA)
+  const lidB = outline(LANDMARKS.lidB)
+  const irisEdges = outline(LANDMARKS.irisEdgeA)
+  const irisRadius = irisEdges.length === 2 ? Math.hypot(irisEdges[1].x - irisEdges[0].x, irisEdges[1].y - irisEdges[0].y) / 2 : width * 0.025
 
   return {
     top,
@@ -128,6 +159,11 @@ export function poseFromPoints(p: (i: number) => Point | undefined): FacePose | 
     width,
     angle: Math.atan2(eyeRight.y - eyeLeft.y, eyeRight.x - eyeLeft.x),
     mouthOpen: Math.hypot(mouthBottom.x - mouthTop.x, mouthBottom.y - mouthTop.y) / height,
+    lipsOuter: outline(LANDMARKS.lipsOuter),
+    lipsInner: outline(LANDMARKS.lipsInner),
+    lidLeft: aIsLeft ? lidA : lidB,
+    lidRight: aIsLeft ? lidB : lidA,
+    irisRadius,
   }
 }
 
@@ -136,6 +172,7 @@ export function smoothPose(previous: FacePose | null, next: FacePose, amount = 0
   if (!previous) return next
   const k = 1 - amount
   const pt = (a: Point, b: Point): Point => ({ x: a.x + (b.x - a.x) * k, y: a.y + (b.y - a.y) * k })
+  const list = (a: Point[], b: Point[]): Point[] => (a.length === b.length ? a.map((p, i) => pt(p, b[i])) : b)
   // A big jump (another face, a cut) shouldn't glide across the screen.
   if (Math.hypot(next.nose.x - previous.nose.x, next.nose.y - previous.nose.y) > next.width * 0.8) return next
   let turn = next.angle - previous.angle
@@ -154,6 +191,11 @@ export function smoothPose(previous: FacePose | null, next: FacePose, amount = 0
     width: previous.width + (next.width - previous.width) * k,
     angle: previous.angle + turn * k,
     mouthOpen: previous.mouthOpen + (next.mouthOpen - previous.mouthOpen) * k,
+    lipsOuter: list(previous.lipsOuter, next.lipsOuter),
+    lipsInner: list(previous.lipsInner, next.lipsInner),
+    lidLeft: list(previous.lidLeft, next.lidLeft),
+    lidRight: list(previous.lidRight, next.lidRight),
+    irisRadius: previous.irisRadius + (next.irisRadius - previous.irisRadius) * k,
   }
 }
 
@@ -217,7 +259,215 @@ function overEyes(face: FacePose, paint: (eye: Point, u: number, index: number) 
   ;[face.eyeLeft, face.eyeRight].forEach((eye, i) => paint(eye, face.width, i))
 }
 
+// ---- makeup ----------------------------------------------------------------
+
+/** "Up" for the face (towards the forehead), following the head tilt. */
+function faceUp(face: FacePose): Point {
+  return { x: Math.sin(face.angle), y: -Math.cos(face.angle) }
+}
+
+/** A closed outline with rounded corners (curves through the midpoints). */
+function traceSmooth(ctx: Ctx, pts: Point[]): void {
+  const n = pts.length
+  const mid = (a: Point, b: Point) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
+  const start = mid(pts[n - 1], pts[0])
+  ctx.moveTo(start.x, start.y)
+  for (let i = 0; i < n; i++) {
+    const next = mid(pts[i], pts[(i + 1) % n])
+    ctx.quadraticCurveTo(pts[i].x, pts[i].y, next.x, next.y)
+  }
+  ctx.closePath()
+}
+
+/**
+ * Colour laid over the skin like makeup: multiplied (so skin texture shows through) and
+ * softly blurred at the edges.
+ */
+function tint(ctx: Ctx, face: FacePose, color: string, alpha: number, softness: number, shape: () => void): void {
+  ctx.save()
+  ctx.filter = `blur(${Math.max(0.5, face.width * softness).toFixed(1)}px)`
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.globalAlpha = alpha
+  ctx.fillStyle = color
+  ctx.beginPath()
+  shape()
+  ctx.fill('evenodd')
+  ctx.restore()
+}
+
+/** A soft round light (gloss, highlighter, glowing eyes): adds light instead of colour. */
+function glow(ctx: Ctx, at: Point, radius: number, color: string, alpha: number, squash = 1, turn = 0): void {
+  if (radius <= 0 || alpha <= 0) return
+  ctx.save()
+  ctx.globalCompositeOperation = 'screen'
+  ctx.translate(at.x, at.y)
+  ctx.rotate(turn)
+  ctx.scale(1, squash)
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, radius)
+  g.addColorStop(0, color)
+  g.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.globalAlpha = alpha
+  ctx.fillStyle = g
+  ctx.beginPath()
+  ctx.arc(0, 0, radius, 0, Math.PI * 2)
+  ctx.fill()
+  ctx.restore()
+}
+
+/** Lip colour (the open mouth stays clear) with a touch of gloss on the lower lip. */
+function lipstick(ctx: Ctx, face: FacePose, color: string, alpha: number, gloss: number): void {
+  const { lipsOuter: outer, lipsInner: inner } = face
+  if (outer.length < 3) return
+  tint(ctx, face, color, alpha, 0.005, () => {
+    traceSmooth(ctx, outer)
+    if (inner.length >= 3) traceSmooth(ctx, inner)
+  })
+  // Lower lip centre: between the outer and inner outlines' bottom points.
+  const low = outer[15]
+  const lowInner = inner.length > 15 ? inner[15] : face.mouthBottom
+  if (low && gloss > 0) glow(ctx, midpoint(low, lowInner, 0.55), face.width * 0.05, 'rgba(255,255,255,1)', gloss, 0.4, face.angle)
+}
+
+/** Shadow over each upper eyelid, highest in the middle, fading at the corners. */
+function eyeshadow(ctx: Ctx, face: FacePose, color: string, alpha: number): void {
+  const up = faceUp(face)
+  for (const lid of [face.lidLeft, face.lidRight]) {
+    if (lid.length < 3) continue
+    const height = face.width * 0.075
+    const crease = lid.map((p, i) => {
+      const lift = height * (0.35 + 0.65 * Math.sin((i / (lid.length - 1)) * Math.PI))
+      return { x: p.x + up.x * lift, y: p.y + up.y * lift }
+    })
+    tint(ctx, face, color, alpha, 0.014, () => {
+      ctx.moveTo(lid[0].x, lid[0].y)
+      for (const p of lid) ctx.lineTo(p.x, p.y)
+      for (const p of [...crease].reverse()) ctx.lineTo(p.x, p.y)
+      ctx.closePath()
+    })
+  }
+}
+
+/** A thin line along each upper lash line, flicked up into a wing at the outer corner. */
+function eyeliner(ctx: Ctx, face: FacePose): void {
+  const up = faceUp(face)
+  ctx.save()
+  ctx.strokeStyle = 'rgba(25,14,20,0.85)'
+  ctx.lineWidth = Math.max(1, face.width * 0.011)
+  ctx.lineJoin = 'round'
+  ctx.lineCap = 'round'
+  const across = { x: Math.cos(face.angle), y: Math.sin(face.angle) }
+  for (const lid of [face.lidLeft, face.lidRight]) {
+    if (lid.length < 3) continue
+    const corner = lid[0]
+    const inner = lid[lid.length - 1]
+    // Outwards along the face (away from the nose), then flicked up.
+    const side = Math.sign((corner.x - inner.x) * across.x + (corner.y - inner.y) * across.y) || 1
+    const wing = {
+      x: corner.x + across.x * side * face.width * 0.055 + up.x * face.width * 0.035,
+      y: corner.y + across.y * side * face.width * 0.055 + up.y * face.width * 0.035,
+    }
+    ctx.beginPath()
+    ctx.moveTo(wing.x, wing.y)
+    for (const p of lid) ctx.lineTo(p.x, p.y)
+    ctx.stroke()
+  }
+  ctx.restore()
+}
+
+function cheekBlush(ctx: Ctx, face: FacePose, rgb: string, alpha: number, size = 0.17): void {
+  for (const cheek of [face.cheekLeft, face.cheekRight]) {
+    const r = face.width * size
+    const g = ctx.createRadialGradient(cheek.x, cheek.y, 0, cheek.x, cheek.y, r)
+    g.addColorStop(0, `rgba(${rgb},${alpha})`)
+    g.addColorStop(1, `rgba(${rgb},0)`)
+    ctx.fillStyle = g
+    ctx.beginPath()
+    ctx.arc(cheek.x, cheek.y, r, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+/** Highlighter on the cheekbones and down the nose. */
+function highlighter(ctx: Ctx, face: FacePose, alpha: number): void {
+  const up = faceUp(face)
+  for (const cheek of [face.cheekLeft, face.cheekRight]) {
+    const bone = { x: cheek.x + up.x * face.width * 0.07, y: cheek.y + up.y * face.width * 0.07 }
+    glow(ctx, bone, face.width * 0.08, 'rgba(255,240,230,1)', alpha, 0.55, face.angle)
+  }
+  glow(ctx, midpoint(midpoint(face.eyeLeft, face.eyeRight), face.nose, 0.45), face.width * 0.05, 'rgba(255,245,235,1)', alpha * 0.8, 1.8, face.angle)
+}
+
+/** Light in the eyes: a soft glow around each iris and a bright catchlight. */
+function eyeLight(ctx: Ctx, face: FacePose, color: string, strength: number, spread: number): void {
+  const r = face.irisRadius
+  const up = faceUp(face)
+  for (const eye of [face.eyeLeft, face.eyeRight]) {
+    glow(ctx, eye, r * spread, color, strength)
+    // Catchlight up and to one side, like a ring light reflected in the eye.
+    const spot = { x: eye.x + (up.x - up.y) * r * 0.35, y: eye.y + (up.y + up.x) * r * 0.35 }
+    ctx.save()
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'
+    ctx.beginPath()
+    ctx.arc(spot.x, spot.y, Math.max(1, r * 0.22), 0, Math.PI * 2)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
 const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, t: number) => void> = {
+  glam: (ctx, face, t) => {
+    eyeshadow(ctx, face, '#8e44ad', 0.45)
+    eyeliner(ctx, face)
+    cheekBlush(ctx, face, '255,92,138', 0.32)
+    highlighter(ctx, face, 0.22)
+    lipstick(ctx, face, '#b0124a', 0.6, 0.35)
+    eyeLight(ctx, face, 'rgba(255,236,250,1)', 0.35, 2.4)
+    // Little twinkles at the outer corners of the eyes.
+    const twinkle = 0.5 + 0.5 * Math.sin(t * 3.2)
+    const up = faceUp(face)
+    ;[face.lidLeft[0] ?? face.eyeLeft, face.lidRight[0] ?? face.eyeRight].forEach((corner, i) => {
+      const side = i === 0 ? -1 : 1
+      const along = { x: Math.cos(face.angle), y: Math.sin(face.angle) }
+      const x = corner.x + along.x * side * face.width * 0.06 + up.x * face.width * 0.05
+      const y = corner.y + along.y * side * face.width * 0.06 + up.y * face.width * 0.05
+      emoji(ctx, '✨', x, y, face.width * (0.05 + 0.03 * (i === 0 ? twinkle : 1 - twinkle)), 0, 0.5 + 0.5 * (i === 0 ? twinkle : 1 - twinkle))
+    })
+  },
+
+  'natural-makeup': (ctx, face) => {
+    eyeshadow(ctx, face, '#b9806e', 0.28)
+    cheekBlush(ctx, face, '255,120,140', 0.24, 0.15)
+    highlighter(ctx, face, 0.14)
+    lipstick(ctx, face, '#d0586f', 0.38, 0.25)
+    eyeLight(ctx, face, 'rgba(255,250,245,1)', 0.22, 2)
+  },
+
+  // Face makeup with no lipstick (lips stay natural), and brighter, more awake eyes.
+  'fresh-face': (ctx, face) => {
+    eyeshadow(ctx, face, '#c79a86', 0.26)
+    cheekBlush(ctx, face, '255,128,140', 0.26, 0.16)
+    highlighter(ctx, face, 0.2)
+    // Under-eye brightener: lifts dark circles.
+    const up = faceUp(face)
+    for (const eye of [face.eyeLeft, face.eyeRight]) {
+      const below = { x: eye.x - up.x * face.width * 0.065, y: eye.y - up.y * face.width * 0.065 }
+      glow(ctx, below, face.width * 0.075, 'rgba(255,238,225,1)', 0.22, 0.45, face.angle)
+    }
+    eyeLight(ctx, face, 'rgba(255,255,255,1)', 0.5, 2.6)
+  },
+
+  'glow-eyes': (ctx, face, t) => {
+    // A glow that slowly shifts between violet, pink and cyan, and gently pulses.
+    const hue = 200 + 80 * Math.sin(t * 0.8)
+    const pulse = 0.8 + 0.2 * Math.sin(t * 3)
+    const color = `hsla(${hue.toFixed(0)},100%,62%,1)`
+    for (const eye of [face.eyeLeft, face.eyeRight]) {
+      glow(ctx, eye, face.irisRadius * 9, color, 0.45 * pulse)
+      glow(ctx, eye, face.irisRadius * 4, color, 0.75 * pulse)
+    }
+    eyeLight(ctx, face, `hsla(${hue.toFixed(0)},100%,75%,1)`, pulse, 1.8)
+  },
+
   'flower-crown': (ctx, face, t) =>
     local(ctx, face.top, face, (u) => {
       const flowers = ['🌸', '🌼', '🌺', '🌷', '🌸', '🌺', '🌷', '🌼', '🌸']
@@ -402,16 +652,7 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
     }),
 
   blush: (ctx, face) => {
-    for (const cheek of [face.cheekLeft, face.cheekRight]) {
-      const r = face.width * 0.17
-      const glow = ctx.createRadialGradient(cheek.x, cheek.y, 0, cheek.x, cheek.y, r)
-      glow.addColorStop(0, 'rgba(255,105,140,0.45)')
-      glow.addColorStop(1, 'rgba(255,105,140,0)')
-      ctx.fillStyle = glow
-      ctx.beginPath()
-      ctx.arc(cheek.x, cheek.y, r, 0, Math.PI * 2)
-      ctx.fill()
-    }
+    cheekBlush(ctx, face, '255,105,140', 0.45)
     // A few freckles across the nose and cheeks.
     local(ctx, midpoint(face.eyeLeft, face.eyeRight, 0.5), face, (u) => {
       const spots: [number, number][] = [
