@@ -27,8 +27,6 @@ export interface CompositorSettings {
   keyColor: [number, number, number]
   similarity: number
   smoothness: number
-  /** Solid color shown behind everything when there is no picture yet. */
-  tone: string
 }
 
 /** What the seller should know about background removal and face effects (never shown to viewers). */
@@ -42,9 +40,10 @@ export type CompositorStatus =
 
 /**
  * Draws the camera with its background treatment into a canvas, every frame:
- * None (as is), Blur (soft room), Picture (person cut out over a picture) or
- * Green screen (keyed over a picture). If background removal can't run, it falls
- * back to the plain camera rather than hiding the seller.
+ * None (as is), Blur (soft room), Picture (person cut out) or Green screen (keyed).
+ * For Picture and Green screen the canvas stays see-through around the seller, and the
+ * picture shows from behind it (VideoLayer), so animated GIF backgrounds play. If background
+ * removal can't run, it falls back to the plain camera rather than hiding the seller.
  */
 export class Compositor {
   private ctx: CanvasRenderingContext2D
@@ -55,7 +54,6 @@ export class Compositor {
   private maskData: ImageData | null = null
   private hasMask = false
   private video: HTMLVideoElement | null = null
-  private background: HTMLImageElement | null = null
   private settings: CompositorSettings | null = null
   private segmenter: ImageSegmenter | null = null
   private segmenterState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle'
@@ -97,10 +95,6 @@ export class Compositor {
     this.lastVideoTime = -1
     this.faceVideoTime = -1
     this.pose = null
-  }
-
-  setBackground(image: HTMLImageElement | null): void {
-    this.background = image
   }
 
   update(settings: CompositorSettings): void {
@@ -218,10 +212,9 @@ export class Compositor {
     const video = this.video
     const live = video !== null && video.readyState >= 2 && video.videoWidth > 0
 
-    // 1. What is behind the seller.
-    if (s.mode === 'image' || s.mode === 'green') {
-      this.drawPicture(W, H, s.tone)
-    } else if (!live) {
+    // 1. What is behind the seller. A Picture / Green screen picture shows from behind the
+    //    canvas (VideoLayer); with no camera yet, None and Blur show a plain dark stage.
+    if (!live && (s.mode === 'none' || s.mode === 'blur')) {
       ctx.fillStyle = '#2A2730'
       ctx.fillRect(0, 0, W, H)
     }
@@ -348,16 +341,6 @@ export class Compositor {
     const pad = W * 0.04
     ctx.drawImage(frame, ...coverCrop(video.videoWidth, video.videoHeight, W, H, zoom), -pad, -pad, W + pad * 2, H + pad * 2)
     ctx.filter = 'none'
-  }
-
-  private drawPicture(W: number, H: number, tone: string): void {
-    const { ctx } = this
-    ctx.fillStyle = tone
-    ctx.fillRect(0, 0, W, H)
-    const img = this.background
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.drawImage(img, ...coverCrop(img.naturalWidth, img.naturalHeight, W, H), 0, 0, W, H)
-    }
   }
 
   /** Runs segmentation once per new camera frame. Returns whether a mask is ready. */

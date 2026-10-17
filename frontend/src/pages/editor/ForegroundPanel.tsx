@@ -61,7 +61,7 @@ export function ForegroundPanel({
             </button>
           )
         })}
-        <UploadTile label="Upload foreground" hint="A wide PNG with a see-through background works best · 5 MB" accept={ACCEPT.foreground} onFile={onUpload} busy={uploading} className="min-h-[92px]" />
+        <UploadTile label="Upload foreground" hint="A wide PNG or GIF with a see-through background works best · 5 MB" accept={ACCEPT.foreground} onFile={onUpload} busy={uploading} className="min-h-[92px]" />
       </div>
 
       {error && <Alert>{error}</Alert>}

@@ -81,7 +81,7 @@ export function BackgroundPanel({
               </div>
             ),
           )}
-          <UploadTile label="Upload photo" hint="PNG, JPG, WEBP · 5 MB" accept={ACCEPT.background} onFile={onUpload} busy={uploading} className="min-h-[92px]" />
+          <UploadTile label="Upload photo" hint="PNG, JPG, WEBP or GIF (moving pictures play) · 5 MB" accept={ACCEPT.background} onFile={onUpload} busy={uploading} className="min-h-[92px]" />
         </div>
       )}
 

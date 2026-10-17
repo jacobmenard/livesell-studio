@@ -28,7 +28,7 @@ final class MediaStorage
     /** Allowed content types per kind, as detected from the file's bytes. */
     public const MIME_TYPES = [
         'image' => ['image/png', 'image/webp', 'image/gif', 'image/jpeg'],
-        'background' => ['image/png', 'image/jpeg', 'image/webp'],
+        'background' => ['image/png', 'image/jpeg', 'image/webp', 'image/gif'],
         'foreground' => ['image/png', 'image/webp', 'image/gif', 'image/jpeg'],
         'sound' => [
             'audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/vnd.wave',
@@ -40,7 +40,7 @@ final class MediaStorage
 
     public const EXTENSIONS = [
         'image' => ['png', 'webp', 'gif', 'jpg', 'jpeg'],
-        'background' => ['png', 'jpg', 'jpeg', 'webp'],
+        'background' => ['png', 'jpg', 'jpeg', 'webp', 'gif'],
         'foreground' => ['png', 'webp', 'gif', 'jpg', 'jpeg'],
         'sound' => ['mp3', 'wav', 'ogg', 'oga', 'm4a', 'aac'],
     ];

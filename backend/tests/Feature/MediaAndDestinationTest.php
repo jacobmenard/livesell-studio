@@ -53,9 +53,9 @@ class MediaAndDestinationTest extends TestCase
         $this->post('/api/media', ['kind' => 'background', 'file' => $big])
             ->assertUnprocessable()->assertJsonValidationErrors(['file']);
 
-        // GIF is fine for popups but not for backgrounds.
-        $gif = UploadedFile::fake()->image('party.gif', 50, 50);
-        $this->post('/api/media', ['kind' => 'background', 'file' => $gif])
+        // A sound is not a picture, whatever the kind asked for.
+        $sound = UploadedFile::fake()->create('jingle.mp3', 10, 'audio/mpeg');
+        $this->post('/api/media', ['kind' => 'background', 'file' => $sound])
             ->assertUnprocessable()->assertJsonValidationErrors(['file']);
     }
 
@@ -77,6 +77,25 @@ class MediaAndDestinationTest extends TestCase
         $this->actingAs($me)->deleteJson("/api/media/{$id}")->assertNoContent();
         $this->assertDatabaseMissing('media', ['id' => $id]);
         $this->assertDatabaseMissing('setup_popups', ['key' => 'img-1']);
+    }
+
+    public function test_gifs_can_be_backgrounds_and_foregrounds_and_stay_gifs_so_they_keep_moving(): void
+    {
+        $me = User::factory()->create();
+        $this->actingAs($me);
+
+        foreach (['background', 'foreground'] as $kind) {
+            $id = $this->post('/api/media', ['kind' => $kind, 'file' => UploadedFile::fake()->image("moving-{$kind}.gif", 320, 180)])
+                ->assertCreated()
+                ->assertJsonPath('data.kind', $kind)
+                ->json('data.id');
+
+            $media = Media::query()->findOrFail($id);
+            $this->assertSame('image/gif', $media->mime);
+            $this->assertStringEndsWith('.gif', $media->path);
+            // Stored as-is (GIFs aren't re-encoded), so every frame is kept.
+            $this->assertStringStartsWith('GIF8', Storage::disk('public')->get($media->path));
+        }
     }
 
     public function test_deleting_a_background_photo_puts_setups_back_on_their_built_in_background(): void

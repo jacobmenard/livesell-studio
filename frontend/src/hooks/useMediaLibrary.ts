@@ -6,7 +6,7 @@ import { MAX_UPLOAD_BYTES } from '../stage/catalog'
 
 const TYPES: Record<MediaKind, { mimes: string[]; label: string }> = {
   image: { mimes: ['image/png', 'image/webp', 'image/gif', 'image/jpeg'], label: 'PNG, WEBP, GIF or JPG' },
-  background: { mimes: ['image/png', 'image/jpeg', 'image/webp'], label: 'PNG, JPG or WEBP' },
+  background: { mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], label: 'PNG, JPG, WEBP or GIF' },
   foreground: { mimes: ['image/png', 'image/webp', 'image/gif', 'image/jpeg'], label: 'PNG, WEBP, GIF or JPG' },
   sound: { mimes: ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/x-wav', 'audio/wave', 'audio/ogg', 'audio/mp4', 'audio/x-m4a', 'audio/aac'], label: 'MP3, WAV, OGG or M4A' },
 }

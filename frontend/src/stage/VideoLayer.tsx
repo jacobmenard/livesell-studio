@@ -16,7 +16,11 @@ interface VideoLayerProps {
   onStatus?: (status: CompositorStatus) => void
 }
 
-/** Camera + background, drawn on a canvas that fills the stage. */
+/**
+ * Camera + background filling the stage. The camera (and the seller cut out of it) is drawn on
+ * a canvas; a background picture sits behind it as a plain image, so animated GIFs play (a
+ * canvas only ever gets a GIF's first frame).
+ */
 export function VideoLayer({ stream, orientation, resolution, camera, background, backgroundUrl, onStatus }: VideoLayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const compositorRef = useRef<Compositor | null>(null)
@@ -66,24 +70,7 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
 
   const preset = BACKGROUND_BY_ID[background.preset] ?? BACKGROUND_BY_ID.rack
   const pictureUrl = backgroundUrl ?? preset.src
-
-  useEffect(() => {
-    const compositor = compositorRef.current
-    if (!compositor) return
-    let cancelled = false
-    const img = new Image()
-    img.decoding = 'async'
-    img.onload = () => {
-      if (!cancelled) compositor.setBackground(img)
-    }
-    img.onerror = () => {
-      if (!cancelled) compositor.setBackground(null)
-    }
-    img.src = pictureUrl
-    return () => {
-      cancelled = true
-    }
-  }, [pictureUrl])
+  const showsPicture = background.mode === 'image' || background.mode === 'green'
 
   const { width, height } = outputSize(orientation, resolution)
   const key = (KEY_COLORS.find((k) => k.id === background.key_color) ?? KEY_COLORS[0]).rgb
@@ -106,9 +93,18 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
       keyColor: key,
       similarity: background.similarity,
       smoothness: background.smoothness,
-      tone: backgroundUrl ? '#17151C' : preset.tone,
     })
-  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, faceEffect, zoom, key, background.similarity, background.smoothness, backgroundUrl, preset.tone])
+  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, faceEffect, zoom, key, background.similarity, background.smoothness])
 
-  return <canvas ref={canvasRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+  return (
+    <>
+      {showsPicture && (
+        // Filled edge to edge (cropped, never stretched), on its tone while it loads.
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, backgroundColor: backgroundUrl ? '#17151C' : preset.tone }}>
+          <img src={pictureUrl} alt="" draggable={false} style={{ display: 'block', width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover' }} />
+        </div>
+      )}
+      <canvas ref={canvasRef} aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }} />
+    </>
+  )
 }
