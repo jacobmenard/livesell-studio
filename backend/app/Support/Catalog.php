@@ -83,10 +83,13 @@ final class Catalog
 
     /** Face-tracked camera effects (frontend src/stage/faceEffects.ts). */
     public const FACE_EFFECTS = [
-        'none', 'glam', 'natural-makeup', 'fresh-face', 'nude-glow', 'rosy-cheeks', 'peach-fresh', 'coral-summer',
+        'none', 'glam', 'natural-makeup', 'fresh-face', 'clean-girl', 'latte', 'strawberry', 'cold-girl', 'sun-kissed',
+        'douyin', 'glazed-donut', 'mob-wife', 'siren-eyes', 'tomato-girl', 'igari', 'coquette', 'cherry-cola',
+        'brownie-glazed', 'supermodel-90s', 'blueberry-milk', 'barbie', 'soft-goth', 'euphoria', 'grunge', 'vampire', 'pearl', 'nude-glow', 'rosy-cheeks', 'peach-fresh', 'coral-summer',
         'soft-berry', 'mlbb', 'k-beauty', 'bronzed', 'evening-glam', 'pink-doll', 'glow-eyes', 'flower-crown', 'butterflies', 'puppy', 'bunny', 'kitty', 'bear', 'heart-eyes', 'star-eyes',
         'money-eyes', 'shades', 'crown', 'halo', 'devil', 'blush', 'sparkles', 'love-hearts', 'crying',
-        'clown', 'mustache', 'piggy', 'cowboy', 'party', 'rainbow',
+        'clown', 'mustache', 'piggy', 'cowboy', 'party', 'rainbow', 'tiara', 'bow', 'deer', 'fox', 'frog-hat',
+        'heart-glasses', 'dizzy-stars', 'petals', 'witch-hat', 'shopping',
     ];
 
     public const OUTPUT_METHODS = ['window', 'rtmp', 'vcam'];

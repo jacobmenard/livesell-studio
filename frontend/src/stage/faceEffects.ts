@@ -15,6 +15,29 @@ export type FaceEffectGroup = 'makeup' | 'fun'
 
 export const FACE_EFFECTS: { id: FaceEffectId; label: string; icon: string; group: FaceEffectGroup | 'both' }[] = [
   { id: 'none', label: 'None', icon: '🚫', group: 'both' },
+  // Trending on TikTok.
+  { id: 'clean-girl', label: 'Clean girl', icon: '🤍', group: 'makeup' },
+  { id: 'glazed-donut', label: 'Glazed donut', icon: '🍩', group: 'makeup' },
+  { id: 'douyin', label: 'Douyin', icon: '🌸', group: 'makeup' },
+  { id: 'latte', label: 'Latte', icon: '☕', group: 'makeup' },
+  { id: 'strawberry', label: 'Strawberry', icon: '🍓', group: 'makeup' },
+  { id: 'cold-girl', label: 'Cold girl', icon: '❄️', group: 'makeup' },
+  { id: 'sun-kissed', label: 'Sun-kissed', icon: '🌞', group: 'makeup' },
+  { id: 'tomato-girl', label: 'Tomato girl', icon: '🍅', group: 'makeup' },
+  { id: 'igari', label: 'Igari blush', icon: '🥂', group: 'makeup' },
+  { id: 'coquette', label: 'Coquette', icon: '💗', group: 'makeup' },
+  { id: 'siren-eyes', label: 'Siren eyes', icon: '🐍', group: 'makeup' },
+  { id: 'mob-wife', label: 'Mob wife', icon: '🍷', group: 'makeup' },
+  { id: 'cherry-cola', label: 'Cherry cola', icon: '🍒', group: 'makeup' },
+  { id: 'brownie-glazed', label: 'Brownie glazed lips', icon: '🍫', group: 'makeup' },
+  { id: 'supermodel-90s', label: '90s supermodel', icon: '📸', group: 'makeup' },
+  { id: 'blueberry-milk', label: 'Blueberry milk', icon: '🥛', group: 'makeup' },
+  { id: 'barbie', label: 'Barbie pink', icon: '💖', group: 'makeup' },
+  { id: 'soft-goth', label: 'Soft goth', icon: '🖤', group: 'makeup' },
+  { id: 'euphoria', label: 'Euphoria glitter', icon: '💎', group: 'makeup' },
+  { id: 'grunge', label: 'Grunge', icon: '🎸', group: 'makeup' },
+  { id: 'vampire', label: 'Vampire', icon: '🧛', group: 'makeup' },
+  { id: 'pearl', label: 'Pearl mermaid', icon: '🐚', group: 'makeup' },
   { id: 'natural-makeup', label: 'Natural makeup', icon: '💋', group: 'makeup' },
   { id: 'fresh-face', label: 'Fresh face', icon: '🌟', group: 'makeup' },
   { id: 'mlbb', label: 'My lips but better', icon: '👄', group: 'makeup' },
@@ -52,6 +75,16 @@ export const FACE_EFFECTS: { id: FaceEffectId; label: string; icon: string; grou
   { id: 'cowboy', label: 'Cowboy hat', icon: '🤠', group: 'fun' },
   { id: 'party', label: 'Party hat', icon: '🥳', group: 'fun' },
   { id: 'rainbow', label: 'Rainbow', icon: '🌈', group: 'fun' },
+  { id: 'tiara', label: 'Princess tiara', icon: '👸', group: 'fun' },
+  { id: 'bow', label: 'Hair bow', icon: '🎀', group: 'fun' },
+  { id: 'deer', label: 'Deer', icon: '🦌', group: 'fun' },
+  { id: 'fox', label: 'Fox', icon: '🦊', group: 'fun' },
+  { id: 'frog-hat', label: 'Frog hat', icon: '🐸', group: 'fun' },
+  { id: 'heart-glasses', label: 'Heart glasses', icon: '💘', group: 'fun' },
+  { id: 'dizzy-stars', label: 'Dizzy stars', icon: '💫', group: 'fun' },
+  { id: 'petals', label: 'Cherry blossoms', icon: '🌸', group: 'fun' },
+  { id: 'witch-hat', label: 'Witch hat', icon: '🧙', group: 'fun' },
+  { id: 'shopping', label: 'Shopping spree', icon: '🛍️', group: 'fun' },
 ]
 
 /** Which picker group an effect belongs to (None goes with Makeup). */
@@ -365,8 +398,11 @@ function eyeshadow(ctx: Ctx, face: FacePose, color: string, alpha: number): void
   }
 }
 
-/** A thin line along each upper lash line, flicked up into a wing at the outer corner (or not). */
-function eyeliner(ctx: Ctx, face: FacePose, wing = true): void {
+/**
+ * A thin line along each upper lash line, flicked up into a wing at the outer corner.
+ * `wing` sets the wing's length: 0 = none, 1 = classic, ~1.6 = long "siren" wing.
+ */
+function eyeliner(ctx: Ctx, face: FacePose, wing = 1): void {
   const up = faceUp(face)
   ctx.save()
   ctx.strokeStyle = 'rgba(25,14,20,0.85)'
@@ -380,9 +416,9 @@ function eyeliner(ctx: Ctx, face: FacePose, wing = true): void {
     const inner = lid[lid.length - 1]
     // Outwards along the face (away from the nose), then flicked up.
     const side = Math.sign((corner.x - inner.x) * across.x + (corner.y - inner.y) * across.y) || 1
-    const tip = wing
-      ? { x: corner.x + across.x * side * face.width * 0.055 + up.x * face.width * 0.035, y: corner.y + across.y * side * face.width * 0.055 + up.y * face.width * 0.035 }
-      : corner
+    const out = face.width * 0.055 * wing
+    const lift = face.width * 0.035 * wing
+    const tip = wing > 0 ? { x: corner.x + across.x * side * out + up.x * lift, y: corner.y + across.y * side * out + up.y * lift } : corner
     ctx.beginPath()
     ctx.moveTo(tip.x, tip.y)
     for (const p of lid) ctx.lineTo(p.x, p.y)
@@ -443,6 +479,31 @@ function contour(ctx: Ctx, face: FacePose, alpha: number): void {
   }
 }
 
+/** A sprinkle of freckles across the nose and upper cheeks. */
+function freckles(ctx: Ctx, face: FacePose, alpha: number): void {
+  local(ctx, midpoint(face.eyeLeft, face.eyeRight, 0.5), face, (u) => {
+    const spots: [number, number][] = [
+      [-0.2, 0.2], [-0.15, 0.26], [-0.24, 0.27], [-0.1, 0.22], [0.2, 0.2], [0.15, 0.26], [0.24, 0.27], [0.1, 0.22], [-0.04, 0.18], [0.04, 0.19],
+    ]
+    for (const [x, y] of spots) ellipse(ctx, x * u, y * u, u * 0.008, u * 0.008, `rgba(120,70,40,${alpha})`)
+  })
+}
+
+/**
+ * Colour on the nose: a rosy tip (the "cold girl" look) and, with `bridge`, a soft band
+ * across the bridge from cheek to cheek (sun-kissed / sunburnt blush).
+ */
+function noseBlush(ctx: Ctx, face: FacePose, rgb: string, alpha: number, bridge: boolean): void {
+  tint(ctx, face, `rgb(${rgb})`, alpha, 0.02, () => {
+    ctx.ellipse(face.nose.x, face.nose.y, face.width * 0.05, face.width * 0.04, face.angle, 0, Math.PI * 2)
+  })
+  if (!bridge) return
+  const at = midpoint(midpoint(face.eyeLeft, face.eyeRight), face.nose, 0.6)
+  tint(ctx, face, `rgb(${rgb})`, alpha * 0.8, 0.03, () => {
+    ctx.ellipse(at.x, at.y, face.width * 0.3, face.width * 0.05, face.angle, 0, Math.PI * 2)
+  })
+}
+
 /** Gradient lips: extra colour in the middle of the lips, fading out (the Korean look). */
 function lipCentre(ctx: Ctx, face: FacePose, color: string, alpha: number): void {
   if (face.lipsOuter.length < 3) return
@@ -459,29 +520,104 @@ function lipCentre(ctx: Ctx, face: FacePose, color: string, alpha: number): void
 interface MakeupLook {
   lips?: { color: string; alpha: number; gloss: number; centre?: string }
   shadow?: { color: string; alpha: number }
-  liner?: 'thin' | 'wing'
+  liner?: 'thin' | 'wing' | 'long'
   blush?: { rgb: string; alpha: number; size?: number; lift?: number }
+  /** Colour on the nose tip, and across the bridge too with `bridge`. */
+  nose?: { rgb: string; alpha: number; bridge?: boolean }
+  freckles?: number
   contour?: number
   highlight?: number
   underEye?: number
   /** Soft brightening of the eyes (no catchlight dot, which looks fake up close). */
   eyes?: number
+  /** A defined outline around the lips (brown liner looks, deep red lips). */
+  lipLiner?: { color: string; alpha: number }
+  /** Twinkling specks on the eyelids, in these colours. */
+  glitter?: { colors: string[]; amount: number }
+  /** Smudged dark liner along the lower lash line (grunge). */
+  smudge?: number
 }
 
-function makeup(look: MakeupLook): (ctx: Ctx, face: FacePose) => void {
-  return (ctx, face) => {
+function makeup(look: MakeupLook): (ctx: Ctx, face: FacePose, t: number) => void {
+  return (ctx, face, t) => {
     if (look.contour) contour(ctx, face, look.contour)
     if (look.shadow) eyeshadow(ctx, face, look.shadow.color, look.shadow.alpha)
-    if (look.liner) eyeliner(ctx, face, look.liner === 'wing')
+    if (look.smudge) lowerSmudge(ctx, face, look.smudge)
+    if (look.liner) eyeliner(ctx, face, { thin: 0, wing: 1, long: 1.6 }[look.liner])
     if (look.blush) cheekBlush(ctx, face, look.blush.rgb, look.blush.alpha, look.blush.size, look.blush.lift)
+    if (look.nose) noseBlush(ctx, face, look.nose.rgb, look.nose.alpha, look.nose.bridge ?? false)
+    if (look.freckles) freckles(ctx, face, look.freckles)
     if (look.highlight) highlighter(ctx, face, look.highlight)
     if (look.underEye) underEyeBrightener(ctx, face, look.underEye)
     if (look.lips) {
       lipstick(ctx, face, look.lips.color, look.lips.alpha, look.lips.gloss)
       if (look.lips.centre) lipCentre(ctx, face, look.lips.centre, 0.4)
     }
+    if (look.lipLiner) lipLiner(ctx, face, look.lipLiner.color, look.lipLiner.alpha)
     if (look.eyes) eyeLight(ctx, face, 'rgba(255,255,255,1)', look.eyes, 2.2, false)
+    if (look.glitter) glitter(ctx, face, look.glitter.colors, look.glitter.amount, t)
   }
+}
+
+/** A soft, defined line around the outer edge of the lips. */
+function lipLiner(ctx: Ctx, face: FacePose, color: string, alpha: number): void {
+  if (face.lipsOuter.length < 3) return
+  ctx.save()
+  ctx.filter = `blur(${Math.max(0.5, face.width * 0.003).toFixed(1)}px)`
+  ctx.globalCompositeOperation = 'multiply'
+  ctx.globalAlpha = alpha
+  ctx.strokeStyle = color
+  ctx.lineWidth = Math.max(1, face.width * 0.009)
+  ctx.lineJoin = 'round'
+  ctx.beginPath()
+  traceSmooth(ctx, face.lipsOuter)
+  ctx.stroke()
+  ctx.restore()
+}
+
+/** Dark liner smudged along the lower lash line, under each eye. */
+function lowerSmudge(ctx: Ctx, face: FacePose, alpha: number): void {
+  const up = faceUp(face)
+  for (const eye of [face.eyeLeft, face.eyeRight]) {
+    // Just under the eye (on the lower lash line and below), never over the eye itself.
+    const below = { x: eye.x - up.x * face.width * 0.05, y: eye.y - up.y * face.width * 0.05 }
+    tint(ctx, face, '#2a1f22', alpha, 0.012, () => {
+      ctx.ellipse(below.x, below.y, face.width * 0.065, face.width * 0.014, face.angle, 0, Math.PI * 2)
+    })
+  }
+}
+
+/**
+ * Glitter on the eyelids: specks scattered over the lid that twinkle in turn. The pattern is
+ * fixed per speck (no randomness), so it doesn't jump around from frame to frame.
+ */
+function glitter(ctx: Ctx, face: FacePose, colors: string[], amount: number, t: number): void {
+  const up = faceUp(face)
+  ctx.save()
+  ctx.globalCompositeOperation = 'lighter'
+  for (const lid of [face.lidLeft, face.lidRight]) {
+    if (lid.length < 3) continue
+    for (let i = 0; i < 18; i++) {
+      // Spread along the lid and up into the crease, in a fixed pseudo-random pattern.
+      const along = ((i * 7) % 18) / 17
+      const at = lid[Math.round(along * (lid.length - 1))]
+      // Starts just above the lash line, so no speck lands on the eye itself.
+      const lift = face.width * (0.022 + ((i * 13) % 10) * 0.0055)
+      const x = at.x + up.x * lift
+      const y = at.y + up.y * lift
+      const twinkle = Math.max(0, Math.sin(t * 4 + i * 1.9))
+      const r = face.width * (0.004 + 0.006 * twinkle)
+      const g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.2)
+      g.addColorStop(0, colors[i % colors.length])
+      g.addColorStop(1, 'rgba(0,0,0,0)')
+      ctx.globalAlpha = amount * (0.35 + 0.65 * twinkle)
+      ctx.fillStyle = g
+      ctx.beginPath()
+      ctx.arc(x, y, r * 2.2, 0, Math.PI * 2)
+      ctx.fill()
+    }
+  }
+  ctx.restore()
 }
 
 /** Light in the eyes: a soft glow around each iris and, unless turned off, a bright catchlight. */
@@ -539,6 +675,172 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
     // Just a soft brightening: no white dot.
     eyeLight(ctx, face, 'rgba(255,255,255,1)', 0.2, 2.2, false)
   },
+
+  // ---- trending makeup looks (named after the TikTok makeup trends they recreate) ----
+  'clean-girl': makeup({
+    lips: { color: '#c08070', alpha: 0.2, gloss: 0.45 },
+    blush: { rgb: '235,140,130', alpha: 0.15, lift: 0.02 },
+    highlight: 0.26,
+    underEye: 0.15,
+    eyes: 0.12,
+  }),
+  latte: makeup({
+    lips: { color: '#9c5a43', alpha: 0.34, gloss: 0.2 },
+    shadow: { color: '#8a5a3b', alpha: 0.3 },
+    liner: 'thin',
+    blush: { rgb: '190,110,80', alpha: 0.18 },
+    contour: 0.2,
+    highlight: 0.15,
+  }),
+  strawberry: makeup({
+    lips: { color: '#d9405e', alpha: 0.34, gloss: 0.3 },
+    blush: { rgb: '255,95,125', alpha: 0.3, lift: 0.02 },
+    nose: { rgb: '255,110,130', alpha: 0.18, bridge: true },
+    freckles: 0.5,
+    highlight: 0.15,
+  }),
+  'cold-girl': makeup({
+    lips: { color: '#d06a80', alpha: 0.26, gloss: 0.3 },
+    blush: { rgb: '255,105,125', alpha: 0.26, lift: 0.03 },
+    nose: { rgb: '255,100,120', alpha: 0.32 },
+    highlight: 0.18,
+    eyes: 0.15,
+  }),
+  'sun-kissed': makeup({
+    lips: { color: '#c8735a', alpha: 0.26, gloss: 0.25 },
+    shadow: { color: '#b98458', alpha: 0.2 },
+    blush: { rgb: '235,125,90', alpha: 0.24 },
+    nose: { rgb: '235,120,90', alpha: 0.24, bridge: true },
+    freckles: 0.45,
+    contour: 0.1,
+    highlight: 0.2,
+  }),
+  douyin: makeup({
+    lips: { color: '#ea6a82', alpha: 0.22, gloss: 0.35, centre: '#d8405e' },
+    shadow: { color: '#e695a8', alpha: 0.24 },
+    blush: { rgb: '255,120,150', alpha: 0.3, size: 0.14, lift: 0.045 },
+    underEye: 0.3,
+    highlight: 0.2,
+    eyes: 0.25,
+  }),
+  'glazed-donut': makeup({
+    lips: { color: '#c78a7c', alpha: 0.16, gloss: 0.55 },
+    blush: { rgb: '240,150,135', alpha: 0.12 },
+    highlight: 0.38,
+    underEye: 0.15,
+    eyes: 0.12,
+  }),
+  'cherry-cola': makeup({
+    lips: { color: '#5c1a1b', alpha: 0.42, gloss: 0.45 },
+    lipLiner: { color: '#3d1012', alpha: 0.45 },
+    shadow: { color: '#8a5a3b', alpha: 0.26 },
+    blush: { rgb: '190,90,70', alpha: 0.2 },
+    contour: 0.12,
+    highlight: 0.16,
+  }),
+  'brownie-glazed': makeup({
+    lips: { color: '#8a5040', alpha: 0.3, gloss: 0.55 },
+    lipLiner: { color: '#5a3424', alpha: 0.5 },
+    blush: { rgb: '200,120,90', alpha: 0.18 },
+    highlight: 0.25,
+    eyes: 0.12,
+  }),
+  'supermodel-90s': makeup({
+    lips: { color: '#a0675a', alpha: 0.3, gloss: 0.05 },
+    lipLiner: { color: '#5e3a2e', alpha: 0.55 },
+    shadow: { color: '#7a5240', alpha: 0.32 },
+    blush: { rgb: '190,105,80', alpha: 0.15 },
+    contour: 0.2,
+  }),
+  'blueberry-milk': makeup({
+    lips: { color: '#d27a92', alpha: 0.26, gloss: 0.35 },
+    shadow: { color: '#8a9fd6', alpha: 0.28 },
+    blush: { rgb: '230,140,170', alpha: 0.22, lift: 0.03 },
+    glitter: { colors: ['#ffffff', '#cfdcff'], amount: 0.5 },
+    highlight: 0.18,
+    eyes: 0.15,
+  }),
+  barbie: makeup({
+    lips: { color: '#e0307a', alpha: 0.45, gloss: 0.4 },
+    shadow: { color: '#ef6aa8', alpha: 0.32 },
+    liner: 'wing',
+    blush: { rgb: '255,90,160', alpha: 0.3, lift: 0.03 },
+    highlight: 0.15,
+    eyes: 0.15,
+  }),
+  'soft-goth': makeup({
+    lips: { color: '#3d0f2a', alpha: 0.5, gloss: 0.15 },
+    shadow: { color: '#3a3340', alpha: 0.42 },
+    liner: 'long',
+    contour: 0.18,
+    highlight: 0.1,
+  }),
+  euphoria: makeup({
+    lips: { color: '#d8758a', alpha: 0.22, gloss: 0.5 },
+    shadow: { color: '#9b5cff', alpha: 0.3 },
+    glitter: { colors: ['#ff8ad8', '#8ad8ff', '#ffe28a', '#ffffff'], amount: 0.85 },
+    highlight: 0.2,
+    eyes: 0.18,
+  }),
+  grunge: makeup({
+    lips: { color: '#7a3a3a', alpha: 0.3, gloss: 0.05 },
+    shadow: { color: '#3d3434', alpha: 0.35 },
+    smudge: 0.48,
+    contour: 0.1,
+  }),
+  vampire: makeup({
+    lips: { color: '#7a0a14', alpha: 0.55, gloss: 0.3 },
+    lipLiner: { color: '#4a0509', alpha: 0.5 },
+    shadow: { color: '#5a2a30', alpha: 0.3 },
+    liner: 'wing',
+    contour: 0.15,
+  }),
+  pearl: makeup({
+    lips: { color: '#e7a0b5', alpha: 0.2, gloss: 0.55 },
+    shadow: { color: '#b7a0e0', alpha: 0.25 },
+    blush: { rgb: '240,160,190', alpha: 0.18 },
+    glitter: { colors: ['#ffffff', '#ffe0f4', '#d8f2ff'], amount: 0.6 },
+    highlight: 0.3,
+    eyes: 0.15,
+  }),
+  'mob-wife': makeup({
+    lips: { color: '#5e1020', alpha: 0.5, gloss: 0.2 },
+    shadow: { color: '#3e2c2a', alpha: 0.4 },
+    liner: 'wing',
+    blush: { rgb: '180,80,80', alpha: 0.15 },
+    contour: 0.2,
+    highlight: 0.15,
+  }),
+  'siren-eyes': makeup({
+    lips: { color: '#a8665a', alpha: 0.26, gloss: 0.2 },
+    shadow: { color: '#6b4a3e', alpha: 0.3 },
+    liner: 'long',
+    blush: { rgb: '200,110,95', alpha: 0.14 },
+    contour: 0.15,
+    highlight: 0.15,
+  }),
+  'tomato-girl': makeup({
+    lips: { color: '#d63b2f', alpha: 0.32, gloss: 0.25 },
+    blush: { rgb: '235,85,60', alpha: 0.3, lift: 0.03 },
+    nose: { rgb: '235,95,70', alpha: 0.14 },
+    highlight: 0.2,
+    eyes: 0.12,
+  }),
+  igari: makeup({
+    lips: { color: '#e06a7a', alpha: 0.24, gloss: 0.35 },
+    // Igari ("hangover") blush sits high, right under the eyes.
+    blush: { rgb: '255,95,120', alpha: 0.32, size: 0.12, lift: 0.13 },
+    highlight: 0.12,
+    eyes: 0.15,
+  }),
+  coquette: makeup({
+    lips: { color: '#e8789a', alpha: 0.3, gloss: 0.4 },
+    shadow: { color: '#e6a0b8', alpha: 0.2 },
+    blush: { rgb: '255,130,170', alpha: 0.32, size: 0.15, lift: 0.04 },
+    nose: { rgb: '255,130,160', alpha: 0.12 },
+    highlight: 0.15,
+    eyes: 0.18,
+  }),
 
   // ---- ten everyday makeup looks (subtle, realistic; most with only a hint of lip colour) ----
   'nude-glow': makeup({
@@ -816,13 +1118,7 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
 
   blush: (ctx, face) => {
     cheekBlush(ctx, face, '255,105,140', 0.45)
-    // A few freckles across the nose and cheeks.
-    local(ctx, midpoint(face.eyeLeft, face.eyeRight, 0.5), face, (u) => {
-      const spots: [number, number][] = [
-        [-0.2, 0.2], [-0.15, 0.26], [-0.24, 0.27], [-0.1, 0.22], [0.2, 0.2], [0.15, 0.26], [0.24, 0.27], [0.1, 0.22], [-0.04, 0.18], [0.04, 0.19],
-      ]
-      for (const [x, y] of spots) ellipse(ctx, x * u, y * u, u * 0.008, u * 0.008, 'rgba(120,70,40,0.55)')
-    })
+    freckles(ctx, face, 0.55)
   },
 
   sparkles: (ctx, face, t) =>
@@ -968,6 +1264,184 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
       })
       emoji(ctx, '☁️', -u * 0.6, -u * 0.04, u * 0.2)
       emoji(ctx, '☁️', u * 0.6, -u * 0.04, u * 0.2)
+    }),
+
+  tiara: (ctx, face, t) =>
+    local(ctx, face.top, face, (u) => {
+      ctx.scale(1.35, 1.35)
+      // A gold band with five points, each tipped with a gem; the middle one is biggest.
+      const gold = ctx.createLinearGradient(0, -u * 0.22, 0, 0)
+      gold.addColorStop(0, '#fff1a8')
+      gold.addColorStop(1, '#c9971f')
+      const peaks = [0.07, 0.11, 0.19, 0.11, 0.07]
+      ctx.beginPath()
+      ctx.moveTo(-u * 0.34, -u * 0.01)
+      peaks.forEach((h, i) => {
+        const x = -u * 0.28 + i * u * 0.14
+        ctx.lineTo(x - u * 0.045, -u * 0.04)
+        ctx.lineTo(x, -u * (0.04 + h))
+        ctx.lineTo(x + u * 0.045, -u * 0.04)
+      })
+      ctx.lineTo(u * 0.34, -u * 0.01)
+      ctx.quadraticCurveTo(0, -u * 0.07, -u * 0.34, -u * 0.01)
+      ctx.fillStyle = gold
+      ctx.fill()
+      peaks.forEach((h, i) => {
+        const x = -u * 0.28 + i * u * 0.14
+        ellipse(ctx, x, -u * (0.04 + h), u * (i === 2 ? 0.032 : 0.02), u * (i === 2 ? 0.032 : 0.02), i % 2 ? '#7fd1ff' : '#ff6fa8')
+      })
+      const twinkle = 0.5 + 0.5 * Math.sin(t * 3)
+      emoji(ctx, '✨', u * 0.1, -u * 0.27, u * (0.06 + 0.04 * twinkle), 0, 0.4 + 0.6 * twinkle)
+    }),
+
+  bow: (ctx, face, t) => local(ctx, face.top, face, (u) => emoji(ctx, '🎀', u * 0.26, -u * 0.1, u * 0.4, 0.35 + Math.sin(t * 2) * 0.04)),
+
+  deer: (ctx, face) => {
+    // Branching antlers, a dark nose and a few pale spots on the cheeks.
+    ears(ctx, face, (u, side) => {
+      ctx.strokeStyle = '#8b5a2b'
+      ctx.lineWidth = Math.max(2, u * 0.035)
+      ctx.lineCap = 'round'
+      ctx.beginPath()
+      ctx.moveTo(side * u * 0.2, -u * 0.02)
+      ctx.quadraticCurveTo(side * u * 0.26, -u * 0.25, side * u * 0.36, -u * 0.46)
+      ctx.moveTo(side * u * 0.25, -u * 0.18)
+      ctx.lineTo(side * u * 0.38, -u * 0.26)
+      ctx.moveTo(side * u * 0.3, -u * 0.34)
+      ctx.lineTo(side * u * 0.22, -u * 0.47)
+      ctx.stroke()
+    })
+    for (const cheek of [face.cheekLeft, face.cheekRight]) {
+      for (const [dx, dy] of [[0, -0.02], [0.03, 0.02], [-0.03, 0.03]]) {
+        ellipse(ctx, cheek.x + dx * face.width, cheek.y + dy * face.width, face.width * 0.012, face.width * 0.012, 'rgba(255,248,235,0.85)')
+      }
+    }
+    animalNose(ctx, face, '#3b2414', 0.07, 0.05)
+  },
+
+  fox: (ctx, face) => {
+    ears(ctx, face, (u, side) => {
+      ctx.translate(side * u * 0.32, -u * 0.06)
+      ctx.rotate(side * 0.28)
+      const tri = (size: number, color: string) => {
+        ctx.beginPath()
+        ctx.moveTo(-u * size, u * size * 0.3)
+        ctx.lineTo(0, -u * size * 1.5)
+        ctx.lineTo(u * size, u * size * 0.3)
+        ctx.closePath()
+        ctx.fillStyle = color
+        ctx.fill()
+      }
+      tri(0.17, '#f28c28')
+      tri(0.09, '#fff1e0')
+    })
+    animalNose(ctx, face, '#1e1410', 0.055, 0.04)
+    local(ctx, face.nose, face, (u) => {
+      ctx.strokeStyle = 'rgba(40,25,15,0.8)'
+      ctx.lineWidth = Math.max(1, u * 0.007)
+      ctx.lineCap = 'round'
+      for (const side of [-1, 1]) {
+        for (const tilt of [-0.08, 0.04]) {
+          ctx.beginPath()
+          ctx.moveTo(side * u * 0.09, u * 0.04)
+          ctx.lineTo(side * u * 0.36, u * (0.04 + tilt))
+          ctx.stroke()
+        }
+      }
+    })
+  },
+
+  'frog-hat': (ctx, face) =>
+    local(ctx, face.top, face, (u) => {
+      // A green beanie with two big frog eyes on top.
+      ctx.fillStyle = '#4caf50'
+      ctx.beginPath()
+      ctx.ellipse(0, u * 0.06, u * 0.5, u * 0.36, 0, Math.PI, 0)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#388e3c'
+      ctx.fillRect(-u * 0.5, 0, u, u * 0.07)
+      for (const side of [-1, 1]) {
+        ellipse(ctx, side * u * 0.2, -u * 0.32, u * 0.11, u * 0.11, '#4caf50')
+        ellipse(ctx, side * u * 0.2, -u * 0.33, u * 0.08, u * 0.08, '#ffffff')
+        ellipse(ctx, side * u * 0.2, -u * 0.32, u * 0.04, u * 0.045, '#111111')
+      }
+      ellipse(ctx, -u * 0.12, -u * 0.1, u * 0.03, u * 0.02, 'rgba(255,120,150,0.8)')
+      ellipse(ctx, u * 0.12, -u * 0.1, u * 0.03, u * 0.02, 'rgba(255,120,150,0.8)')
+    }),
+
+  'heart-glasses': (ctx, face) =>
+    local(ctx, midpoint(face.eyeLeft, face.eyeRight), face, (u) => {
+      const half = Math.hypot(face.eyeRight.x - face.eyeLeft.x, face.eyeRight.y - face.eyeLeft.y) / 2
+      const heart = (cx: number, size: number) => {
+        ctx.beginPath()
+        ctx.moveTo(cx, size * 0.35)
+        ctx.bezierCurveTo(cx - size * 1.1, -size * 0.25, cx - size * 0.55, -size * 0.95, cx, -size * 0.4)
+        ctx.bezierCurveTo(cx + size * 0.55, -size * 0.95, cx + size * 1.1, -size * 0.25, cx, size * 0.35)
+        ctx.closePath()
+      }
+      ctx.lineWidth = Math.max(1.5, u * 0.018)
+      ctx.strokeStyle = '#c2185b'
+      for (const side of [-1, 1]) {
+        heart(side * half, u * 0.22)
+        ctx.fillStyle = 'rgba(255,60,120,0.72)'
+        ctx.fill()
+        ctx.stroke()
+      }
+      ctx.beginPath()
+      ctx.moveTo(-half + u * 0.1, -u * 0.05)
+      ctx.quadraticCurveTo(0, -u * 0.1, half - u * 0.1, -u * 0.05)
+      ctx.stroke()
+    }),
+
+  'dizzy-stars': (ctx, face, t) =>
+    local(ctx, face.top, face, (u) => {
+      for (let i = 0; i < 5; i++) {
+        const a = t * 2.2 + (i * Math.PI * 2) / 5
+        const depth = Math.sin(a) // behind the head when < 0: smaller and fainter
+        emoji(ctx, i % 2 ? '💫' : '⭐', Math.cos(a) * u * 0.45, -u * 0.14 + depth * u * 0.08, u * (0.14 + 0.04 * depth), 0, 0.55 + 0.45 * (depth + 1) / 2)
+      }
+    }),
+
+  petals: (ctx, face, t) =>
+    local(ctx, face.top, face, (u) => {
+      for (let i = 0; i < 9; i++) {
+        const cycle = (t * 0.22 + i / 9) % 1
+        const x = (((i * 41) % 100) / 100 - 0.5) * u * 1.7 + Math.sin(t * 1.5 + i) * u * 0.06
+        const y = -u * 0.4 + cycle * u * 1.9
+        emoji(ctx, '🌸', x, y, u * (0.07 + 0.03 * ((i * 7) % 3)), t * 1.2 + i, cycle < 0.85 ? 0.9 : (1 - cycle) * 6)
+      }
+    }),
+
+  'witch-hat': (ctx, face) =>
+    local(ctx, face.top, face, (u) => {
+      ctx.fillStyle = '#3a2457'
+      ctx.beginPath()
+      ctx.moveTo(-u * 0.3, -u * 0.06)
+      ctx.quadraticCurveTo(-u * 0.12, -u * 0.4, u * 0.02, -u * 0.62)
+      ctx.quadraticCurveTo(u * 0.12, -u * 0.72, u * 0.26, -u * 0.66) // the bent tip
+      ctx.quadraticCurveTo(u * 0.12, -u * 0.58, u * 0.1, -u * 0.5)
+      ctx.quadraticCurveTo(u * 0.18, -u * 0.25, u * 0.3, -u * 0.06)
+      ctx.closePath()
+      ctx.fill()
+      ctx.fillStyle = '#ff8c1a'
+      ctx.fillRect(-u * 0.27, -u * 0.15, u * 0.55, u * 0.06)
+      ctx.strokeStyle = '#ffd54a'
+      ctx.lineWidth = Math.max(1.5, u * 0.012)
+      ctx.strokeRect(-u * 0.04, -u * 0.16, u * 0.08, u * 0.08)
+      ellipse(ctx, 0, -u * 0.04, u * 0.62, u * 0.09, '#2c1a44')
+    }),
+
+  shopping: (ctx, face, t) =>
+    local(ctx, midpoint(face.top, face.nose, 0.2), face, (u) => {
+      // Shopping bags, a price tag and a card circling the seller's head.
+      const items = ['🛍️', '🏷️', '🛍️', '💳']
+      items.forEach((item, i) => {
+        const a = t * 0.8 + (i * Math.PI * 2) / items.length
+        const x = Math.cos(a) * u * 0.78
+        const y = Math.sin(a) * u * 0.4 - u * 0.2 + Math.sin(t * 3 + i) * u * 0.02
+        emoji(ctx, item, x, y, u * 0.17, Math.sin(a) * 0.2)
+      })
     }),
 }
 
