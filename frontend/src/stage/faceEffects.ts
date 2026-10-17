@@ -10,36 +10,54 @@ import type { FaceEffectId } from '../lib/types'
 
 export type { FaceEffectId }
 
-export const FACE_EFFECTS: { id: FaceEffectId; label: string; icon: string }[] = [
-  { id: 'none', label: 'None', icon: '🚫' },
-  { id: 'glam', label: 'Glam makeup', icon: '💄' },
-  { id: 'natural-makeup', label: 'Natural makeup', icon: '💋' },
-  { id: 'fresh-face', label: 'Fresh face', icon: '🌟' },
-  { id: 'glow-eyes', label: 'Glowing eyes', icon: '👁️' },
-  { id: 'flower-crown', label: 'Flower crown', icon: '🌸' },
-  { id: 'butterflies', label: 'Butterflies', icon: '🦋' },
-  { id: 'puppy', label: 'Puppy', icon: '🐶' },
-  { id: 'bunny', label: 'Bunny', icon: '🐰' },
-  { id: 'kitty', label: 'Kitty', icon: '🐱' },
-  { id: 'bear', label: 'Teddy bear', icon: '🐻' },
-  { id: 'heart-eyes', label: 'Heart eyes', icon: '😍' },
-  { id: 'star-eyes', label: 'Star eyes', icon: '🤩' },
-  { id: 'money-eyes', label: 'Money eyes', icon: '🤑' },
-  { id: 'shades', label: 'Cool shades', icon: '😎' },
-  { id: 'crown', label: 'Royal crown', icon: '👑' },
-  { id: 'halo', label: 'Angel halo', icon: '😇' },
-  { id: 'devil', label: 'Devil horns', icon: '😈' },
-  { id: 'blush', label: 'Soft blush', icon: '🌷' },
-  { id: 'sparkles', label: 'Sparkles', icon: '✨' },
-  { id: 'love-hearts', label: 'Love hearts', icon: '💕' },
-  { id: 'crying', label: 'Crying', icon: '😭' },
-  { id: 'clown', label: 'Clown', icon: '🤡' },
-  { id: 'mustache', label: 'Mustache', icon: '🥸' },
-  { id: 'piggy', label: 'Piggy', icon: '🐷' },
-  { id: 'cowboy', label: 'Cowboy hat', icon: '🤠' },
-  { id: 'party', label: 'Party hat', icon: '🥳' },
-  { id: 'rainbow', label: 'Rainbow', icon: '🌈' },
+/** Makeup looks are kept apart from the fun stickers in the picker. "None" shows in both. */
+export type FaceEffectGroup = 'makeup' | 'fun'
+
+export const FACE_EFFECTS: { id: FaceEffectId; label: string; icon: string; group: FaceEffectGroup | 'both' }[] = [
+  { id: 'none', label: 'None', icon: '🚫', group: 'both' },
+  { id: 'natural-makeup', label: 'Natural makeup', icon: '💋', group: 'makeup' },
+  { id: 'fresh-face', label: 'Fresh face', icon: '🌟', group: 'makeup' },
+  { id: 'mlbb', label: 'My lips but better', icon: '👄', group: 'makeup' },
+  { id: 'nude-glow', label: 'Nude glow', icon: '🤎', group: 'makeup' },
+  { id: 'rosy-cheeks', label: 'Rosy cheeks', icon: '🌹', group: 'makeup' },
+  { id: 'peach-fresh', label: 'Peach fresh', icon: '🍑', group: 'makeup' },
+  { id: 'k-beauty', label: 'K-beauty dewy', icon: '💧', group: 'makeup' },
+  { id: 'pink-doll', label: 'Pink doll', icon: '🎀', group: 'makeup' },
+  { id: 'coral-summer', label: 'Coral summer', icon: '🧡', group: 'makeup' },
+  { id: 'bronzed', label: 'Bronzed', icon: '☀️', group: 'makeup' },
+  { id: 'soft-berry', label: 'Soft berry', icon: '🍇', group: 'makeup' },
+  { id: 'evening-glam', label: 'Evening glam', icon: '🌙', group: 'makeup' },
+  { id: 'glam', label: 'Glam makeup', icon: '💄', group: 'makeup' },
+  { id: 'glow-eyes', label: 'Glowing eyes', icon: '👁️', group: 'fun' },
+  { id: 'flower-crown', label: 'Flower crown', icon: '🌸', group: 'fun' },
+  { id: 'butterflies', label: 'Butterflies', icon: '🦋', group: 'fun' },
+  { id: 'puppy', label: 'Puppy', icon: '🐶', group: 'fun' },
+  { id: 'bunny', label: 'Bunny', icon: '🐰', group: 'fun' },
+  { id: 'kitty', label: 'Kitty', icon: '🐱', group: 'fun' },
+  { id: 'bear', label: 'Teddy bear', icon: '🐻', group: 'fun' },
+  { id: 'heart-eyes', label: 'Heart eyes', icon: '😍', group: 'fun' },
+  { id: 'star-eyes', label: 'Star eyes', icon: '🤩', group: 'fun' },
+  { id: 'money-eyes', label: 'Money eyes', icon: '🤑', group: 'fun' },
+  { id: 'shades', label: 'Cool shades', icon: '😎', group: 'fun' },
+  { id: 'crown', label: 'Royal crown', icon: '👑', group: 'fun' },
+  { id: 'halo', label: 'Angel halo', icon: '😇', group: 'fun' },
+  { id: 'devil', label: 'Devil horns', icon: '😈', group: 'fun' },
+  { id: 'blush', label: 'Soft blush', icon: '🌷', group: 'fun' },
+  { id: 'sparkles', label: 'Sparkles', icon: '✨', group: 'fun' },
+  { id: 'love-hearts', label: 'Love hearts', icon: '💕', group: 'fun' },
+  { id: 'crying', label: 'Crying', icon: '😭', group: 'fun' },
+  { id: 'clown', label: 'Clown', icon: '🤡', group: 'fun' },
+  { id: 'mustache', label: 'Mustache', icon: '🥸', group: 'fun' },
+  { id: 'piggy', label: 'Piggy', icon: '🐷', group: 'fun' },
+  { id: 'cowboy', label: 'Cowboy hat', icon: '🤠', group: 'fun' },
+  { id: 'party', label: 'Party hat', icon: '🥳', group: 'fun' },
+  { id: 'rainbow', label: 'Rainbow', icon: '🌈', group: 'fun' },
 ]
+
+/** Which picker group an effect belongs to (None goes with Makeup). */
+export function faceEffectGroup(id: FaceEffectId): FaceEffectGroup {
+  return FACE_EFFECTS.find((e) => e.id === id)?.group === 'fun' ? 'fun' : 'makeup'
+}
 
 export const isFaceEffect = (id: string): id is FaceEffectId => FACE_EFFECTS.some((e) => e.id === id)
 
@@ -347,8 +365,8 @@ function eyeshadow(ctx: Ctx, face: FacePose, color: string, alpha: number): void
   }
 }
 
-/** A thin line along each upper lash line, flicked up into a wing at the outer corner. */
-function eyeliner(ctx: Ctx, face: FacePose): void {
+/** A thin line along each upper lash line, flicked up into a wing at the outer corner (or not). */
+function eyeliner(ctx: Ctx, face: FacePose, wing = true): void {
   const up = faceUp(face)
   ctx.save()
   ctx.strokeStyle = 'rgba(25,14,20,0.85)'
@@ -362,20 +380,22 @@ function eyeliner(ctx: Ctx, face: FacePose): void {
     const inner = lid[lid.length - 1]
     // Outwards along the face (away from the nose), then flicked up.
     const side = Math.sign((corner.x - inner.x) * across.x + (corner.y - inner.y) * across.y) || 1
-    const wing = {
-      x: corner.x + across.x * side * face.width * 0.055 + up.x * face.width * 0.035,
-      y: corner.y + across.y * side * face.width * 0.055 + up.y * face.width * 0.035,
-    }
+    const tip = wing
+      ? { x: corner.x + across.x * side * face.width * 0.055 + up.x * face.width * 0.035, y: corner.y + across.y * side * face.width * 0.055 + up.y * face.width * 0.035 }
+      : corner
     ctx.beginPath()
-    ctx.moveTo(wing.x, wing.y)
+    ctx.moveTo(tip.x, tip.y)
     for (const p of lid) ctx.lineTo(p.x, p.y)
     ctx.stroke()
   }
   ctx.restore()
 }
 
-function cheekBlush(ctx: Ctx, face: FacePose, rgb: string, alpha: number, size = 0.17): void {
-  for (const cheek of [face.cheekLeft, face.cheekRight]) {
+/** Blush on each cheek; `lift` moves it up towards the cheekbones (in face widths). */
+function cheekBlush(ctx: Ctx, face: FacePose, rgb: string, alpha: number, size = 0.17, lift = 0): void {
+  const up = faceUp(face)
+  for (const spot of [face.cheekLeft, face.cheekRight]) {
+    const cheek = { x: spot.x + up.x * face.width * lift, y: spot.y + up.y * face.width * lift }
     const r = face.width * size
     const g = ctx.createRadialGradient(cheek.x, cheek.y, 0, cheek.x, cheek.y, r)
     g.addColorStop(0, `rgba(${rgb},${alpha})`)
@@ -395,6 +415,73 @@ function highlighter(ctx: Ctx, face: FacePose, alpha: number): void {
     glow(ctx, bone, face.width * 0.08, 'rgba(255,240,230,1)', alpha, 0.55, face.angle)
   }
   glow(ctx, midpoint(midpoint(face.eyeLeft, face.eyeRight), face.nose, 0.45), face.width * 0.05, 'rgba(255,245,235,1)', alpha * 0.8, 1.8, face.angle)
+}
+
+/** Under-eye brightener: a soft warm light just below each eye that lifts dark circles. */
+function underEyeBrightener(ctx: Ctx, face: FacePose, alpha: number): void {
+  const up = faceUp(face)
+  for (const eye of [face.eyeLeft, face.eyeRight]) {
+    const below = { x: eye.x - up.x * face.width * 0.065, y: eye.y - up.y * face.width * 0.065 }
+    glow(ctx, below, face.width * 0.075, 'rgba(255,238,225,1)', alpha, 0.45, face.angle)
+  }
+}
+
+/** Contour: soft shade in the hollow under each cheekbone, sloping up towards the ear. */
+function contour(ctx: Ctx, face: FacePose, alpha: number): void {
+  const up = faceUp(face)
+  const across = { x: Math.cos(face.angle), y: Math.sin(face.angle) }
+  const centre = midpoint(face.cheekLeft, face.cheekRight)
+  for (const cheek of [face.cheekLeft, face.cheekRight]) {
+    const side = Math.sign((cheek.x - centre.x) * across.x + (cheek.y - centre.y) * across.y) || 1
+    const at = {
+      x: cheek.x + across.x * side * face.width * 0.11 - up.x * face.width * 0.035,
+      y: cheek.y + across.y * side * face.width * 0.11 - up.y * face.width * 0.035,
+    }
+    tint(ctx, face, 'rgb(150,100,80)', alpha, 0.03, () => {
+      ctx.ellipse(at.x, at.y, face.width * 0.11, face.width * 0.035, face.angle - side * 0.35, 0, Math.PI * 2)
+    })
+  }
+}
+
+/** Gradient lips: extra colour in the middle of the lips, fading out (the Korean look). */
+function lipCentre(ctx: Ctx, face: FacePose, color: string, alpha: number): void {
+  if (face.lipsOuter.length < 3) return
+  const middle = midpoint(face.mouthTop, face.mouthBottom)
+  tint(ctx, face, color, alpha, 0.018, () => {
+    ctx.ellipse(middle.x, middle.y, face.width * 0.07, face.width * 0.028, face.angle, 0, Math.PI * 2)
+  })
+}
+
+/**
+ * A complete everyday makeup look, as a recipe. Every part is optional and kept subtle so it
+ * reads as real makeup on camera (colours multiply into the skin; light is added softly).
+ */
+interface MakeupLook {
+  lips?: { color: string; alpha: number; gloss: number; centre?: string }
+  shadow?: { color: string; alpha: number }
+  liner?: 'thin' | 'wing'
+  blush?: { rgb: string; alpha: number; size?: number; lift?: number }
+  contour?: number
+  highlight?: number
+  underEye?: number
+  /** Soft brightening of the eyes (no catchlight dot, which looks fake up close). */
+  eyes?: number
+}
+
+function makeup(look: MakeupLook): (ctx: Ctx, face: FacePose) => void {
+  return (ctx, face) => {
+    if (look.contour) contour(ctx, face, look.contour)
+    if (look.shadow) eyeshadow(ctx, face, look.shadow.color, look.shadow.alpha)
+    if (look.liner) eyeliner(ctx, face, look.liner === 'wing')
+    if (look.blush) cheekBlush(ctx, face, look.blush.rgb, look.blush.alpha, look.blush.size, look.blush.lift)
+    if (look.highlight) highlighter(ctx, face, look.highlight)
+    if (look.underEye) underEyeBrightener(ctx, face, look.underEye)
+    if (look.lips) {
+      lipstick(ctx, face, look.lips.color, look.lips.alpha, look.lips.gloss)
+      if (look.lips.centre) lipCentre(ctx, face, look.lips.centre, 0.4)
+    }
+    if (look.eyes) eyeLight(ctx, face, 'rgba(255,255,255,1)', look.eyes, 2.2, false)
+  }
 }
 
 /** Light in the eyes: a soft glow around each iris and, unless turned off, a bright catchlight. */
@@ -448,15 +535,89 @@ const EFFECTS: Record<Exclude<FaceEffectId, 'none'>, (ctx: Ctx, face: FacePose, 
     eyeshadow(ctx, face, '#c79a86', 0.26)
     cheekBlush(ctx, face, '255,128,140', 0.26, 0.16)
     highlighter(ctx, face, 0.2)
-    // Under-eye brightener: lifts dark circles.
-    const up = faceUp(face)
-    for (const eye of [face.eyeLeft, face.eyeRight]) {
-      const below = { x: eye.x - up.x * face.width * 0.065, y: eye.y - up.y * face.width * 0.065 }
-      glow(ctx, below, face.width * 0.075, 'rgba(255,238,225,1)', 0.22, 0.45, face.angle)
-    }
+    underEyeBrightener(ctx, face, 0.22)
     // Just a soft brightening: no white dot.
     eyeLight(ctx, face, 'rgba(255,255,255,1)', 0.2, 2.2, false)
   },
+
+  // ---- ten everyday makeup looks (subtle, realistic; most with only a hint of lip colour) ----
+  'nude-glow': makeup({
+    lips: { color: '#b0705f', alpha: 0.28, gloss: 0.15 },
+    shadow: { color: '#a8806a', alpha: 0.2 },
+    blush: { rgb: '232,150,130', alpha: 0.18 },
+    contour: 0.1,
+    highlight: 0.16,
+    eyes: 0.15,
+  }),
+  'rosy-cheeks': makeup({
+    lips: { color: '#c75b6e', alpha: 0.28, gloss: 0.2 },
+    shadow: { color: '#b48090', alpha: 0.18 },
+    blush: { rgb: '255,110,140', alpha: 0.3, size: 0.16, lift: 0.02 },
+    highlight: 0.12,
+    eyes: 0.15,
+  }),
+  'peach-fresh': makeup({
+    lips: { color: '#d9785f', alpha: 0.3, gloss: 0.25 },
+    shadow: { color: '#d39a7c', alpha: 0.2 },
+    blush: { rgb: '255,150,110', alpha: 0.26 },
+    highlight: 0.18,
+    underEye: 0.15,
+    eyes: 0.15,
+  }),
+  'coral-summer': makeup({
+    lips: { color: '#e0604f', alpha: 0.36, gloss: 0.3 },
+    shadow: { color: '#b27a52', alpha: 0.24 },
+    blush: { rgb: '255,120,95', alpha: 0.24 },
+    contour: 0.12,
+    highlight: 0.2,
+    eyes: 0.15,
+  }),
+  'soft-berry': makeup({
+    lips: { color: '#8e2a4c', alpha: 0.38, gloss: 0.2 },
+    shadow: { color: '#7d4a6b', alpha: 0.24 },
+    liner: 'thin',
+    blush: { rgb: '215,100,130', alpha: 0.2 },
+    contour: 0.12,
+    highlight: 0.12,
+  }),
+  mlbb: makeup({
+    lips: { color: '#b5636a', alpha: 0.26, gloss: 0.3 },
+    blush: { rgb: '240,130,130', alpha: 0.15 },
+    highlight: 0.12,
+    eyes: 0.12,
+  }),
+  'k-beauty': makeup({
+    lips: { color: '#e0607a', alpha: 0.18, gloss: 0.35, centre: '#d1435b' },
+    shadow: { color: '#e0a08a', alpha: 0.15 },
+    blush: { rgb: '255,135,150', alpha: 0.24, size: 0.14, lift: 0.04 },
+    highlight: 0.28,
+    underEye: 0.18,
+    eyes: 0.2,
+  }),
+  bronzed: makeup({
+    lips: { color: '#a8634f', alpha: 0.3, gloss: 0.2 },
+    shadow: { color: '#9c6b43', alpha: 0.3 },
+    blush: { rgb: '205,110,80', alpha: 0.22 },
+    contour: 0.18,
+    highlight: 0.2,
+    eyes: 0.12,
+  }),
+  'evening-glam': makeup({
+    lips: { color: '#a3122a', alpha: 0.42, gloss: 0.25 },
+    shadow: { color: '#4b3a46', alpha: 0.36 },
+    liner: 'wing',
+    blush: { rgb: '210,95,110', alpha: 0.18 },
+    contour: 0.15,
+    highlight: 0.18,
+    eyes: 0.15,
+  }),
+  'pink-doll': makeup({
+    lips: { color: '#e06a8c', alpha: 0.3, gloss: 0.35 },
+    shadow: { color: '#d98aa8', alpha: 0.24 },
+    blush: { rgb: '255,120,165', alpha: 0.3, size: 0.15, lift: 0.03 },
+    highlight: 0.15,
+    eyes: 0.2,
+  }),
 
   'glow-eyes': (ctx, face, t) => {
     // A glow that slowly shifts between violet, pink and cyan, and gently pulses.

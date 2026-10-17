@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { Icon } from '../../components/Icon'
 import { Button, Panel, Segmented, Switch, cx } from '../../components/ui'
 import type { CameraSettings, Orientation, Resolution } from '../../lib/types'
 import { LOOK_PRESETS, isNeutralLook, sameLook, type CameraLook } from '../../stage/enhance'
-import { FACE_EFFECTS } from '../../stage/faceEffects'
+import { FACE_EFFECTS, faceEffectGroup, type FaceEffectGroup } from '../../stage/faceEffects'
 import { MIN_ZOOM } from '../../stage/geometry'
 import { AUDIO_MESSAGES, CAMERA_MESSAGES, type AudioStatus, type CameraDevice, type CameraStatus } from '../../stage/useCamera'
 
@@ -326,12 +327,24 @@ function CameraLookControls({ look, onCamera }: { look: CameraLook; onCamera: (p
   )
 }
 
-/** Face-tracked effects (flower crown, puppy ears…), shown on the preview and the live. */
+/** Face-tracked effects (makeup looks, flower crown, puppy ears…), shown on the preview and the live. */
 function FaceEffectPicker({ value, onChange }: { value: CameraSettings['effect']; onChange: (effect: CameraSettings['effect']) => void }) {
+  // Two short lists instead of one long one; opens on the list holding the current effect.
+  const [group, setGroup] = useState<FaceEffectGroup>(() => faceEffectGroup(value))
   return (
     <div className="flex flex-col gap-1.5">
-      <div role="group" aria-label="Face effects" className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
-        {FACE_EFFECTS.map((e) => {
+      <Segmented
+        label="Effect type"
+        size="sm"
+        value={group}
+        onChange={setGroup}
+        options={[
+          { id: 'makeup', label: '💄 Makeup' },
+          { id: 'fun', label: '🎉 Fun' },
+        ]}
+      />
+      <div role="group" aria-label={group === 'makeup' ? 'Makeup looks' : 'Fun effects'} className="grid grid-cols-[repeat(auto-fill,minmax(76px,1fr))] gap-1.5">
+        {FACE_EFFECTS.filter((e) => e.group === group || e.group === 'both').map((e) => {
           const on = e.id === value
           return (
             <button
