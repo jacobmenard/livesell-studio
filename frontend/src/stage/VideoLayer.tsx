@@ -3,13 +3,14 @@ import type { BackgroundSettings, CameraSettings, Orientation, Resolution } from
 import { BACKGROUND_BY_ID, KEY_COLORS } from './catalog'
 import { Compositor, type CompositorStatus } from './compositor'
 import { isFaceEffect } from './faceEffects'
+import { DEFAULT_FILTER_STRENGTH, isCameraFilter } from './filters'
 import { MIN_ZOOM, outputSize } from './geometry'
 
 interface VideoLayerProps {
   stream: MediaStream | null
   orientation: Orientation
   resolution: Resolution
-  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing' | 'effect' | 'zoom'>
+  camera: Pick<CameraSettings, 'mirror' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing' | 'effect' | 'filter' | 'filter_strength' | 'zoom'>
   background: BackgroundSettings
   /** URL of the seller's own background photo, when one is picked. */
   backgroundUrl: string | null
@@ -80,6 +81,8 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
   const { brightness = 50, contrast = 50, saturation = 50, warmth = 50, smoothing = 0 } = camera
   // An unknown effect (e.g. from a newer app version) shows nothing rather than breaking.
   const faceEffect = camera.effect && isFaceEffect(camera.effect) ? camera.effect : 'none'
+  const filter = camera.filter && isCameraFilter(camera.filter) ? camera.filter : 'none'
+  const filterStrength = camera.filter_strength ?? DEFAULT_FILTER_STRENGTH
 
   useEffect(() => {
     compositorRef.current?.update({
@@ -89,12 +92,14 @@ export function VideoLayer({ stream, orientation, resolution, camera, background
       mirror: camera.mirror,
       look: { brightness, contrast, saturation, warmth, smoothing },
       faceEffect,
+      filter,
+      filterStrength,
       zoom,
       keyColor: key,
       similarity: background.similarity,
       smoothness: background.smoothness,
     })
-  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, faceEffect, zoom, key, background.similarity, background.smoothness])
+  }, [width, height, background.mode, camera.mirror, brightness, contrast, saturation, warmth, smoothing, faceEffect, filter, filterStrength, zoom, key, background.similarity, background.smoothness])
 
   return (
     <>

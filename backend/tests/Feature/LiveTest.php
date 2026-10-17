@@ -131,6 +131,29 @@ class LiveTest extends TestCase
         $this->putJson("/api/setups/{$setup->id}/scene", $scene)->assertUnprocessable()->assertJsonValidationErrors('camera.effect');
     }
 
+    public function test_a_colour_filter_goes_live_with_its_strength_and_older_pictures_have_none(): void
+    {
+        Event::fake([SceneUpdated::class]);
+        $me = User::factory()->create();
+        $setup = $this->setupFor($me);
+        $this->actingAs($me);
+
+        $this->putJson("/api/setups/{$setup->id}/scene", $this->scene())->assertOk()
+            ->assertJsonPath('data.camera.filter', 'none')
+            ->assertJsonPath('data.camera.filter_strength', 80);
+
+        $scene = $this->scene();
+        $scene['camera'] += ['filter' => 'vintage', 'filter_strength' => 65];
+        $this->putJson("/api/setups/{$setup->id}/scene", $scene)->assertOk()
+            ->assertJsonPath('data.camera.filter', 'vintage')
+            ->assertJsonPath('data.camera.filter_strength', 65);
+
+        $bad = $scene;
+        $bad['camera']['filter'] = 'sepia-plus';
+        $bad['camera']['filter_strength'] = 120;
+        $this->putJson("/api/setups/{$setup->id}/scene", $bad)->assertUnprocessable()->assertJsonValidationErrors(['camera.filter', 'camera.filter_strength']);
+    }
+
     public function test_scene_updates_also_reach_the_active_output_link(): void
     {
         Event::fake([SceneUpdated::class]);

@@ -4,6 +4,26 @@ export type Orientation = 'landscape' | 'portrait'
 export type Resolution = '720p' | '1080p'
 export type ThemePref = 'light' | 'dark' | 'system'
 
+/** Colour filters for the camera picture (src/stage/filters.ts; same list as the API's Catalog). */
+export type CameraFilterId =
+  | 'none'
+  | 'fair'
+  | 'soft'
+  | 'glow'
+  | 'clear'
+  | 'warm'
+  | 'cool'
+  | 'vivid'
+  | 'pastel'
+  | 'dreamy'
+  | 'neon'
+  | 'vintage'
+  | 'film'
+  | 'retro'
+  | 'cinematic'
+  | 'bw'
+  | 'noir'
+
 /** Face-tracked camera effects (drawn by src/stage/faceEffects.ts; same list as the API's Catalog). */
 export type FaceEffectId =
   | 'none'
@@ -204,6 +224,9 @@ export interface CameraSettings {
   smoothing: number
   /** A face-tracked effect (flower crown, puppy ears…), or "none". */
   effect: FaceEffectId
+  /** A colour filter for the whole picture, and how strongly it applies (0–100). */
+  filter: CameraFilterId
+  filter_strength: number
   zoom: number
   /** Send the camera's own sound (or the default microphone) with the clean screen. */
   audio: boolean

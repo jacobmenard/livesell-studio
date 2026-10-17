@@ -4,16 +4,18 @@ import { Button, Panel, Segmented, Switch, cx } from '../../components/ui'
 import type { CameraSettings, Orientation, Resolution } from '../../lib/types'
 import { LOOK_PRESETS, isNeutralLook, sameLook, type CameraLook } from '../../stage/enhance'
 import { FACE_EFFECTS, faceEffectGroup, type FaceEffectGroup } from '../../stage/faceEffects'
+import { CAMERA_FILTERS, DEFAULT_FILTER_STRENGTH } from '../../stage/filters'
 import { MIN_ZOOM } from '../../stage/geometry'
 import { AUDIO_MESSAGES, CAMERA_MESSAGES, type AudioStatus, type CameraDevice, type CameraStatus } from '../../stage/useCamera'
 
 /** The Camera step's own tabs, so each part fits on screen without scrolling. */
-export type CameraSection = 'camera' | 'frame' | 'look' | 'effects' | 'sound'
+export type CameraSection = 'camera' | 'frame' | 'look' | 'filters' | 'effects' | 'sound'
 
 const SECTIONS: { id: CameraSection; label: string; hint: string }[] = [
   { id: 'camera', label: 'Camera', hint: 'Pick your camera and turn it on.' },
   { id: 'frame', label: 'Frame', hint: 'Shape, quality and how close the camera is.' },
   { id: 'look', label: 'Look', hint: 'Make your picture brighter, warmer or smoother.' },
+  { id: 'filters', label: 'Filters', hint: 'A colour style for your whole picture, like Vintage or B&W.' },
   { id: 'effects', label: 'Effects', hint: 'Fun stickers that follow your face.' },
   { id: 'sound', label: 'Sound', hint: 'Choose whether your camera’s sound goes live.' },
 ]
@@ -57,7 +59,7 @@ export function CameraPanel({
   const phone = camera.source === 'phone'
   const look: CameraLook = { brightness: camera.brightness, contrast: camera.contrast, saturation: camera.saturation, warmth: camera.warmth, smoothing: camera.smoothing }
   // A dot on a tab that has something switched on, so it's easy to find again.
-  const active: Partial<Record<CameraSection, boolean>> = { look: !isNeutralLook(look), effects: camera.effect !== 'none' }
+  const active: Partial<Record<CameraSection, boolean>> = { look: !isNeutralLook(look), filters: camera.filter !== 'none', effects: camera.effect !== 'none' }
   const current = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0]
 
   return (
@@ -144,6 +146,8 @@ export function CameraPanel({
       )}
 
       {current.id === 'look' && <CameraLookControls look={look} onCamera={onCamera} />}
+
+      {current.id === 'filters' && <FilterPicker camera={camera} onCamera={onCamera} />}
 
       {current.id === 'effects' && <FaceEffectPicker value={camera.effect} onChange={(effect) => onCamera({ effect })} />}
 
@@ -323,6 +327,52 @@ function CameraLookControls({ look, onCamera }: { look: CameraLook; onCamera: (p
           {s.hint && <span className="text-xs">{s.hint}</span>}
         </label>
       ))}
+    </div>
+  )
+}
+
+/** Colour filters for the whole picture, with how strongly they apply. */
+function FilterPicker({ camera, onCamera }: { camera: CameraSettings; onCamera: (patch: Partial<CameraSettings>) => void }) {
+  const strength = camera.filter_strength ?? DEFAULT_FILTER_STRENGTH
+  return (
+    <div className="flex flex-col gap-3">
+      <div role="group" aria-label="Colour filters" className="grid grid-cols-[repeat(auto-fill,minmax(68px,1fr))] gap-1.5">
+        {CAMERA_FILTERS.map((f) => {
+          const on = f.id === camera.filter
+          return (
+            <button
+              key={f.id}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onCamera({ filter: f.id })}
+              className={cx(
+                'flex flex-col items-center gap-1 rounded-xl border-2 p-1.5 text-[11px] leading-tight font-semibold transition-[transform,border-color] duration-150 active:scale-95 motion-reduce:transition-none',
+                on ? 'border-select bg-tint text-text' : 'border-transparent bg-field text-text-2 hover:text-text',
+              )}
+            >
+              <span aria-hidden="true" className="block h-10 w-full rounded-lg" style={{ background: f.swatch }} />
+              {f.label}
+            </button>
+          )
+        })}
+      </div>
+      {camera.filter !== 'none' && (
+        <div className="flex flex-col gap-1 text-[13px] text-muted">
+          <span className="flex items-baseline justify-between gap-2">
+            <span aria-hidden="true">Strength</span>
+            <span className="text-xs tabular-nums">{strength}%</span>
+          </span>
+          <input
+            type="range"
+            min={0}
+            max={100}
+            value={strength}
+            aria-label="Filter strength"
+            aria-valuetext={`${strength}%`}
+            onChange={(e) => onCamera({ filter_strength: Number(e.target.value) })}
+          />
+        </div>
+      )}
     </div>
   )
 }

@@ -3,7 +3,9 @@
  * camera frame on the GPU (WebGL). Face smoothing is an edge-preserving blur limited to
  * skin-coloured pixels, with a soft glow: skin looks even while eyes, lips, hair and the
  * products on show stay sharp. No face detection, so nothing extra to download.
+ * The same pass also applies the colour filter, if one is picked (filters.ts).
  */
+import type { FilterGrade } from './filters'
 
 /** The camera's look settings (0–100 sliders; 50 = unchanged, smoothing 0 = off). */
 export interface CameraLook {
@@ -52,7 +54,11 @@ void main() {
 }`
 
 const FRAGMENT = `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
 precision mediump float;
+#endif
 uniform sampler2D u_tex;
 uniform vec2 u_step;        // smoothing radius, in texture coordinates
 uniform float u_brightness; // multiplier, 0.5–1.5
@@ -60,6 +66,18 @@ uniform float u_contrast;   // 0.5–1.5
 uniform float u_saturation; // 0–2
 uniform float u_warmth;     // −1–1
 uniform float u_smoothing;  // 0–1
+// Colour filter (see filters.ts), blended in by u_fStrength (0 = off).
+uniform float u_fStrength;
+uniform vec3 u_fGain;
+uniform float u_fContrast;
+uniform float u_fSaturation;
+uniform float u_fFade;
+uniform vec3 u_fShadows;
+uniform vec3 u_fHighlights;
+uniform float u_fMono;
+uniform float u_fVignette;
+uniform float u_fGrain;
+uniform float u_seed;       // changes every frame, so film grain moves
 varying vec2 v_uv;
 
 const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
@@ -108,17 +126,57 @@ void main() {
   c = (c - 0.5) * u_contrast + 0.5;
   c = mix(vec3(dot(c, LUMA)), c, u_saturation);
   c += vec3(0.06, 0.015, -0.06) * u_warmth;
-
   c = clamp(c, 0.0, 1.0);
+
+  if (u_fStrength > 0.0) {
+    vec3 g = c * u_fGain;
+    g = (g - 0.5) * u_fContrast + 0.5;
+    float l = clamp(dot(g, LUMA), 0.0, 1.0);
+    g = mix(vec3(l), g, u_fSaturation);
+    g = mix(g, vec3(l), u_fMono);
+    g += u_fShadows * (1.0 - l) + u_fHighlights * l;
+    // Fade: blacks lifted, whites softened, like old film.
+    g = mix(vec3(u_fFade), vec3(1.0 - u_fFade * 0.3), clamp(g, 0.0, 1.0));
+    g *= 1.0 - u_fVignette * smoothstep(0.3, 0.85, distance(v_uv, vec2(0.5)));
+    float noise = fract(sin(dot(v_uv * 1000.0 + u_seed, vec2(12.9898, 78.233))) * 43758.5453);
+    g += (noise - 0.5) * u_fGrain;
+    c = mix(c, clamp(g, 0.0, 1.0), u_fStrength);
+  }
+
   gl_FragColor = vec4(c * texel.a, texel.a);
 }`
+
+/** A colour filter as the shader takes it, with its strength (0–1). */
+export interface FilterUniforms {
+  strength: number
+  grade: FilterGrade
+}
 
 /** Applies a CameraLook to camera frames. Throws when WebGL isn't available. */
 export class Enhancer {
   readonly canvas: HTMLCanvasElement
   private gl: WebGLRenderingContext
   private texture: WebGLTexture
-  private uniforms: Record<'step' | 'brightness' | 'contrast' | 'saturation' | 'warmth' | 'smoothing', WebGLUniformLocation>
+  private uniforms: Record<
+    | 'step'
+    | 'brightness'
+    | 'contrast'
+    | 'saturation'
+    | 'warmth'
+    | 'smoothing'
+    | 'fStrength'
+    | 'fGain'
+    | 'fContrast'
+    | 'fSaturation'
+    | 'fFade'
+    | 'fShadows'
+    | 'fHighlights'
+    | 'fMono'
+    | 'fVignette'
+    | 'fGrain'
+    | 'seed',
+    WebGLUniformLocation
+  >
 
   constructor() {
     this.canvas = document.createElement('canvas')
@@ -171,14 +229,25 @@ export class Enhancer {
       saturation: loc('u_saturation'),
       warmth: loc('u_warmth'),
       smoothing: loc('u_smoothing'),
+      fStrength: loc('u_fStrength'),
+      fGain: loc('u_fGain'),
+      fContrast: loc('u_fContrast'),
+      fSaturation: loc('u_fSaturation'),
+      fFade: loc('u_fFade'),
+      fShadows: loc('u_fShadows'),
+      fHighlights: loc('u_fHighlights'),
+      fMono: loc('u_fMono'),
+      fVignette: loc('u_fVignette'),
+      fGrain: loc('u_fGrain'),
+      seed: loc('u_seed'),
     }
   }
 
   /**
-   * One frame with the look applied, as a canvas the same size as the source (a camera
-   * video, or the green-screen keyer's output, whose transparency is kept).
+   * One frame with the look (and colour filter, if any) applied, as a canvas the same size as
+   * the source (a camera video, or the green-screen keyer's output, whose transparency is kept).
    */
-  render(source: HTMLVideoElement | HTMLCanvasElement, width: number, height: number, look: CameraLook): HTMLCanvasElement {
+  render(source: HTMLVideoElement | HTMLCanvasElement, width: number, height: number, look: CameraLook, filter: FilterUniforms | null = null): HTMLCanvasElement {
     const { gl } = this
     if (this.canvas.width !== width || this.canvas.height !== height) {
       this.canvas.width = width
@@ -195,6 +264,18 @@ export class Enhancer {
     gl.uniform1f(this.uniforms.saturation, look.saturation / 50)
     gl.uniform1f(this.uniforms.warmth, (look.warmth - 50) / 50)
     gl.uniform1f(this.uniforms.smoothing, look.smoothing / 100)
+    const g = filter?.grade ?? {}
+    gl.uniform1f(this.uniforms.fStrength, filter ? filter.strength : 0)
+    gl.uniform3fv(this.uniforms.fGain, g.gain ?? [1, 1, 1])
+    gl.uniform1f(this.uniforms.fContrast, g.contrast ?? 1)
+    gl.uniform1f(this.uniforms.fSaturation, g.saturation ?? 1)
+    gl.uniform1f(this.uniforms.fFade, g.fade ?? 0)
+    gl.uniform3fv(this.uniforms.fShadows, g.shadows ?? [0, 0, 0])
+    gl.uniform3fv(this.uniforms.fHighlights, g.highlights ?? [0, 0, 0])
+    gl.uniform1f(this.uniforms.fMono, g.mono ?? 0)
+    gl.uniform1f(this.uniforms.fVignette, g.vignette ?? 0)
+    gl.uniform1f(this.uniforms.fGrain, g.grain ?? 0)
+    gl.uniform1f(this.uniforms.seed, (performance.now() / 1000) % 100)
     gl.clearColor(0, 0, 0, 0)
     gl.clear(gl.COLOR_BUFFER_BIT)
     gl.drawArrays(gl.TRIANGLES, 0, 6)

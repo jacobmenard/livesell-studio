@@ -4,6 +4,7 @@ import { ChromaKeyer } from './chroma'
 import { Enhancer, isNeutralLook, lookAsCssFilter, sameLook, type CameraLook } from './enhance'
 import { drawFaceEffect, poseFromPoints, smoothPose, type FaceEffectId, type FacePose } from './faceEffects'
 import { loadFaceTracker } from './faceTracker'
+import { filterAsCssFilter, filterGrade, type CameraFilterId } from './filters'
 import { coverCrop, maskAlpha, placeCamera, type CameraPlacement } from './geometry'
 import { loadSegmenter } from './segmenter'
 
@@ -22,6 +23,9 @@ export interface CompositorSettings {
   look: CameraLook
   /** A face-tracked effect drawn over the camera (see faceEffects.ts). */
   faceEffect: FaceEffectId
+  /** A colour filter for the whole picture (see filters.ts), and its strength (0–100). */
+  filter: CameraFilterId
+  filterStrength: number
   /** −100–100: 0 fills the stage, above zooms in, below zooms out (see placeCamera). */
   zoom: number
   keyColor: [number, number, number]
@@ -63,6 +67,7 @@ export class Compositor {
   private enhancerFailed = false
   private enhancedTime = -1
   private enhancedLook: CameraLook | null = null
+  private enhancedFilter = ''
   private faceTracker: FaceLandmarker | null = null
   private faceState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle'
   private faceVideoTime = -1
@@ -224,7 +229,7 @@ export class Compositor {
     // Green screen keys first (so the look can't shift the key colour), then the look is
     // applied once; everything below draws that frame. Segmentation still reads the video.
     const keyed = s.mode === 'green' ? (this.chroma?.render(video, s.keyColor, s.similarity, s.smoothness) ?? null) : null
-    const { frame, filter } = this.withLook(keyed ?? video, video, s.look)
+    const { frame, filter } = this.withLook(keyed ?? video, video, s)
 
     ctx.save()
     if (s.mirror) {
@@ -308,12 +313,14 @@ export class Compositor {
   }
 
   /**
-   * The frame with the seller's look applied on the GPU, re-rendered only for a new camera
-   * frame or new settings (the stage redraws at 60 fps, cameras send 30). Without WebGL the
-   * basic adjustments come back as a canvas filter instead.
+   * The frame with the seller's look and colour filter applied on the GPU, re-rendered only
+   * for a new camera frame or new settings (the stage redraws at 60 fps, cameras send 30).
+   * Without WebGL the basic adjustments come back as a canvas filter instead.
    */
-  private withLook(source: Frame, video: HTMLVideoElement, look: CameraLook): { frame: Frame; filter: string } {
-    if (isNeutralLook(look)) return { frame: source, filter: 'none' }
+  private withLook(source: Frame, video: HTMLVideoElement, s: CompositorSettings): { frame: Frame; filter: string } {
+    const { look } = s
+    const filtered = s.filter !== 'none' && s.filterStrength > 0
+    if (isNeutralLook(look) && !filtered) return { frame: source, filter: 'none' }
     if (!this.enhancer && !this.enhancerFailed) {
       try {
         this.enhancer = new Enhancer()
@@ -322,13 +329,23 @@ export class Compositor {
         this.enhancerFailed = true
       }
     }
-    if (!this.enhancer) return { frame: source, filter: lookAsCssFilter(look) }
+    if (!this.enhancer) {
+      const css = [isNeutralLook(look) ? '' : lookAsCssFilter(look), filtered ? filterAsCssFilter(s.filter, s.filterStrength) : ''].filter(Boolean).join(' ')
+      return { frame: source, filter: css || 'none' }
+    }
 
-    const fresh = source === video && video.currentTime === this.enhancedTime && this.enhancedLook !== null && sameLook(look, this.enhancedLook)
+    const filterKey = filtered ? `${s.filter}:${s.filterStrength}` : ''
+    const fresh =
+      source === video &&
+      video.currentTime === this.enhancedTime &&
+      this.enhancedLook !== null &&
+      sameLook(look, this.enhancedLook) &&
+      filterKey === this.enhancedFilter
     if (!fresh) {
-      this.enhancer.render(source, video.videoWidth, video.videoHeight, look)
+      this.enhancer.render(source, video.videoWidth, video.videoHeight, look, filtered ? { strength: s.filterStrength / 100, grade: filterGrade(s.filter) } : null)
       this.enhancedTime = video.currentTime
       this.enhancedLook = look
+      this.enhancedFilter = filterKey
     }
     return { frame: this.enhancer.canvas, filter: 'none' }
   }

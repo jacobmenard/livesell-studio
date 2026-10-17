@@ -75,6 +75,12 @@ final class Catalog
 
     public const CAMERA_SOURCES = ['camera', 'phone'];
 
+    /** Colour filters for the camera picture (frontend src/stage/filters.ts). */
+    public const CAMERA_FILTERS = [
+        'none', 'fair', 'soft', 'glow', 'clear', 'warm', 'cool', 'vivid', 'pastel', 'dreamy', 'neon',
+        'vintage', 'film', 'retro', 'cinematic', 'bw', 'noir',
+    ];
+
     /** Face-tracked camera effects (frontend src/stage/faceEffects.ts). */
     public const FACE_EFFECTS = [
         'none', 'glam', 'natural-makeup', 'fresh-face', 'nude-glow', 'rosy-cheeks', 'peach-fresh', 'coral-summer',
