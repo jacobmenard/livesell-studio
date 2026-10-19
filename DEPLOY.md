@@ -94,7 +94,7 @@ which node        # note this path for step 10 (e.g. /home/SITE_USER/.nvm/versio
 
 ```bash
 cd ~/htdocs/DOMAIN/backend
-cp ../deploy/backend.env.production.example .env
+[ -f .env ] || cp ../deploy/backend.env.production.example .env   # never replaces a filled-in .env
 php8.4 $(which composer) install --no-dev --optimize-autoloader
 php8.4 artisan key:generate
 ```
@@ -123,7 +123,7 @@ php8.4 artisan route:cache
 
 ```bash
 cd ~/htdocs/DOMAIN/frontend
-cp ../deploy/frontend.env.production.example .env
+[ -f .env ] || cp ../deploy/frontend.env.production.example .env
 bash ../deploy/make-secrets.sh    # copies REVERB_APP_KEY from backend/.env
 npm ci
 npm run build
@@ -133,7 +133,7 @@ npm run build
 
 ```bash
 cd ~/htdocs/DOMAIN/relay
-cp ../deploy/relay.env.production.example .env
+[ -f .env ] || cp ../deploy/relay.env.production.example .env
 bash ../deploy/make-secrets.sh    # copies RELAY_SECRET from backend/.env
 nano .env      # replace DOMAIN
 npm ci --omit=dev

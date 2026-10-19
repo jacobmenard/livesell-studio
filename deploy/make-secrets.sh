@@ -10,7 +10,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [ ! -f backend/.env ]; then
-  echo "backend/.env is missing: cp deploy/backend.env.production.example backend/.env first." >&2
+  echo "backend/.env is missing: create it from deploy/backend.env.production.example first (DEPLOY.md step 6)." >&2
   exit 1
 fi
 
