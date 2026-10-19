@@ -142,11 +142,11 @@ npm ci --omit=dev
 ## 9. Web server rules (CloudPanel)
 
 1. CloudPanel → your site → **Vhost**.
-2. In the main `server { ... }` block (the one with `{{root}}` and `location ~ \.php$`):
-   - delete the default `location / { try_files $uri $uri/ /index.php?$args; }` block,
+2. The Vhost has two `server { ... }` blocks. In the **first** one (with `listen 443`):
+   - delete the `location / { {{varnish_proxy_pass}} ... }` block,
    - delete the static-files block that starts with `location ~* ^.+\.(css|js|jpg|...`,
    - paste the contents of [`deploy/nginx-locations.conf`](deploy/nginx-locations.conf) in their place.
-   Keep the `location ~ \.php$ { ... }` block exactly as CloudPanel made it.
+   Leave the second block (`listen 8080`, CloudPanel's Varnish backend) exactly as it is.
 3. Replace `SITE_USER` and `DOMAIN` in what you pasted, then **Save**. CloudPanel refuses to
    save if there's a mistake, and tells you the line.
 
