@@ -26,12 +26,58 @@ export function unlockAudio(): void {
   audio()
 }
 
+/** The sound effects' audio engine, shared with streaming so effects can be mixed into the live. */
+export function soundContext(): AudioContext | null {
+  return audio()
+}
+
+// While streaming straight, effects go into the live's mix instead of the speakers, so the
+// streaming window stays silent (nothing for the microphone to pick up again).
+let liveBus: AudioNode | null = null
+const decoded = new Map<string, Promise<AudioBuffer>>()
+
+/** Sends sound effects into the live (streaming straight); null sends them to the speakers again. */
+export function routeSoundsToLive(bus: AudioNode | null): void {
+  liveBus = bus
+}
+
+/** A sound file played into the live's mix (decoded once, then reused). */
+async function playFileInto(url: string, gain: number, bus: AudioNode): Promise<boolean> {
+  const ctx = audio()
+  if (!ctx) return false
+  try {
+    let buffer = decoded.get(url)
+    if (!buffer) {
+      buffer = fetch(url)
+        .then((r) => {
+          if (!r.ok) throw new Error(`Sound not found (${r.status})`)
+          return r.arrayBuffer()
+        })
+        .then((bytes) => ctx.decodeAudioData(bytes))
+      decoded.set(url, buffer)
+      buffer.catch(() => decoded.delete(url))
+    }
+    const source = ctx.createBufferSource()
+    source.buffer = await buffer
+    const out = ctx.createGain()
+    out.gain.value = gain
+    source.connect(out)
+    out.connect(bus)
+    source.start()
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** Plays a sound. Volume is 0–100. Resolves false if the browser refused to play it. */
 export async function playSound(sound: BuiltinSoundId | { url: string }, volume: number): Promise<boolean> {
   const gain = Math.min(1, Math.max(0, volume / 100))
   if (gain <= 0) return true
 
   const url = typeof sound === 'string' ? SOUND_FILES[sound] : sound.url
+  const bus = liveBus
+  if (url && bus) return playFileInto(url, gain, bus)
   if (url) {
     try {
       const el = new Audio(url)
@@ -48,7 +94,7 @@ export async function playSound(sound: BuiltinSoundId | { url: string }, volume:
   try {
     const out = ctx.createGain()
     out.gain.value = gain
-    out.connect(ctx.destination)
+    out.connect(bus ?? ctx.destination)
     synth(sound as BuiltinSoundId, ctx, out, ctx.currentTime + 0.02)
     return ctx.state !== 'suspended'
   } catch {

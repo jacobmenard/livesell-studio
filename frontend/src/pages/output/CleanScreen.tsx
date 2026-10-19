@@ -110,11 +110,19 @@ export function CleanScreen({ source, broadcast }: { source: FeedSource; broadca
     }
   }, [])
 
+  // The streaming window never plays anything out loud: while live its sounds go straight into
+  // the stream (see broadcast.ts), and before or after streaming they're simply skipped.
+  const streaming = useRef(false)
+  useEffect(() => {
+    streaming.current = isBroadcasting(live.status.state)
+  }, [live.status.state])
+
   useEffect(() => {
     if (!soundEvent) return
+    if (broadcast && !streaming.current) return
     const { sound, url, volume } = soundEvent.event
     void playSound(url ? { url } : (sound as BuiltinSoundId), volume)
-  }, [soundEvent])
+  }, [soundEvent, broadcast])
 
   // An open clean screen is a live: it holds one of the plan's slots while it's open.
   const session = useLiveSession(scene && !fatal ? source.live : null)
@@ -200,8 +208,8 @@ function BroadcastStart({ platform, status, onStart }: { platform: string; statu
         </h1>
         {status.state === 'error' && <Alert>{status.message}</Alert>}
         <p className="m-0 text-sm text-text-2">
-          Chrome will ask to share this tab: keep <strong>Also share tab audio</strong> on (that carries your sound effects; your camera’s sound is added
-          separately), then choose <strong>Share</strong>. This card disappears before anything goes live. Keep this window open while you’re live.
+          Chrome will ask to share this tab: choose <strong>Share</strong>. Your voice and sound effects go straight into the live, so this window stays silent
+          (no echo). This card disappears before anything goes live. Keep this window open while you’re live.
         </p>
         <Button variant="primary" size="lg" onClick={onStart}>
           {status.state === 'idle' ? 'Start streaming' : 'Start streaming again'}

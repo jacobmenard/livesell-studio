@@ -150,8 +150,9 @@ Emails use Laravel's mailer: locally `MAIL_MAILER=log` writes them to
 1. In the editor, open **Go live → Stream straight to Facebook or YouTube**, pick the
    platform, paste the server URL and stream key (Facebook: Live Producer → Streaming
    software; YouTube: Studio → Go live → Stream) and **Save**.
-2. Click **Go live on Facebook**. The clean screen opens; click **Start streaming**, keep
-   **Also share tab audio** on and choose **Share**.
+2. Click **Go live on Facebook**. The clean screen opens; click **Start streaming** and choose
+   **Share**. Your voice and sound effects are mixed straight into the live, so the clean-screen
+   window itself stays silent (nothing for your microphone to pick up again).
 3. The editor shows **● Live on Facebook**. On Facebook, click **Go live** in Live Producer
    once the preview appears (YouTube starts by itself if auto-start is on).
 4. **Stop streaming** in the editor (or Chrome's **Stop sharing**) ends it. Keep the
@@ -224,6 +225,9 @@ npm test                        # node --test
 - Stream keys: `encrypted` cast at rest, hidden from serialization, only a hint returned.
 
 ## Production checklist
+
+Step-by-step for a VPS with CloudPanel (e.g. Hostinger KVM 2): **[DEPLOY.md](DEPLOY.md)**, with
+the Nginx rules, Supervisor programs and `.env` templates in [`deploy/`](deploy/).
 
 - Serve `frontend/dist` and the API from the **same domain** (e.g. nginx: `/` → SPA with
   history fallback, `/api`, `/sanctum`, `/storage` → Laravel). Set `SESSION_DOMAIN`,

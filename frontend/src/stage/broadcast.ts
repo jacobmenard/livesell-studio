@@ -1,6 +1,7 @@
 import { errorMessage } from '../lib/api'
 import { broadcastApi } from '../lib/endpoints'
 import type { Orientation, Platform, Resolution } from '../lib/types'
+import { routeSoundsToLive, soundContext } from './sounds'
 
 /**
  * Streaming straight to Facebook / YouTube. Browsers can't speak RTMP, so the clean
@@ -72,7 +73,9 @@ export function startBroadcast(options: BroadcastOptions): () => void {
   let capture: MediaStream | null = null
   let socket: WebSocket | null = null
   let recorder: MediaRecorder | null = null
-  let mixer: AudioContext | null = null
+  let voiceSource: MediaStreamAudioSourceNode | null = null
+  // Only closed when this live made its own (the shared sound engine stays open).
+  let ownMixer: AudioContext | null = null
 
   const report = (state: BroadcastState, message = '') => {
     if (finished) return
@@ -83,7 +86,9 @@ export function startBroadcast(options: BroadcastOptions): () => void {
   const release = () => {
     if (recorder && recorder.state !== 'inactive') recorder.stop()
     capture?.getTracks().forEach((t) => t.stop())
-    void mixer?.close()
+    routeSoundsToLive(null)
+    voiceSource?.disconnect()
+    void ownMixer?.close()
     if (socket && socket.readyState <= WebSocket.OPEN) socket.close(1000)
   }
 
@@ -114,9 +119,9 @@ export function startBroadcast(options: BroadcastOptions): () => void {
     try {
       capture = await navigator.mediaDevices.getDisplayMedia({
         video: { frameRate: { ideal: 30, max: 30 } },
-        // The tab carries only the sound effects, and they don't also play out loud here
-        // (the seller hears them from the editor's "Hear it myself"), so the mic can't pick them up again.
-        audio: { suppressLocalAudioPlayback: true } as MediaTrackConstraints,
+        // No tab audio: the voice and sound effects are mixed straight into the live below, and
+        // this window plays nothing out loud, so there's nothing for the mic to hear again.
+        audio: false,
         preferCurrentTab: true,
         selfBrowserSurface: 'include',
         surfaceSwitching: 'exclude',
@@ -145,20 +150,22 @@ export function startBroadcast(options: BroadcastOptions): () => void {
       }
     }
 
-    // One sound track for the live: the camera's sound plus the tab's sound effects, mixed here.
-    // With neither it's silence, since platforms expect a sound track.
-    const effects = capture.getAudioTracks()
+    // One sound track for the live, mixed here: the camera's sound, plus the sound effects,
+    // which play into this mix instead of the speakers while streaming (sounds.ts). Mixing on
+    // the sound effects' own engine is what lets them join. Silence if there's neither, since
+    // platforms expect a sound track.
     const voice = options.mic?.getAudioTracks().filter((t) => t.readyState === 'live') ?? []
-    mixer = new AudioContext()
+    const shared = soundContext()
+    const mixer = shared ?? new AudioContext()
+    if (!shared) ownMixer = mixer
     void mixer.resume()
     const bus = mixer.createMediaStreamDestination()
-    for (const sound of [effects, voice]) {
-      if (sound.length > 0) mixer.createMediaStreamSource(new MediaStream(sound)).connect(bus)
+    if (voice.length > 0) {
+      voiceSource = mixer.createMediaStreamSource(new MediaStream(voice))
+      voiceSource.connect(bus)
     }
-    let soundNote = ''
-    if (effects.length === 0) {
-      soundNote = voice.length > 0 ? 'Your sound effects won’t be heard on the live: tab audio wasn’t shared.' : 'You’re live without sound: tab audio wasn’t shared.'
-    }
+    if (shared) routeSoundsToLive(bus)
+    const soundNote = voice.length > 0 ? '' : 'You’re live without your voice: camera sound is off (Camera → Sound). Sound effects still go live.'
     const media = new MediaStream([video, ...bus.stream.getAudioTracks()])
 
     let ticket: string
