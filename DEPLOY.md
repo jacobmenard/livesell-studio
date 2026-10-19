@@ -99,17 +99,14 @@ php8.4 $(which composer) install --no-dev --optimize-autoloader
 php8.4 artisan key:generate
 ```
 
-Generate the other secrets and **copy each into `.env`**:
+Create the Reverb and relay secrets (written straight into `.env`, never shown):
 
 ```bash
-php8.4 -r "echo 'REVERB_APP_ID=', random_int(100000, 999999), PHP_EOL;"
-php8.4 -r "echo 'REVERB_APP_KEY=', bin2hex(random_bytes(10)), PHP_EOL;"
-php8.4 -r "echo 'REVERB_APP_SECRET=', bin2hex(random_bytes(20)), PHP_EOL;"
-php8.4 -r "echo 'RELAY_SECRET=', bin2hex(random_bytes(32)), PHP_EOL;"
+bash ../deploy/make-secrets.sh
 ```
 
 Now edit `.env` (`nano .env`, save with Ctrl+O, Enter, exit with Ctrl+X) and replace every
-`DOMAIN` and `CHANGE_ME`: database name/user/password (step 2), the secrets above, your email
+`DOMAIN` and the remaining `CHANGE_ME`: database name/user/password (step 2), your email
 provider's SMTP details, and your superadmin email and a strong password.
 
 Then set up the database and files:
@@ -127,7 +124,7 @@ php8.4 artisan route:cache
 ```bash
 cd ~/htdocs/DOMAIN/frontend
 cp ../deploy/frontend.env.production.example .env
-nano .env      # set VITE_REVERB_APP_KEY to the same REVERB_APP_KEY as backend/.env
+bash ../deploy/make-secrets.sh    # copies REVERB_APP_KEY from backend/.env
 npm ci
 npm run build
 ```
@@ -137,7 +134,8 @@ npm run build
 ```bash
 cd ~/htdocs/DOMAIN/relay
 cp ../deploy/relay.env.production.example .env
-nano .env      # RELAY_SECRET = same as backend/.env; replace DOMAIN
+bash ../deploy/make-secrets.sh    # copies RELAY_SECRET from backend/.env
+nano .env      # replace DOMAIN
 npm ci --omit=dev
 ```
 
