@@ -7,7 +7,9 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
-PHP="${PHP:-php8.3}"
+PHP="${PHP:-php8.4}"
+# Composer runs on the same PHP as the site (the server's default `php` may be older).
+COMPOSER=("$PHP" "$(command -v composer)")
 
 echo "==> Getting the latest code"
 git pull --ff-only
@@ -15,7 +17,7 @@ git pull --ff-only
 echo "==> Backend"
 cd "$ROOT/backend"
 "$PHP" artisan down --retry=15 || true
-composer install --no-dev --optimize-autoloader --no-interaction
+"${COMPOSER[@]}" install --no-dev --optimize-autoloader --no-interaction
 "$PHP" artisan migrate --force
 "$PHP" artisan storage:link 2>/dev/null || true
 "$PHP" artisan config:cache

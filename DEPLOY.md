@@ -39,7 +39,7 @@ Everything you paste lives in [`deploy/`](deploy/). Throughout, replace:
 ## 2. Create the site
 
 1. CloudPanel → **Add Site** → **Create a PHP Site**.
-2. Application: **Laravel 12** (or the newest Laravel shown), PHP **8.3**.
+2. Application: **Laravel 12** (or the newest Laravel shown), PHP **8.4**.
 3. Domain name: `DOMAIN`. Site user: `SITE_USER`, with a strong password (save it).
 4. Open the new site → **Settings** → **Root Directory**: change it to `backend/public` → Save.
 5. **SSL/TLS** → **Actions → New Let's Encrypt Certificate** → Create.
@@ -95,17 +95,17 @@ which node        # note this path for step 10 (e.g. /home/SITE_USER/.nvm/versio
 ```bash
 cd ~/htdocs/DOMAIN/backend
 cp ../deploy/backend.env.production.example .env
-composer install --no-dev --optimize-autoloader
-php8.3 artisan key:generate
+php8.4 $(which composer) install --no-dev --optimize-autoloader
+php8.4 artisan key:generate
 ```
 
 Generate the other secrets and **copy each into `.env`**:
 
 ```bash
-php8.3 -r "echo 'REVERB_APP_ID=', random_int(100000, 999999), PHP_EOL;"
-php8.3 -r "echo 'REVERB_APP_KEY=', bin2hex(random_bytes(10)), PHP_EOL;"
-php8.3 -r "echo 'REVERB_APP_SECRET=', bin2hex(random_bytes(20)), PHP_EOL;"
-php8.3 -r "echo 'RELAY_SECRET=', bin2hex(random_bytes(32)), PHP_EOL;"
+php8.4 -r "echo 'REVERB_APP_ID=', random_int(100000, 999999), PHP_EOL;"
+php8.4 -r "echo 'REVERB_APP_KEY=', bin2hex(random_bytes(10)), PHP_EOL;"
+php8.4 -r "echo 'REVERB_APP_SECRET=', bin2hex(random_bytes(20)), PHP_EOL;"
+php8.4 -r "echo 'RELAY_SECRET=', bin2hex(random_bytes(32)), PHP_EOL;"
 ```
 
 Now edit `.env` (`nano .env`, save with Ctrl+O, Enter, exit with Ctrl+X) and replace every
@@ -115,11 +115,11 @@ provider's SMTP details, and your superadmin email and a strong password.
 Then set up the database and files:
 
 ```bash
-php8.3 artisan migrate --force
-php8.3 artisan db:seed --force          # starter templates + your superadmin account
-php8.3 artisan storage:link
-php8.3 artisan config:cache
-php8.3 artisan route:cache
+php8.4 artisan migrate --force
+php8.4 artisan db:seed --force          # starter templates + your superadmin account
+php8.4 artisan storage:link
+php8.4 artisan config:cache
+php8.4 artisan route:cache
 ```
 
 ## 7. Frontend (as the site user)
@@ -171,7 +171,7 @@ themselves after a crash or a reboot.
 Your site → **Cron Jobs** → **Add Cron Job**: every minute (`* * * * *`), command:
 
 ```
-/usr/bin/php8.3 /home/SITE_USER/htdocs/DOMAIN/backend/artisan schedule:run >> /dev/null 2>&1
+/usr/bin/php8.4 /home/SITE_USER/htdocs/DOMAIN/backend/artisan schedule:run >> /dev/null 2>&1
 ```
 
 ## 12. Check that everything works
@@ -198,11 +198,11 @@ Then as root: `supervisorctl restart negosyowork-reverb negosyowork-relay`.
 | What you see | Where to look / what to do |
 |---|---|
 | Blank page or 404 on the site | Step 9: check the Vhost paths (`SITE_USER`, `DOMAIN`) and that `frontend/dist` exists (step 7). |
-| "Server error" (500) | `tail -50 ~/htdocs/DOMAIN/backend/storage/logs/laravel-*.log` (as the site user). After editing `.env`, run `php8.3 artisan config:cache`. |
-| Logged out right after logging in | `.env`: `SESSION_DOMAIN`, `SANCTUM_STATEFUL_DOMAINS`, `APP_URL` must all match `DOMAIN`, then `php8.3 artisan config:cache`. |
+| "Server error" (500) | `tail -50 ~/htdocs/DOMAIN/backend/storage/logs/laravel-*.log` (as the site user). After editing `.env`, run `php8.4 artisan config:cache`. |
+| Logged out right after logging in | `.env`: `SESSION_DOMAIN`, `SANCTUM_STATEFUL_DOMAINS`, `APP_URL` must all match `DOMAIN`, then `php8.4 artisan config:cache`. |
 | Popups take a second to show | Reverb isn't reached: `supervisorctl status`, and check `VITE_REVERB_APP_KEY` = `REVERB_APP_KEY` (rebuild the frontend after changing it). |
 | "Can't reach the streaming relay" | `supervisorctl status negosyowork-relay`; log: `/home/SITE_USER/logs/negosyowork-relay.log`. |
-| Emails don't arrive | `.env` SMTP settings, then `php8.3 artisan config:cache`. |
+| Emails don't arrive | `.env` SMTP settings, then `php8.4 artisan config:cache`. |
 
 How much the VPS can handle: the website, camera effects and OBS / TikTok LIVE Studio use very
 little (the work happens in each seller's browser). **Streaming straight** re-encodes video on
