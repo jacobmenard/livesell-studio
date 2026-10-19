@@ -19,6 +19,8 @@ return new class extends Migration
         Schema::table('subscriptions', function (Blueprint $table) {
             $table->dropConstrainedForeignId('scheduled_plan_id');
             $table->dropConstrainedForeignId('requested_plan_id');
+            // Index first: MySQL drops it with the column, SQLite refuses to drop an indexed column.
+            $table->dropIndex(['xendit_plan_id']);
             $table->dropColumn(['xendit_customer_id', 'xendit_plan_id', 'requested_at']);
         });
 

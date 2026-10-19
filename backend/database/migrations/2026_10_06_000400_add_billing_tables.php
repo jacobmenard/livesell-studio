@@ -70,6 +70,7 @@ return new class extends Migration
         Schema::dropIfExists('billing_checkouts');
         Schema::table('subscriptions', function (Blueprint $table) {
             $table->dropConstrainedForeignId('scheduled_plan_id');
+            $table->dropIndex(['xendit_plan_id']);
             $table->dropColumn(['xendit_customer_id', 'xendit_plan_id']);
         });
         DB::table('plans')->where('code', 'trial')->delete();
