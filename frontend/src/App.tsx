@@ -1,5 +1,6 @@
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router'
 import { useAuth } from './auth/AuthProvider'
+import { RouteError } from './components/RouteError'
 import { Spinner } from './components/ui'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/auth/LoginPage'
@@ -55,31 +56,37 @@ function NotFound() {
 }
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/setups" replace /> },
   {
-    element: <GuestOnly />,
+    // A page that fails to load (e.g. a file from before the last deploy) or crashes.
+    errorElement: <RouteError />,
     children: [
-      { path: '/login', element: <LoginPage /> },
-      { path: '/register', element: <RegisterPage /> },
-      { path: '/forgot-password', element: <ForgotPasswordPage /> },
-      { path: '/reset-password', element: <ResetPasswordPage /> },
+      { path: '/', element: <Navigate to="/setups" replace /> },
+      {
+        element: <GuestOnly />,
+        children: [
+          { path: '/login', element: <LoginPage /> },
+          { path: '/register', element: <RegisterPage /> },
+          { path: '/forgot-password', element: <ForgotPasswordPage /> },
+          { path: '/reset-password', element: <ResetPasswordPage /> },
+        ],
+      },
+      {
+        element: <RequireAuth />,
+        children: [
+          { path: '/setups', element: <DashboardPage /> },
+          { path: '/setups/:id', lazy: editor },
+          { path: '/setups/:id/screen', lazy: ownerOutput },
+          { path: '/plans', lazy: plans },
+          { path: '/team', lazy: team },
+          { path: '/admin', lazy: admin },
+          { path: '/admin/payments', lazy: adminPayments },
+        ],
+      },
+      // Public pricing (signed in or not).
+      { path: '/pricing', element: <PricingPage /> },
+      // Public, token-protected clean screen for OBS / TikTok LIVE Studio.
+      { path: '/output/:token', lazy: linkOutput },
+      { path: '*', element: <NotFound /> },
     ],
   },
-  {
-    element: <RequireAuth />,
-    children: [
-      { path: '/setups', element: <DashboardPage /> },
-      { path: '/setups/:id', lazy: editor },
-      { path: '/setups/:id/screen', lazy: ownerOutput },
-      { path: '/plans', lazy: plans },
-      { path: '/team', lazy: team },
-      { path: '/admin', lazy: admin },
-      { path: '/admin/payments', lazy: adminPayments },
-    ],
-  },
-  // Public pricing (signed in or not).
-  { path: '/pricing', element: <PricingPage /> },
-  // Public, token-protected clean screen for OBS / TikTok LIVE Studio.
-  { path: '/output/:token', lazy: linkOutput },
-  { path: '*', element: <NotFound /> },
 ])
