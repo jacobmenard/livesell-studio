@@ -12,6 +12,7 @@ import { useLiveSession } from '../../stage/useLiveSession'
 import { useStreamAudio } from '../../stage/useStreamAudio'
 import { useCamera } from '../../stage/useCamera'
 import { VideoLayer } from '../../stage/VideoLayer'
+import { CAMERA_FAILED, CameraHelp } from './CameraHelp'
 
 // Only while the WebSocket is down (normally popups arrive over it at once).
 const POLL_MS = 1000
@@ -171,6 +172,7 @@ export function CleanScreen({ source, broadcast }: { source: FeedSource; broadca
             backgroundUrl={scene.background.media_url ?? null}
           />
         )}
+        {!seeThrough && CAMERA_FAILED.has(camera.status) && <CameraHelp status={camera.status} browserSource={'token' in source.live} />}
         <ForegroundLayer foreground={scene.foreground} />
         <PopupLayer popups={scene.popups} />
         {preview && <PreviewWatermark message={session.message} />}

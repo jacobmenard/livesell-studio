@@ -254,6 +254,11 @@ function WindowOutput({
           <p className="m-0 text-[13px] text-text-2">Make a private link to add your clean screen to OBS or TikTok LIVE Studio as a Browser Source.</p>
         )}
         <p className="m-0 text-xs text-muted">Anyone with the link can see your screen, so keep it private.</p>
+        <Alert tone="info">
+          <strong>Your camera won’t show in a Browser Source:</strong> OBS and TikTok LIVE Studio don’t let it open your webcam. For your camera with background and
+          face effects, use <strong>Open clean screen</strong> above and add that window as a <strong>Window Capture</strong>. The link is for popups and effects
+          over a camera you add in OBS: turn on <strong>See-through background</strong> below.
+        </Alert>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={makeLink} loading={busy}>
             {link?.active ? 'Make a new link (old one stops working)' : 'Make a link'}
