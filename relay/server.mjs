@@ -101,8 +101,13 @@ async function handleLive(ws, ticket) {
     let errorTail = []
 
     proc.on('error', (error) => {
-      console.error(`[relay] FFmpeg could not start: ${error.message}`)
-      fail(error.code === 'ENOENT' ? 'FFmpeg is not installed on this computer (or FFMPEG_PATH is wrong). Install it and restart the relay.' : `FFmpeg could not start: ${error.message}`)
+      console.error(`[relay] FFmpeg could not start at "${FFMPEG}": ${error.message}. Install it (apt install ffmpeg) or fix FFMPEG_PATH in relay/.env, then restart the relay.`)
+      // Shown to the seller, but only the server's admin can fix it.
+      fail(
+        error.code === 'ENOENT'
+          ? 'Streaming straight isn’t available right now: the streaming server can’t find FFmpeg. Please tell the NegosyoWork team (or use OBS / TikTok LIVE Studio meanwhile).'
+          : `FFmpeg could not start: ${error.message}`,
+      )
     })
     proc.stdout.setEncoding('utf8').on('data', (chunk) => {
       if (!live && chunk.includes('progress=continue')) {
