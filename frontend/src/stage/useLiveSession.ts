@@ -26,7 +26,8 @@ function endOnUnload(url: string) {
   void fetch(url, {
     method: 'DELETE',
     keepalive: true,
-    credentials: 'same-origin',
+    // The API may be on its own subdomain: send the session cookie there too.
+    credentials: 'include',
     headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', ...(xsrf ? { 'X-XSRF-TOKEN': decodeURIComponent(xsrf) } : {}) },
   }).catch(() => {
     /* the session expires on its own after 90 s */

@@ -177,8 +177,11 @@ export function startBroadcast(options: BroadcastOptions): () => void {
     if (finished) return release()
 
     report('connecting')
-    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const ws = new WebSocket(`${scheme}//${window.location.host}/relay?ticket=${encodeURIComponent(ticket)}`)
+    // The relay sits next to the API (its own subdomain in production), else on this page's host.
+    const relay = new URL('/relay', import.meta.env.VITE_API_URL || window.location.origin)
+    relay.protocol = relay.protocol === 'https:' ? 'wss:' : 'ws:'
+    relay.searchParams.set('ticket', ticket)
+    const ws = new WebSocket(relay.href)
     socket = ws
     let opened = false
 

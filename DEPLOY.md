@@ -1,15 +1,18 @@
 # Deploying NegosyoWork Studio on a Hostinger VPS with CloudPanel
 
-This guide puts the whole app on one VPS (Hostinger KVM 2, Ubuntu 24.04, CloudPanel): the
-website, the API, the database, Reverb (instant popups) and the streaming relay (stream
-straight to Facebook / YouTube). It takes about an hour the first time.
+This guide puts the whole app on one VPS (Hostinger KVM 2, Ubuntu 24.04, CloudPanel), on two
+addresses: the **app** sellers open (e.g. `app.yourdomain.com`), and the **API** behind it
+(e.g. `api.yourdomain.com`: Laravel, the database, Reverb for instant popups and the streaming
+relay for streaming straight to Facebook / YouTube). It takes about an hour the first time.
 
 Everything you paste lives in [`deploy/`](deploy/). Throughout, replace:
 
 | Placeholder | What to put |
 |---|---|
-| `DOMAIN` | Your app's address, e.g. `studio.yourdomain.com` (no `https://`) |
-| `SITE_USER` | The site user you create in CloudPanel (step 2), e.g. `negosyowork` |
+| `DOMAIN` | The API's address, e.g. `api.yourdomain.com` (no `https://`). The code lives in its folder. |
+| `APP_DOMAIN` | The app's address sellers open, e.g. `app.yourdomain.com` |
+| `PARENT_DOMAIN` | What both share, e.g. `yourdomain.com` |
+| `SITE_USER` | The API site's user you create in CloudPanel (step 2), e.g. `negosyowork` |
 | `VPS_IP` | Your VPS's IP address (Hostinger → VPS → Overview) |
 
 > Never paste real passwords or keys into GitHub, chats or screenshots. They only go into the
@@ -26,7 +29,7 @@ Everything you paste lives in [`deploy/`](deploy/). Throughout, replace:
    git push
    ```
 2. **Point your domain at the VPS.** At your domain provider (or Hostinger → Domains → DNS),
-   add an **A record**: name = `studio` (or `@` for the bare domain), value = `VPS_IP`.
+   add two **A records** with value = `VPS_IP`: name = `api` and name = `app`.
    It can take a few minutes to an hour to work.
 
 ## 1. Open CloudPanel
@@ -45,6 +48,9 @@ Everything you paste lives in [`deploy/`](deploy/). Throughout, replace:
 5. **SSL/TLS** → **Actions → New Let's Encrypt Certificate** → Create.
    (Your domain must already point to the VPS, step 0.)
 6. **Databases** → **Add Database**: pick a name, user and strong password. Save all three.
+7. Back in **Sites** → **Add Site** → **Create a Static HTML Site**: domain `APP_DOMAIN`, any
+   site user (nothing is put in its folder). Then its **SSL/TLS** → **New Let's Encrypt
+   Certificate** → Create. Its Vhost is set in step 9.
 
 ## 3. Install FFmpeg and Supervisor (as root)
 
@@ -106,7 +112,7 @@ bash ../deploy/make-secrets.sh
 ```
 
 Now edit `.env` (`nano .env`, save with Ctrl+O, Enter, exit with Ctrl+X) and replace every
-`DOMAIN` and the remaining `CHANGE_ME`: database name/user/password (step 2), your email
+`DOMAIN`, `APP_DOMAIN`, `PARENT_DOMAIN` and the remaining `CHANGE_ME`: database name/user/password (step 2), your email
 provider's SMTP details, and your superadmin email and a strong password.
 
 Then set up the database and files:
@@ -125,6 +131,7 @@ php8.4 artisan route:cache
 cd ~/htdocs/DOMAIN/frontend
 [ -f .env ] || cp ../deploy/frontend.env.production.example .env
 bash ../deploy/make-secrets.sh    # copies REVERB_APP_KEY from backend/.env
+nano .env      # replace DOMAIN
 npm ci
 npm run build
 ```
@@ -141,14 +148,21 @@ npm ci --omit=dev
 
 ## 9. Web server rules (CloudPanel)
 
-1. CloudPanel → your site → **Vhost**.
+**The API site** (`DOMAIN`):
+
+1. CloudPanel → the `DOMAIN` site → **Vhost**.
 2. The Vhost has two `server { ... }` blocks. In the **first** one (with `listen 443`):
    - delete the `location / { {{varnish_proxy_pass}} ... }` block,
    - delete the static-files block that starts with `location ~* ^.+\.(css|js|jpg|...`,
    - paste the contents of [`deploy/nginx-locations.conf`](deploy/nginx-locations.conf) in their place.
    Leave the second block (`listen 8080`, CloudPanel's Varnish backend) exactly as it is.
-3. Replace `SITE_USER` and `DOMAIN` in what you pasted, then **Save**. CloudPanel refuses to
-   save if there's a mistake, and tells you the line.
+3. **Save**. CloudPanel refuses to save if there's a mistake, and tells you the line.
+
+**The app site** (`APP_DOMAIN`):
+
+1. CloudPanel → the `APP_DOMAIN` site → **Vhost**: replace everything with the contents of
+   [`deploy/nginx-app.conf`](deploy/nginx-app.conf).
+2. Replace `APP_DOMAIN`, `SITE_USER` (the API site's user) and `DOMAIN`, then **Save**.
 
 ## 10. Keep Reverb and the relay running (as root)
 
@@ -174,7 +188,7 @@ Your site → **Cron Jobs** → **Add Cron Job**: every minute (`* * * * *`), co
 
 ## 12. Check that everything works
 
-1. Open `https://DOMAIN` and log in with your superadmin email and password.
+1. Open `https://APP_DOMAIN` and log in with your superadmin email and password.
 2. **Payments** → *Where sellers send payments*: enter your bank details again (they're in
    your local database, not in the code).
 3. Open a setup → turn on the camera → tap a popup: it should appear on the clean screen at once
@@ -195,10 +209,11 @@ Then as root: `supervisorctl restart negosyowork-reverb negosyowork-relay`.
 
 | What you see | Where to look / what to do |
 |---|---|
-| Blank page or 404 on the site | Step 9: check the Vhost paths (`SITE_USER`, `DOMAIN`) and that `frontend/dist` exists (step 7). |
+| Blank page or 404 on the app | Step 9 (app site): check the paths (`SITE_USER`, `DOMAIN`) and that `frontend/dist` exists (step 7). |
+| "Network error" on login | `frontend/.env`: `VITE_API_URL=https://DOMAIN`, then `npm run build`. `backend/.env`: `FRONTEND_URL=https://APP_DOMAIN`, then `php8.4 artisan config:cache`. |
 | "Server error" (500) | `tail -50 ~/htdocs/DOMAIN/backend/storage/logs/laravel-*.log` (as the site user). After editing `.env`, run `php8.4 artisan config:cache`. |
-| Logged out right after logging in | `.env`: `SESSION_DOMAIN`, `SANCTUM_STATEFUL_DOMAINS`, `APP_URL` must all match `DOMAIN`, then `php8.4 artisan config:cache`. |
-| Popups take a second to show | Reverb isn't reached: `supervisorctl status`, and check `VITE_REVERB_APP_KEY` = `REVERB_APP_KEY` (rebuild the frontend after changing it). |
+| Logged out right after logging in | `backend/.env`: `SESSION_DOMAIN=.PARENT_DOMAIN` (with the dot), `SANCTUM_STATEFUL_DOMAINS=APP_DOMAIN`, then `php8.4 artisan config:cache`. |
+| Popups take a second to show | Reverb isn't reached: `supervisorctl status`; `VITE_REVERB_APP_KEY` = `REVERB_APP_KEY` and `VITE_REVERB_HOST=DOMAIN` (rebuild the frontend after changing it); `REVERB_ALLOWED_ORIGINS=APP_DOMAIN`. |
 | "Can't reach the streaming relay" | `supervisorctl status negosyowork-relay`; log: `/home/SITE_USER/logs/negosyowork-relay.log`. |
 | Emails don't arrive | `.env` SMTP settings, then `php8.4 artisan config:cache`. |
 
