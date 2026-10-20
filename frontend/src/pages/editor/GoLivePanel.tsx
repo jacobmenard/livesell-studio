@@ -221,6 +221,17 @@ function WindowOutput({
       <p className="m-0 text-xs text-muted">
         Opens a window with only your live picture. Capture that window in TikTok LIVE Studio or OBS at {portrait ? '1080 × 1920' : '1920 × 1080'}.
       </p>
+      <details className="text-xs text-text-2">
+        <summary className="cursor-pointer font-semibold text-text">No echo: how to set up the sound</summary>
+        <ul className="m-0 mt-1.5 flex list-disc flex-col gap-1 pl-5">
+          <li>Your voice: add your microphone in OBS or TikTok LIVE Studio (they do by default). The clean screen never plays your mic.</li>
+          <li>
+            Sound effects: in OBS, tick <strong>Capture Audio</strong> in the Window Capture (or add an <strong>Application Audio Capture</strong> for Chrome),
+            then mute <strong>Desktop Audio</strong> so nothing is recorded twice. In TikTok LIVE Studio, keep only one of your mic and computer sound for each.
+          </li>
+          <li>Wear earphones if you can, so your speakers never reach the microphone.</li>
+        </ul>
+      </details>
 
       <div className="flex flex-col gap-1.5">
         <span className="text-[13px] font-semibold">Browser Source link</span>
@@ -256,8 +267,8 @@ function WindowOutput({
         <p className="m-0 text-xs text-muted">Anyone with the link can see your screen, so keep it private.</p>
         <Alert tone="info">
           <strong>Your camera won’t show in a Browser Source:</strong> OBS and TikTok LIVE Studio don’t let it open your webcam. For your camera with background and
-          face effects, use <strong>Open clean screen</strong> above and add that window as a <strong>Window Capture</strong>. The link is for popups and effects
-          over a camera you add in OBS: turn on <strong>See-through background</strong> below.
+          face effects, use <strong>Open clean screen</strong> above and add that window as a <strong>Window Capture</strong>. Or use the link only for popups
+          and effects over a camera you add in OBS, with <strong>See-through background</strong> on below (it hides your camera and background).
         </Alert>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={makeLink} loading={busy}>
@@ -276,8 +287,15 @@ function WindowOutput({
         checked={settings.see_through}
         onChange={(v) => onSettings({ see_through: v })}
         label="See-through background"
-        description="Popups and effects only, for when your camera is already in OBS"
+        description="Hides your camera and background on the clean screen: only popups, foreground and effects show. For when your camera is already in OBS."
       />
+      {settings.see_through && (
+        // The editor's preview still shows everything, so say plainly what viewers get.
+        <Alert tone="info">
+          <strong>See-through is on:</strong> your clean screen and Browser Source show <strong>no camera and no background</strong>, only popups, foreground and
+          effects. Turn it off to show your camera and background again.
+        </Alert>
+      )}
 
       <p role="status" className={cx('m-0 text-xs', syncState === 'error' ? 'text-danger-text' : 'text-muted')}>
         {syncState === 'error'

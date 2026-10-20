@@ -9,7 +9,6 @@ import { ForegroundLayer, PopupLayer, StageFrame } from '../../stage/Stage'
 import { platformLabel, useBroadcast } from '../../stage/useBroadcast'
 import { playSound, unlockAudio } from '../../stage/sounds'
 import { useLiveSession } from '../../stage/useLiveSession'
-import { useStreamAudio } from '../../stage/useStreamAudio'
 import { useCamera } from '../../stage/useCamera'
 import { VideoLayer } from '../../stage/VideoLayer'
 import { CAMERA_FAILED, CameraHelp } from './CameraHelp'
@@ -137,12 +136,11 @@ export function CleanScreen({ source, broadcast }: { source: FeedSource; broadca
     resolution: '1080p',
     preferLabel: scene?.camera.device_label ?? null,
     autoStart: scene !== null && !seeThrough && !blocked,
-    audio: scene?.camera.audio ?? false,
+    // The microphone only for streaming straight, which mixes it into the live silently.
+    // OBS / TikTok LIVE Studio record the mic themselves: playing it out loud here as well
+    // is what put the voice in the live twice (an echo) and let the speakers feed the mic.
+    audio: broadcast ? (scene?.camera.audio ?? false) : false,
   })
-  // For OBS / TikTok LIVE Studio the window plays the camera's sound so they capture it (the
-  // camera is off in see-through mode). Streaming straight mixes it into the live instead:
-  // playing it out loud too is what made the mic hear itself (an echo).
-  useStreamAudio(broadcast ? null : camera.stream)
 
   // Turned-off link or deleted setup, or the plan's live limit is reached (this screen comes
   // on by itself once another live ends): tell whoever set it up.

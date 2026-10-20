@@ -172,6 +172,8 @@ function Editor({ initial }: { initial: SetupFull }) {
   // ---- sounds --------------------------------------------------------------
   const pads = useMemo(() => soundPads(media.items), [media.items])
   const soundSettings = doc.sound_settings
+  // The clean-screen window opened from this editor, and whether it streams straight.
+  const screenWindow = useRef<{ win: Window; broadcast: boolean } | null>(null)
 
   const play = useCallback(
     (sound: SoundRef) => {
@@ -183,7 +185,12 @@ function Editor({ initial }: { initial: SetupFull }) {
 
       const mediaId = sound.startsWith('media:') ? Number(sound.slice(6)) : null
       const item = mediaId ? media.items.find((m) => m.id === mediaId) : undefined
-      if (soundSettings.monitor) {
+      // An open clean screen on this computer plays the sound already (out loud, for OBS to
+      // capture): playing it here too would put it in the live twice. Streaming straight
+      // keeps that window silent, so then it plays here for the seller to hear.
+      const screen = screenWindow.current
+      const screenPlaysIt = soundSettings.to_stream && screen !== null && !screen.win.closed && !screen.broadcast
+      if (soundSettings.monitor && !screenPlaysIt) {
         void playSound(item ? { url: item.url } : (sound as (typeof SOUNDS)[number]['id']), soundSettings.volume).then((ok) => {
           if (!ok) setErrors((e) => ({ ...e, sound: 'That sound could not be played in this browser.' }))
         })
@@ -371,6 +378,7 @@ function Editor({ initial }: { initial: SetupFull }) {
   const openCleanScreen = useCallback(() => {
     const [w, h] = doc.orientation === 'portrait' ? [540, 960] : [960, 540]
     const win = window.open(`/setups/${setupId}/screen`, `negosyowork-screen-${setupId}`, `popup=yes,width=${w},height=${h}`)
+    screenWindow.current = win ? { win, broadcast: false } : null
     win?.focus()
   }, [doc.orientation, setupId])
 
@@ -385,6 +393,7 @@ function Editor({ initial }: { initial: SetupFull }) {
       const w = Math.round(h * ratio)
       const query = new URLSearchParams({ broadcast: platform, quality: doc.resolution })
       const win = window.open(`/setups/${setupId}/screen?${query}`, `negosyowork-screen-${setupId}`, `popup=yes,width=${w},height=${h}`)
+      screenWindow.current = win ? { win, broadcast: true } : null
       win?.focus()
     },
     [doc.orientation, doc.resolution, setupId],

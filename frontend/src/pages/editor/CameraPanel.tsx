@@ -157,7 +157,7 @@ export function CameraPanel({
             checked={camera.audio}
             onChange={(v) => onCamera({ audio: v })}
             label="Send camera sound to the live"
-            description="Your camera’s microphone or HDMI sound, otherwise your computer’s microphone. Turn off if your live app already adds your mic."
+            description="For Stream straight: your camera’s microphone or HDMI sound, otherwise your computer’s microphone. With OBS or TikTok LIVE Studio, add your mic there instead (they do by default): the clean screen never plays your mic, so there’s no echo."
           />
           {camera.audio && live && (
             <p role="status" className={cx('m-0 text-[13px]', audioStatus === 'live' ? 'text-select' : 'text-danger-text')}>
