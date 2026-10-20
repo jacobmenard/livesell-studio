@@ -164,7 +164,7 @@ function AccountRow({ account, plans, onChanged }: { account: AdminAccount; plan
         {account.role === 'superadmin' && <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold">Superadmin</span>}
         <span className="flex-1" />
         <span className="text-[13px] text-text-2">
-          {account.plan.name}
+          {account.trial_ends_at ? `Free trial (${account.plan.name}) until ${formatDate(account.trial_ends_at)}` : account.plan.name}
           {account.ends_at && ` until ${formatDate(account.ends_at)}`} · {account.members} sub-user{account.members === 1 ? '' : 's'}
         </span>
       </div>

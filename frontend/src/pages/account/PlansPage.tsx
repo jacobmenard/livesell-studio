@@ -73,22 +73,21 @@ export function PlansPage() {
 
           <PricingCards
             plans={summary.plans}
-            currentCode={summary.plan.code}
+            currentCode={summary.trial_ends_at ? undefined : summary.plan.code}
             renderAction={(plan) => <PlanAction plan={plan} summary={summary} owner={owner} onPay={setPaying} />}
           />
 
           <p className="m-0 text-[13px] text-muted">
             {owner
-              ? 'Pay by GCash bank transfer, then send the reference number and receipt. Your plan starts the day the payment is approved and runs for a month. Renew anytime in the last month; switching plans starts a fresh month (days left aren’t carried over).'
+              ? 'Pay by GCash, then send the reference number and a screenshot of the receipt. Your plan starts the day the payment is approved and runs for a month. Renew anytime in the last month; switching plans starts a fresh month (days left aren’t carried over).'
               : `Only ${user?.account_name} can change the plan.`}
           </p>
 
           <ComparePlans plans={summary.plans} />
 
-          {paying && summary.payment_details && (
+          {paying && (
             <PayDialog
               plan={paying.plan}
-              details={summary.payment_details}
               title={paying.kind === 'renew' ? `Renew ${paying.plan.name}` : `Pay for ${paying.plan.name}`}
               note={payNote(paying, summary)}
               onClose={closeDialog}
@@ -111,28 +110,29 @@ function payNote({ plan, kind }: Paying, summary: SubscriptionSummary): string {
   if (kind === 'switch') {
     return `${plan.name} starts fresh the day your payment is approved and runs for a month. Days left on ${summary.plan.name} aren’t carried over.${pausedNote}`
   }
-  return `${plan.name} starts the day your payment is approved and runs for a month.${pausedNote}`
+  const trialNote = summary.trial_ends_at ? ' Your free trial ends then.' : ''
+  return `${plan.name} starts the day your payment is approved and runs for a month.${trialNote}${pausedNote}`
 }
 
 function CurrentPlan({ summary, owner, accountName }: { summary: SubscriptionSummary; owner: boolean; accountName: string }) {
   const { plan } = summary
-  const trial = !plan.purchasable
+  const free = !plan.purchasable
+  const trialEndsAt = summary.trial_ends_at
+  let status = 'No end date.'
+  if (trialEndsAt) status = `You can go live free until ${formatDate(trialEndsAt)}. Choose a plan and send your payment to keep going live after that.`
+  else if (free) status = 'Set up your camera, popups and backgrounds for free. Choose a plan to go live.'
+  else if (summary.ends_at) status = `Paid until ${formatDate(summary.ends_at)}. Renew before then to keep going live.`
 
   return (
     <section aria-label="Your plan" className="flex flex-wrap items-center gap-x-8 gap-y-3 rounded-[20px] border border-line bg-surface p-[18px]">
       <div className="flex min-w-60 flex-1 flex-col gap-1">
         <span className="text-[13px] text-muted">{owner ? 'Your plan' : `${accountName}’s plan`}</span>
         <span className="font-display text-2xl font-extrabold">
-          {plan.name}
-          {!trial && <span className="text-base font-semibold text-muted"> · {formatPrice(plan.price_monthly, plan.currency)}/month</span>}
+          {trialEndsAt ? 'Free trial' : plan.name}
+          {trialEndsAt && <span className="text-base font-semibold text-muted"> · {plan.name} features</span>}
+          {!free && !trialEndsAt && <span className="text-base font-semibold text-muted"> · {formatPrice(plan.price_monthly, plan.currency)}/month</span>}
         </span>
-        <span className="text-[13px] text-text-2">
-          {trial
-            ? 'Set up your camera, popups and backgrounds for free. Choose a plan to go live.'
-            : summary.ends_at
-              ? `Paid until ${formatDate(summary.ends_at)}. Renew before then to keep going live.`
-              : 'No end date.'}
-        </span>
+        <span className="text-[13px] text-text-2">{status}</span>
       </div>
       <Meter label="Sub-users" used={summary.usage.subusers} max={plan.max_subusers} />
       <Meter label="Setups live now" used={summary.usage.live_setups} max={plan.max_live_setups} />
@@ -144,12 +144,11 @@ function CurrentPlan({ summary, owner, accountName }: { summary: SubscriptionSum
 function Billing({ summary, onRenew }: { summary: SubscriptionSummary; onRenew: (plan: Plan) => void }) {
   const next = summary.next_payment
   const pending = summary.pending_payment
-  const canRenew = next !== null && !pending && next.renewable_from === null && summary.payment_details !== null
+  const canRenew = next !== null && !pending && next.renewable_from === null
 
   let renewHint = 'Renew'
   if (pending) renewHint = 'Payment being checked'
   else if (next?.renewable_from) renewHint = `Renew from ${formatDate(next.renewable_from)}`
-  else if (!summary.payment_details) renewHint = 'Payments open soon'
 
   return (
     <section aria-labelledby="billing-h" className="flex flex-col gap-2 rounded-[20px] border border-line bg-surface p-[18px]">
@@ -208,14 +207,15 @@ function PaymentRow({ payment: p }: { payment: Payment }) {
 
 /** The button on a plan card: pay for it, renew it, or why it can't be paid right now. */
 function PlanAction({ plan, summary, owner, onPay }: { plan: Plan; summary: SubscriptionSummary; owner: boolean; onPay: (paying: Paying) => void }) {
-  const current = plan.code === summary.plan.code
+  // During the free trial no plan is "yours" yet: every paid plan can be chosen.
+  const onTrial = summary.trial_ends_at !== null
+  const current = !onTrial && plan.code === summary.plan.code
   const pending = summary.pending_payment
 
   if (!owner) return current ? <Button disabled>Current plan</Button> : null
   // Free isn't bought: a paid account goes back to it when the paid month ends.
   if (!plan.purchasable) return current ? <Button disabled>Your plan</Button> : null
   if (pending) return <Button disabled>{pending.plan.code === plan.code ? 'Being checked' : marketingFor(plan).cta}</Button>
-  if (!summary.payment_details) return <Button disabled>Payments open soon</Button>
 
   if (current) {
     const next = summary.next_payment
@@ -228,7 +228,7 @@ function PlanAction({ plan, summary, owner, onPay }: { plan: Plan; summary: Subs
     )
   }
 
-  const onFree = !summary.plan.purchasable
+  const onFree = onTrial || !summary.plan.purchasable
   const label = onFree ? marketingFor(plan).cta : plan.price_monthly > summary.plan.price_monthly ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`
   return (
     <Button variant={onFree || plan.price_monthly > summary.plan.price_monthly ? 'primary' : 'secondary'} onClick={() => onPay({ plan, kind: onFree ? 'new' : 'switch' })}>

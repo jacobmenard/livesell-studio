@@ -84,8 +84,6 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::get('payments/pending-count', [AdminPaymentController::class, 'pendingCount']);
         Route::post('payments/{payment}/approve', [AdminPaymentController::class, 'approve']);
         Route::post('payments/{payment}/reject', [AdminPaymentController::class, 'reject']);
-        Route::get('payment-settings', [AdminPaymentController::class, 'settings']);
-        Route::put('payment-settings', [AdminPaymentController::class, 'updateSettings']);
         Route::get('accounts', [AdminAccountController::class, 'index']);
         Route::put('accounts/{account}/plan', [AdminAccountController::class, 'updatePlan']);
         Route::get('plans', [AdminPlanController::class, 'index']);

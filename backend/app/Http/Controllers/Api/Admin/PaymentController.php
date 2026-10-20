@@ -10,8 +10,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Superadmin: payments to check against the bank account, and where sellers send money.
- * Approving a payment puts its plan in force; rejecting it tells the seller why.
+ * Superadmin: payments to check against what was received. Approving a payment puts its
+ * plan in force; rejecting it tells the seller why.
  */
 class PaymentController extends Controller
 {
@@ -61,24 +61,5 @@ class PaymentController extends Controller
         $payment = $this->payments->reject($payment, $request->user(), $data['reason']);
 
         return new PaymentResource($payment->load(['plan', 'account', 'submitter', 'reviewer']));
-    }
-
-    public function settings(): JsonResponse
-    {
-        return response()->json(['data' => $this->payments->settings()]);
-    }
-
-    public function updateSettings(Request $request): JsonResponse
-    {
-        $data = $request->validate([
-            'bank_name' => ['required', 'string', 'max:60'],
-            'account_number' => ['required', 'string', 'max:34', 'regex:/^[0-9][0-9 \-]*$/'],
-            'account_name' => ['required', 'string', 'max:80'],
-            'instructions' => ['nullable', 'string', 'max:1000'],
-        ], ['account_number.regex' => 'Use numbers only (spaces and dashes are fine).']);
-
-        $this->payments->saveSettings($data);
-
-        return response()->json(['data' => $this->payments->settings()]);
     }
 }

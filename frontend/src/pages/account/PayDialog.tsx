@@ -4,25 +4,23 @@ import { Alert, Button, TextField, UploadTile } from '../../components/ui'
 import { errorMessage, fieldErrors } from '../../lib/api'
 import { paymentsApi } from '../../lib/endpoints'
 import { formatPrice } from '../../lib/format'
-import type { Payment, PaymentDetails, Plan } from '../../lib/types'
+import type { Payment, Plan } from '../../lib/types'
 
 const PROOF_TYPES = ['image/png', 'image/jpeg', 'image/webp']
 const MAX_PROOF_BYTES = 5 * 1024 * 1024
 
 /**
- * Paying for a plan by hand: send the exact amount from GCash to the bank account, then
- * give the reference number and a screenshot of the receipt for the superadmin to check.
+ * Paying for a plan by hand: pay the exact amount (GCash), then send the reference number
+ * and a screenshot of the receipt. The superadmin checks it; the plan starts once approved.
  */
 export function PayDialog({
   plan,
-  details,
   title,
   note,
   onClose,
   onPaid,
 }: {
   plan: Plan
-  details: PaymentDetails
   title: string
   /** What happens once it's approved (when the month starts, sub-users paused...). */
   note: ReactNode
@@ -106,25 +104,11 @@ export function PayDialog({
 
         <ol className="m-0 flex list-none flex-col gap-3 p-0 text-sm">
           <Step n={1}>
-            Open <strong>GCash</strong> → <strong>Bank Transfer</strong> → choose <strong>{details.bank_name || 'the bank below'}</strong>.
+            Pay exactly <strong>{amount}</strong> for {plan.name} through <strong>GCash</strong>. GCash may add its own fee.
           </Step>
-          <Step n={2}>
-            <span className="flex flex-col gap-2">
-              <span>Send to this account:</span>
-              <span className="flex flex-col gap-1.5 rounded-xl border border-line-strong bg-surface-2 p-3">
-                {details.bank_name && <Detail label="Bank" value={details.bank_name} />}
-                <Detail label="Account number" value={details.account_number} copy />
-                <Detail label="Account name" value={details.account_name} copy />
-              </span>
-            </span>
-          </Step>
-          <Step n={3}>
-            Send exactly <strong>{amount}</strong>. GCash may add its own transfer fee.
-          </Step>
-          <Step n={4}>Enter the reference number from the GCash receipt and attach a screenshot of it.</Step>
+          <Step n={2}>Enter the reference number from your receipt and attach a screenshot of it.</Step>
+          <Step n={3}>We check your payment and email you. Your plan switches on as soon as it’s approved.</Step>
         </ol>
-
-        {details.instructions && <p className="m-0 text-[13px] whitespace-pre-line text-text-2">{details.instructions}</p>}
 
         <TextField
           label="Reference number"
@@ -171,30 +155,5 @@ function Step({ n, children }: { n: number; children: ReactNode }) {
       </span>
       <span className="min-w-0 flex-1 pt-0.5">{children}</span>
     </li>
-  )
-}
-
-function Detail({ label, value, copy = false }: { label: string; value: string; copy?: boolean }) {
-  const [copied, setCopied] = useState(false)
-  const copyValue = async () => {
-    try {
-      await navigator.clipboard.writeText(value)
-      setCopied(true)
-      window.setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // Clipboard needs https (or localhost); the value can still be selected by hand.
-    }
-  }
-  return (
-    <span className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
-      <span className="min-w-32 text-[13px] text-muted">{label}</span>
-      <span className="flex-1 font-semibold break-all select-all">{value}</span>
-      {copy && (
-        <Button size="sm" variant="ghost" onClick={copyValue} aria-label={`Copy ${label.toLowerCase()}`}>
-          <Icon name={copied ? 'check' : 'copy'} size={14} />
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      )}
-    </span>
   )
 }

@@ -52,11 +52,23 @@ class Plan extends Model
             ?? self::query()->ordered()->firstOrFail();
     }
 
-    /** The plan an account has right now: its subscription's while current, else the default. */
+    /** The limits a new sign-up has during the free trial. */
+    public static function trial(): self
+    {
+        return self::query()->where('code', config('livesell.trial_plan'))->first() ?? self::default();
+    }
+
+    /**
+     * The plan an account has right now: its subscription's while current, else the trial's
+     * during the free week, else the default.
+     */
     public static function forAccount(User $account): self
     {
         $subscription = $account->subscription()->with('plan')->first();
+        if ($subscription && $subscription->isCurrent()) {
+            return $subscription->plan;
+        }
 
-        return $subscription && $subscription->isCurrent() ? $subscription->plan : self::default();
+        return $account->onTrial() ? self::trial() : self::default();
     }
 }

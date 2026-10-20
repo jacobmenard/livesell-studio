@@ -123,22 +123,23 @@ Generate the shared secret with
 `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`, put it in both
 `backend/.env` and `relay/.env`, and restart `php artisan serve`.
 
-### 5. Payments (GCash → bank transfer)
+### 5. Free trial and payments (GCash)
 
-New accounts start on the **Free trial**: they can set everything up but can't go live.
-Solo / Duo / Team are paid by hand, and the superadmin checks each payment:
+New sign-ups get a **free week** with Solo's limits, so they can go live
+(`LIVESELL_TRIAL_DAYS`, `LIVESELL_TRIAL_PLAN`; 0 days turns it off). After that they're on
+**Free**: they can set everything up but can't go live. Solo / Duo / Team are paid by hand,
+and the superadmin checks each payment. The app keeps no bank details: sellers learn where to
+pay from you.
 
-1. As the superadmin, open **Payments** and fill in **Where sellers send payments** (bank,
-   account number, account name, optional instructions). Until an account number and name
-   are set, sellers see "Payments open soon".
-2. A seller picks a plan on **Plan**, sends the exact price from GCash (**Bank Transfer**,
-   InstaPay) to that account, and submits the reference number with a receipt screenshot.
+1. A seller picks a plan on **Plan**, pays the exact price by GCash, and submits the
+   reference number with a receipt screenshot.
    The amount always comes from the plan, and receipts are stored on the private disk
    (`storage/app/private/payment-proofs`), shown only to the account owner and the superadmin.
-3. The superadmin gets an email and a badge on **Payments**, checks the receipt against the
-   bank account, then **Approves** (the plan runs one month from the approval date) or
-   **Rejects** with a reason the seller sees. The seller gets an email either way.
-4. Renewing: the Plan page shows the next month as a row to click. It can be paid anytime in
+2. The superadmin gets an email and a badge on **Payments**, checks the receipt against what
+   was received, then **Approves** (the plan runs one month from the approval date and any
+   free week ends) or **Rejects** with a reason the seller sees. The seller gets an email
+   either way.
+3. Renewing: the Plan page shows the next month as a row to click. It can be paid anytime in
    the last month of the current one, and adds a month after it (never more than one ahead).
    Switching to another plan starts a fresh month on approval; days left aren't carried over.
 

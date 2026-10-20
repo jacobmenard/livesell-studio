@@ -29,13 +29,76 @@ class SubscriptionTest extends TestCase
         return $member;
     }
 
-    public function test_every_account_starts_on_the_free_trial_and_the_three_plans_can_be_bought(): void
+    /** @return array<string, string> */
+    private function signUp(string $email = 'new@example.com'): array
+    {
+        return ['name' => 'New Seller', 'email' => $email, 'password' => 'secret-pass-1', 'password_confirmation' => 'secret-pass-1'];
+    }
+
+    public function test_a_new_sign_up_gets_a_free_week_that_can_go_live_then_drops_to_free(): void
+    {
+        $this->postJson('/api/auth/register', $this->signUp())->assertCreated();
+
+        $this->getJson('/api/subscription')
+            ->assertOk()
+            ->assertJsonPath('data.plan.code', 'solo')
+            ->assertJsonPath('data.plan.max_live_setups', 1)
+            ->assertJsonPath('data.trial_ends_at', now()->addDays(7)->toIso8601String())
+            ->assertJsonPath('data.ends_at', null)
+            ->assertJsonPath('data.next_payment', null);
+
+        $this->travel(7)->days();
+        $this->travel(1)->minutes();
+        $this->getJson('/api/subscription')
+            ->assertJsonPath('data.plan.code', 'trial')
+            ->assertJsonPath('data.plan.max_live_setups', 0)
+            ->assertJsonPath('data.trial_ends_at', null);
+    }
+
+    public function test_the_trial_length_is_configurable_and_zero_turns_it_off(): void
+    {
+        config(['livesell.trial_days' => 0]);
+        $this->postJson('/api/auth/register', $this->signUp())->assertCreated();
+
+        $this->getJson('/api/subscription')->assertJsonPath('data.plan.code', 'trial')->assertJsonPath('data.trial_ends_at', null);
+        $this->assertNull(User::query()->where('email', 'new@example.com')->value('trial_ends_at'));
+    }
+
+    public function test_sign_up_cannot_set_its_own_trial(): void
+    {
+        $this->postJson('/api/auth/register', $this->signUp() + ['trial_ends_at' => now()->addYears(5)->toIso8601String()])->assertCreated();
+
+        $trialEndsAt = User::query()->where('email', 'new@example.com')->firstOrFail()->trial_ends_at;
+        $this->assertSame(now()->addDays(7)->toIso8601String(), $trialEndsAt?->toIso8601String());
+    }
+
+    public function test_the_superadmin_sees_the_trial_and_setting_a_plan_ends_it(): void
+    {
+        $seller = User::factory()->create();
+        $seller->forceFill(['trial_ends_at' => now()->addDays(3)])->save();
+        $admin = $this->admin();
+
+        // Newest first: the admin, then the seller.
+        $this->actingAs($admin)->getJson('/api/admin/accounts')
+            ->assertJsonPath('data.1.email', $seller->email)
+            ->assertJsonPath('data.1.plan.code', 'solo')
+            ->assertJsonPath('data.1.trial_ends_at', now()->addDays(3)->toIso8601String());
+
+        $this->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team', 'ends_at' => null])
+            ->assertOk()
+            ->assertJsonPath('data.plan.code', 'team')
+            ->assertJsonPath('data.trial_ends_at', null);
+        $this->assertNull($seller->fresh()->trial_ends_at);
+    }
+
+    public function test_an_account_without_a_trial_is_on_free_and_the_three_plans_can_be_bought(): void
     {
         $me = User::factory()->create();
 
         $this->actingAs($me)->getJson('/api/subscription')
             ->assertOk()
             ->assertJsonPath('data.plan.code', 'trial')
+            ->assertJsonPath('data.trial_ends_at', null)
             ->assertJsonPath('data.plan.max_live_setups', 0)
             ->assertJsonPath('data.usage', ['subusers' => 0, 'live_setups' => 0])
             ->assertJsonPath('data.plans.*.code', ['trial', 'solo', 'duo', 'team'])

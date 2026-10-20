@@ -39,6 +39,7 @@ class User extends Authenticatable
         'role' => 'seller',
         'owner_id' => null,
         'deactivated_at' => null,
+        'trial_ends_at' => null,
         'completed_tours' => null,
     ];
 
@@ -50,6 +51,7 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'owner_id' => 'integer',
             'deactivated_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
             'completed_tours' => 'array',
         ];
     }
@@ -78,6 +80,12 @@ class User extends Authenticatable
     public function isDeactivated(): bool
     {
         return $this->deactivated_at !== null;
+    }
+
+    /** In the free week after signing up (see Plan::forAccount); a plan put in place ends it. */
+    public function onTrial(): bool
+    {
+        return $this->trial_ends_at !== null && $this->trial_ends_at->isFuture();
     }
 
     /**

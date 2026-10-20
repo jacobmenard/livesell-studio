@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AppSetting;
 use App\Models\Payment;
 use App\Models\Plan;
 use App\Models\Subscription;
@@ -18,51 +17,19 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Plans paid by hand: the seller sends the plan's price from GCash to the business's bank
- * account and submits the reference number with a receipt screenshot; the superadmin checks
- * it and approves (the plan runs for a month from that day) or rejects it.
+ * Plans paid by hand: the seller pays the plan's price (GCash) and submits the reference
+ * number with a receipt screenshot; the superadmin checks it and approves (the plan runs for
+ * a month from that day, ending any free trial) or rejects it. The app keeps no bank details.
  *
  * Renewing the same plan adds a month after the current one, but only one month ahead.
  * Switching to another plan starts fresh on the approval date (days left are not carried).
  */
 final class Payments
 {
-    /** Where sellers send money, edited by the superadmin (see AppSetting). */
-    public const SETTING_KEYS = [
-        'bank_name' => 'payment.bank_name',
-        'account_number' => 'payment.account_number',
-        'account_name' => 'payment.account_name',
-        'instructions' => 'payment.instructions',
-    ];
-
     public function __construct(
         private readonly Subscriptions $subscriptions,
         private readonly MediaStorage $media,
     ) {}
-
-    /** @return array{bank_name: string, account_number: string, account_name: string, instructions: string} */
-    public function settings(): array
-    {
-        $values = AppSetting::values(array_values(self::SETTING_KEYS));
-
-        /** @var array{bank_name: string, account_number: string, account_name: string, instructions: string} */
-        return collect(self::SETTING_KEYS)->map(fn (string $key) => $values[$key])->all();
-    }
-
-    /** @param array<string, string|null> $settings keyed like SETTING_KEYS */
-    public function saveSettings(array $settings): void
-    {
-        AppSetting::put(collect(self::SETTING_KEYS)
-            ->mapWithKeys(fn (string $key, string $name) => [$key => $settings[$name] ?? null])
-            ->all());
-    }
-
-    public function acceptingPayments(): bool
-    {
-        $settings = $this->settings();
-
-        return $settings['account_number'] !== '' && $settings['account_name'] !== '';
-    }
 
     /**
      * Until when the account must wait before paying for $plan again, or null when it can pay
@@ -192,9 +159,6 @@ final class Payments
     /** Refuses a payment the account can't make right now, with a reason for the seller. */
     private function guardSubmission(User $account, Plan $plan, string $reference): void
     {
-        if (! $this->acceptingPayments()) {
-            throw ValidationException::withMessages(['plan' => 'Payments aren’t open yet. Please try again later.']);
-        }
         if (! $plan->purchasable || $plan->price_monthly < 1) {
             throw ValidationException::withMessages(['plan' => 'That plan can’t be bought.']);
         }

@@ -14,8 +14,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * The account's plan: what it has, what is in use, where to send a payment, the next
- * month's payment (renewal), and the payments sent so far (owner only).
+ * The account's plan: what it has (or the free trial and when it ends), what is in use, the
+ * next month's payment (renewal), and the payments sent so far (owner only).
  */
 class SubscriptionController extends Controller
 {
@@ -54,9 +54,10 @@ class SubscriptionController extends Controller
         return [
             'plan' => new PlanResource($plan),
             'ends_at' => $current?->ends_at?->toIso8601String(),
+            // Set during the free week: the plan above is the trial's, not a paid one.
+            'trial_ends_at' => ! $current && $account->onTrial() ? $account->trial_ends_at?->toIso8601String() : null,
             'usage' => $this->subscriptions->usage($account),
             'plans' => PlanResource::collection(Plan::query()->ordered()->get()),
-            'payment_details' => $this->payments->acceptingPayments() ? $this->payments->settings() : null,
             'pending_payment' => $pending ? new PaymentResource($pending) : null,
             'next_payment' => $nextPayment,
             'payments' => $isOwner

@@ -24,6 +24,14 @@ return [
     'default_plan' => env('LIVESELL_DEFAULT_PLAN', 'trial'),
 
     /*
+    | New sign-ups get a free trial: this many days with this plan's limits (so they can go
+    | live), then the default plan until a payment is approved. 0 turns the trial off.
+    */
+    'trial_days' => (int) env('LIVESELL_TRIAL_DAYS', 7),
+
+    'trial_plan' => env('LIVESELL_TRIAL_PLAN', 'solo'),
+
+    /*
     | Streaming straight to Facebook / YouTube goes through the local relay (relay/),
     | which swaps a one-time ticket for the saved server and key. The relay must use the
     | same secret; leave it empty to turn direct streaming off.

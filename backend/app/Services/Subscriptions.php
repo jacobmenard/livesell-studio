@@ -30,7 +30,10 @@ final class Subscriptions
         ];
     }
 
-    /** Puts an account on a plan until $endsAt (null = no end) and fits the team to it. */
+    /**
+     * Puts an account on a plan until $endsAt (null = no end) and fits the team to it. It
+     * replaces the free trial, if one is still running.
+     */
     public function apply(User $account, Plan $plan, ?Carbon $endsAt): Subscription
     {
         return DB::transaction(function () use ($account, $plan, $endsAt): Subscription {
@@ -38,6 +41,10 @@ final class Subscriptions
             $subscription->plan_id = $plan->id;
             $subscription->ends_at = $endsAt;
             $subscription->save();
+
+            if ($account->trial_ends_at !== null) {
+                $account->forceFill(['trial_ends_at' => null])->save();
+            }
 
             $this->fitSeats($account, $plan);
 

@@ -162,23 +162,16 @@ export interface Plan {
 export interface SubscriptionSummary {
   plan: Plan
   ends_at: string | null
+  /** Set during the free week after signing up: `plan` is then the trial's, not a paid one. */
+  trial_ends_at: string | null
   usage: { subusers: number; live_setups: number }
   plans: Plan[]
-  /** Where to send money (GCash → bank transfer); null while payments aren't open. */
-  payment_details: PaymentDetails | null
   /** A payment the superadmin hasn't checked yet (one at a time). */
   pending_payment: Payment | null
   /** The next month of the current paid plan, which can be paid ahead. */
   next_payment: NextPayment | null
   /** The latest payments, for the account owner (empty for sub-users). */
   payments: Payment[]
-}
-
-export interface PaymentDetails {
-  bank_name: string
-  account_number: string
-  account_name: string
-  instructions: string
 }
 
 export interface NextPayment {
@@ -239,6 +232,8 @@ export interface AdminAccount {
   role: User['role']
   plan: Plan
   ends_at: string | null
+  /** Set while the account is in its free week. */
+  trial_ends_at: string | null
   members: number
   joined_at: string | null
 }

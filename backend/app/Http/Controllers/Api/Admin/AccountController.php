@@ -35,9 +35,10 @@ class AccountController extends Controller
             ->paginate(25);
 
         $default = Plan::default();
+        $trialPlan = Plan::trial();
 
         return response()->json([
-            'data' => $accounts->getCollection()->map(fn (User $u) => $this->row($u, $default))->values(),
+            'data' => $accounts->getCollection()->map(fn (User $u) => $this->row($u, $default, $trialPlan))->values(),
             'meta' => ['current_page' => $accounts->currentPage(), 'last_page' => $accounts->lastPage(), 'total' => $accounts->total()],
         ]);
     }
@@ -56,22 +57,24 @@ class AccountController extends Controller
 
         $account->load('subscription.plan')->loadCount(['subUsers as members_count']);
 
-        return response()->json(['data' => $this->row($account, Plan::default())]);
+        return response()->json(['data' => $this->row($account, Plan::default(), Plan::trial())]);
     }
 
     /** @return array<string, mixed> */
-    private function row(User $account, Plan $default): array
+    private function row(User $account, Plan $default, Plan $trialPlan): array
     {
         $subscription = $account->subscription;
         $current = $subscription && $subscription->isCurrent();
+        $trial = ! $current && $account->onTrial();
 
         return [
             'id' => $account->id,
             'name' => $account->name,
             'email' => $account->email,
             'role' => $account->role->value,
-            'plan' => new PlanResource($current ? $subscription->plan : $default),
+            'plan' => new PlanResource($current ? $subscription->plan : ($trial ? $trialPlan : $default)),
             'ends_at' => $current ? $subscription->ends_at?->toIso8601String() : null,
+            'trial_ends_at' => $trial ? $account->trial_ends_at?->toIso8601String() : null,
             'members' => (int) $account->members_count,
             'joined_at' => $account->created_at?->toIso8601String(),
         ];

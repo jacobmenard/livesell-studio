@@ -8,7 +8,6 @@ import type {
   Orientation,
   OutputLinkState,
   Payment,
-  PaymentDetails,
   PaymentStatus,
   Plan,
   Platform,
@@ -145,9 +144,6 @@ export const adminApi = {
     http.post<Wrapped<AdminPayment>>(`/api/admin/payments/${paymentId}/approve`).then((r) => r.data.data),
   rejectPayment: (paymentId: number, reason: string) =>
     http.post<Wrapped<AdminPayment>>(`/api/admin/payments/${paymentId}/reject`, { reason }).then((r) => r.data.data),
-  paymentSettings: () => http.get<Wrapped<PaymentDetails>>('/api/admin/payment-settings').then((r) => r.data.data),
-  savePaymentSettings: (body: PaymentDetails) =>
-    http.put<Wrapped<PaymentDetails>>('/api/admin/payment-settings', body).then((r) => r.data.data),
 }
 
 export interface LiveSessionHandle {

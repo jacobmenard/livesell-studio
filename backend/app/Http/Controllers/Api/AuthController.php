@@ -31,11 +31,14 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'max:128', 'confirmed', PasswordRule::min(8)],
         ]);
 
-        $user = User::create([
+        $trialDays = (int) config('livesell.trial_days');
+        $user = new User([
             'name' => trim($data['name']),
             'email' => Str::lower($data['email']),
             'password' => $data['password'],
         ]);
+        // The free week (not fillable, so sign-up input can never set it).
+        $user->forceFill(['trial_ends_at' => $trialDays > 0 ? now()->addDays($trialDays) : null])->save();
 
         event(new Registered($user));
 

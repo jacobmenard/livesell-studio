@@ -8,12 +8,12 @@ use App\Models\Plan;
 use App\Models\User;
 use App\Notifications\PaymentReviewed;
 use App\Notifications\PaymentSubmitted;
-use App\Services\Payments;
 use App\Services\Subscriptions;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -28,13 +28,6 @@ class PaymentTest extends TestCase
         Notification::fake();
         Storage::fake(Payment::PROOF_DISK);
         $this->travelTo(Carbon::parse('2026-03-10 09:00:00'));
-
-        app(Payments::class)->saveSettings([
-            'bank_name' => 'Metrobank',
-            'account_number' => '1234567890123',
-            'account_name' => 'Test Business',
-            'instructions' => null,
-        ]);
     }
 
     private function admin(): User
@@ -87,7 +80,6 @@ class PaymentTest extends TestCase
         $this->getJson('/api/subscription')
             ->assertJsonPath('data.plan.code', 'trial')
             ->assertJsonPath('data.pending_payment.id', $id)
-            ->assertJsonPath('data.payment_details.bank_name', 'Metrobank')
             ->assertJsonPath('data.payments.0.status', 'pending');
 
         // One payment at a time.
@@ -117,13 +109,39 @@ class PaymentTest extends TestCase
         $this->assertSame([], Storage::disk(Payment::PROOF_DISK)->allFiles());
     }
 
-    public function test_payments_are_closed_until_the_bank_account_is_set(): void
+    public function test_the_app_keeps_no_bank_details_and_payments_are_always_open(): void
     {
-        app(Payments::class)->saveSettings(['bank_name' => '', 'account_number' => '', 'account_name' => '', 'instructions' => '']);
         $seller = User::factory()->create();
 
-        $this->pay($seller, 'solo', 'REF123456')->assertUnprocessable()->assertJsonValidationErrors('plan');
-        $this->getJson('/api/subscription')->assertJsonPath('data.payment_details', null);
+        $this->pay($seller, 'solo', 'REF123456')->assertCreated();
+        $this->getJson('/api/subscription')->assertJsonMissingPath('data.payment_details');
+
+        $this->flushSession();
+        $this->actingAs($this->admin());
+        $this->getJson('/api/admin/payment-settings')->assertNotFound();
+        $this->assertFalse(Schema::hasTable('app_settings'));
+    }
+
+    public function test_paying_during_the_free_trial_starts_the_plan_on_approval_and_ends_the_trial(): void
+    {
+        $seller = User::factory()->create();
+        $seller->forceFill(['trial_ends_at' => now()->addDays(5)])->save();
+        $id = $this->pay($seller, 'duo', 'REF110001')->assertCreated()->json('data.id');
+
+        // Until it's approved, the seller keeps the trial.
+        $this->getJson('/api/subscription')
+            ->assertJsonPath('data.plan.code', 'solo')
+            ->assertJsonPath('data.trial_ends_at', now()->addDays(5)->toIso8601String());
+
+        $this->travel(1)->days();
+        $this->approve($id)->assertOk()->assertJsonPath('data.period_start', now()->toIso8601String());
+
+        $this->flushSession();
+        $this->actingAs($seller)->getJson('/api/subscription')
+            ->assertJsonPath('data.plan.code', 'duo')
+            ->assertJsonPath('data.trial_ends_at', null)
+            ->assertJsonPath('data.ends_at', now()->addMonthNoOverflow()->toIso8601String());
+        $this->assertNull($seller->fresh()->trial_ends_at);
     }
 
     public function test_approving_starts_the_plan_on_the_approval_date_for_a_month(): void
@@ -244,7 +262,7 @@ class PaymentTest extends TestCase
         $this->actingAs($member)->getJson('/api/subscription')->assertOk()->assertJsonPath('data.payments', []);
     }
 
-    public function test_only_the_superadmin_reviews_payments_and_edits_where_to_send_them(): void
+    public function test_only_the_superadmin_reviews_payments(): void
     {
         $seller = User::factory()->create();
         $id = $this->pay($seller, 'solo', 'REF700001')->json('data.id');
@@ -253,17 +271,6 @@ class PaymentTest extends TestCase
         $this->getJson('/api/admin/payments/pending-count')->assertForbidden();
         $this->postJson("/api/admin/payments/{$id}/approve")->assertForbidden();
         $this->postJson("/api/admin/payments/{$id}/reject", ['reason' => 'nope'])->assertForbidden();
-        $this->getJson('/api/admin/payment-settings')->assertForbidden();
-        $this->putJson('/api/admin/payment-settings', ['bank_name' => 'X', 'account_number' => '1', 'account_name' => 'X'])->assertForbidden();
-
-        $this->flushSession();
-        $this->actingAs($this->admin());
-        $this->putJson('/api/admin/payment-settings', ['bank_name' => 'BDO', 'account_number' => 'abc', 'account_name' => 'Shop'])
-            ->assertUnprocessable()->assertJsonValidationErrors('account_number');
-        $this->putJson('/api/admin/payment-settings', ['bank_name' => 'BDO', 'account_number' => '0012 3456 7890', 'account_name' => 'Shop', 'instructions' => 'Use InstaPay.'])
-            ->assertOk()
-            ->assertJsonPath('data.account_number', '0012 3456 7890');
-        $this->getJson('/api/admin/payment-settings')->assertJsonPath('data.bank_name', 'BDO');
     }
 
     public function test_renewing_a_plan_without_an_end_date_is_refused(): void

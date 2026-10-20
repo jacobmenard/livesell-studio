@@ -7,7 +7,7 @@ import { Alert, Button, Segmented, Spinner, TextField } from '../../components/u
 import { errorMessage, fieldErrors } from '../../lib/api'
 import { adminApi, paymentsApi } from '../../lib/endpoints'
 import { formatDate, formatPrice } from '../../lib/format'
-import type { AdminPayment, PaymentDetails, PaymentStatus } from '../../lib/types'
+import type { AdminPayment, PaymentStatus } from '../../lib/types'
 import { notifyPaymentsChanged } from '../../lib/pendingPayments'
 
 type Filter = PaymentStatus | 'all'
@@ -25,7 +25,7 @@ export function AdminPaymentsPage() {
   return (
     <AppPage
       title="Payments"
-      subtitle="Check each receipt against the bank account. Approving switches the plan on for a month from today."
+      subtitle="Check each receipt against what you received. Approving switches the plan on for a month from today."
       actions={
         <Link to="/admin" className="text-sm font-semibold">
           Accounts and plans
@@ -33,7 +33,6 @@ export function AdminPaymentsPage() {
       }
     >
       <PaymentList />
-      <PaymentSettings />
     </AppPage>
   )
 }
@@ -264,92 +263,5 @@ function ProofThumb({ paymentId }: { paymentId: number }) {
     <a href={url} target="_blank" rel="noopener noreferrer" className={box} aria-label="Open the receipt full size">
       <img src={url} alt="Payment receipt" className="h-full w-full object-cover object-top" />
     </a>
-  )
-}
-
-const EMPTY_SETTINGS: PaymentDetails = { bank_name: '', account_number: '', account_name: '', instructions: '' }
-
-/** Where sellers send money; shown in their pay dialog. */
-function PaymentSettings() {
-  const [form, setForm] = useState<PaymentDetails | null>(null)
-  const [errors, setErrors] = useState<Record<string, string>>({})
-  const [loadError, setLoadError] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [saved, setSaved] = useState(false)
-
-  useEffect(() => {
-    let cancelled = false
-    adminApi
-      .paymentSettings()
-      .then((s) => !cancelled && setForm(s))
-      .catch((e) => {
-        if (cancelled) return
-        setLoadError(errorMessage(e, "We couldn't load the payment details."))
-        setForm(EMPTY_SETTINGS)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const save = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!form) return
-    setBusy(true)
-    setErrors({})
-    setSaved(false)
-    try {
-      setForm(await adminApi.savePaymentSettings({ ...form, bank_name: form.bank_name.trim(), account_number: form.account_number.trim(), account_name: form.account_name.trim() }))
-      setSaved(true)
-    } catch (err) {
-      const fields = fieldErrors(err)
-      setErrors(Object.keys(fields).length ? fields : { form: errorMessage(err, "We couldn't save the payment details.") })
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const set = (key: keyof PaymentDetails, value: string) => {
-    setSaved(false)
-    setForm((f) => (f ? { ...f, [key]: value } : f))
-  }
-
-  return (
-    <section aria-labelledby="pay-settings-h" className="flex flex-col gap-3 rounded-[20px] border border-line bg-surface p-[18px]">
-      <div className="flex flex-col gap-0.5">
-        <h2 id="pay-settings-h" className="m-0 font-display text-xl font-semibold">
-          Where sellers send payments
-        </h2>
-        <p className="m-0 text-[13px] text-muted">Sellers send money from GCash (Bank Transfer) to this account. Payments stay closed until an account number and name are set.</p>
-      </div>
-      {loadError && <Alert>{loadError}</Alert>}
-      {!form && !loadError && <Spinner label="Loading…" />}
-      {form && (
-        <form noValidate onSubmit={save} className="flex flex-col gap-3">
-          <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(200px,1fr))]">
-            <TextField label="Bank" value={form.bank_name} maxLength={60} error={errors.bank_name} onChange={(e) => set('bank_name', e.target.value)} />
-            <TextField label="Account number" value={form.account_number} maxLength={34} inputMode="numeric" error={errors.account_number} onChange={(e) => set('account_number', e.target.value)} />
-            <TextField label="Account name" value={form.account_name} maxLength={80} error={errors.account_name} onChange={(e) => set('account_name', e.target.value)} />
-          </div>
-          <label className="flex flex-col gap-1.5 text-sm font-semibold">
-            Extra instructions (optional)
-            <textarea
-              value={form.instructions}
-              maxLength={1000}
-              rows={3}
-              onChange={(e) => set('instructions', e.target.value)}
-              className="rounded-xl border border-line-strong bg-surface px-3.5 py-2.5 font-normal text-text"
-            />
-            {errors.instructions && <span className="text-[13px] font-normal text-danger-text">{errors.instructions}</span>}
-          </label>
-          {errors.form && <Alert>{errors.form}</Alert>}
-          <div>
-            <Button type="submit" variant="primary" loading={busy}>
-              {saved ? 'Saved' : 'Save payment details'}
-            </Button>
-          </div>
-        </form>
-      )}
-    </section>
   )
 }
