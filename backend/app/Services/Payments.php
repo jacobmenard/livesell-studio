@@ -224,11 +224,15 @@ final class Payments
         $admins = User::query()->where('role', 'superadmin')->get();
         $this->notify($admins, new PaymentSubmitted($payment));
 
-        // The business inbox too (e.g. support@), unless a superadmin account already uses it.
-        $inbox = trim((string) config('livesell.payments_email'));
-        if ($inbox !== '' && ! $admins->contains(fn (User $admin): bool => strcasecmp($admin->email, $inbox) === 0)) {
-            $this->notify(Notification::route('mail', $inbox), new PaymentSubmitted($payment));
-        }
+        // The business inbox (e.g. support@) and any extra addresses too, each once, skipping
+        // invalid ones and those a superadmin account already uses.
+        $taken = $admins->map(fn (User $admin): string => Str::lower($admin->email))->all();
+        collect([config('livesell.payments_email'), ...config('livesell.payment_alert_emails', [])])
+            ->map(fn ($email): string => trim((string) $email))
+            ->filter(fn (string $email): bool => filter_var($email, FILTER_VALIDATE_EMAIL) !== false)
+            ->unique(fn (string $email): string => Str::lower($email))
+            ->reject(fn (string $email): bool => in_array(Str::lower($email), $taken, true))
+            ->each(fn (string $email) => $this->notify(Notification::route('mail', $email), new PaymentSubmitted($payment)));
     }
 
     private function notify($notifiables, object $notification): void

@@ -48,6 +48,12 @@ return [
     'payments_email' => env('LIVESELL_PAYMENTS_EMAIL'),
 
     /*
+    | More addresses that get the "payment to check" email, comma separated (e.g. the owner's
+    | personal email). Invalid ones are skipped and nobody gets it twice.
+    */
+    'payment_alert_emails' => array_values(array_filter(array_map('trim', explode(',', (string) env('LIVESELL_PAYMENT_ALERT_EMAILS', ''))))),
+
+    /*
     | The superadmin account made by SuperAdminSeeder. Leave the password empty locally
     | to have one generated and printed; production refuses to seed without one.
     */

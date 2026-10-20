@@ -142,6 +142,30 @@ class PaymentTest extends TestCase
         Notification::assertSentOnDemandTimes(PaymentSubmitted::class, 0);
     }
 
+    public function test_extra_addresses_get_the_payment_alert_once_each(): void
+    {
+        config([
+            'livesell.payments_email' => 'support@negosyoworks.test',
+            // A duplicate (other case), an invalid entry and a superadmin's own address.
+            'livesell.payment_alert_emails' => ['owner@gmail.test', 'Owner@Gmail.test', 'not-an-email', 'boss@negosyoworks.test'],
+        ]);
+        $admin = $this->admin();
+        $admin->forceFill(['email' => 'boss@negosyoworks.test'])->save();
+
+        $this->pay(User::factory()->create(), 'solo', 'REF200004')->assertCreated();
+
+        $sentTo = [];
+        Notification::assertSentOnDemand(PaymentSubmitted::class, function ($n, array $channels, object $notifiable) use (&$sentTo): bool {
+            $sentTo[] = $notifiable->routes['mail'];
+
+            return true;
+        });
+        sort($sentTo);
+        $this->assertSame(['owner@gmail.test', 'support@negosyoworks.test'], array_values(array_unique($sentTo)));
+        Notification::assertSentOnDemandTimes(PaymentSubmitted::class, 2);
+        Notification::assertSentTo($admin, PaymentSubmitted::class);
+    }
+
     public function test_a_mail_server_failure_does_not_lose_the_payment(): void
     {
         Notification::shouldReceive('send')->andThrow(new \RuntimeException('SMTP down'));
