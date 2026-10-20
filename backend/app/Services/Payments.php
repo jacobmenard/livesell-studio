@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
@@ -10,6 +11,7 @@ use App\Notifications\PaymentReviewed;
 use App\Notifications\PaymentSubmitted;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
@@ -17,9 +19,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Plans paid by hand: the seller pays the plan's price (GCash) and submits the reference
- * number with a receipt screenshot; the superadmin checks it and approves (the plan runs for
- * a month from that day, ending any free trial) or rejects it. The app keeps no bank details.
+ * Plans paid by hand: the seller picks one of the superadmin's payment methods (GCash, Maya
+ * or a bank account), sends the plan's price to it and submits the reference number with a
+ * receipt screenshot; the superadmin checks it and approves (the plan runs for a month from
+ * that day, ending any free trial) or rejects it.
  *
  * Renewing the same plan adds a month after the current one, but only one month ahead.
  * Switching to another plan starts fresh on the approval date (days left are not carried).
@@ -51,10 +54,16 @@ final class Payments
         return Payment::query()->where('user_id', $account->id)->pending()->with('plan')->latest('id')->first();
     }
 
-    public function submit(User $account, User $submitter, Plan $plan, string $reference, UploadedFile $proof): Payment
+    /** @return Collection<int, PaymentMethod> the ways to pay sellers can choose from */
+    public function methods(): Collection
+    {
+        return PaymentMethod::query()->enabled()->ordered()->get();
+    }
+
+    public function submit(User $account, User $submitter, Plan $plan, PaymentMethod $method, string $reference, UploadedFile $proof): Payment
     {
         $reference = self::normalizeReference($reference);
-        $this->guardSubmission($account, $plan, $reference);
+        $this->guardSubmission($account, $plan, $method, $reference);
 
         $mime = (string) $proof->getMimeType();
         [$bytes] = $this->media->sanitizeImage($proof->getRealPath(), $mime, 'proof');
@@ -67,10 +76,10 @@ final class Payments
         Storage::disk(Payment::PROOF_DISK)->put($path, $bytes);
 
         try {
-            $payment = DB::transaction(function () use ($account, $submitter, $plan, $reference, $path): Payment {
+            $payment = DB::transaction(function () use ($account, $submitter, $plan, $method, $reference, $path): Payment {
                 // One submission per account at a time: check again under a lock on the owner.
                 User::query()->whereKey($account->id)->lockForUpdate()->first();
-                $this->guardSubmission($account, $plan, $reference);
+                $this->guardSubmission($account, $plan, $method, $reference);
 
                 $payment = new Payment;
                 $payment->forceFill([
@@ -80,7 +89,9 @@ final class Payments
                     // Always the plan's price, never an amount from the seller.
                     'amount' => $plan->price_monthly,
                     'currency' => $plan->currency,
-                    'method' => Payment::METHOD_GCASH_BANK,
+                    'method' => $method->type,
+                    'payment_method_id' => $method->id,
+                    'method_label' => $method->summary(),
                     'reference_number' => $reference,
                     'proof_path' => $path,
                 ])->save();
@@ -157,8 +168,11 @@ final class Payments
     }
 
     /** Refuses a payment the account can't make right now, with a reason for the seller. */
-    private function guardSubmission(User $account, Plan $plan, string $reference): void
+    private function guardSubmission(User $account, Plan $plan, PaymentMethod $method, string $reference): void
     {
+        if (! $method->enabled) {
+            throw ValidationException::withMessages(['payment_method' => 'That payment method isn’t available. Choose another.']);
+        }
         if (! $plan->purchasable || $plan->price_monthly < 1) {
             throw ValidationException::withMessages(['plan' => 'That plan can’t be bought.']);
         }
@@ -173,7 +187,7 @@ final class Payments
             throw ValidationException::withMessages(['plan' => "You can renew {$plan->name} from {$from->format('M j, Y')} (one month ahead at most)."]);
         }
         if (! preg_match('/^[A-Z0-9]{6,30}$/', $reference)) {
-            throw ValidationException::withMessages(['reference_number' => 'Enter the reference number from your GCash receipt (6–30 letters or numbers).']);
+            throw ValidationException::withMessages(['reference_number' => 'Enter the reference number from your receipt (6–30 letters or numbers).']);
         }
         $used = Payment::query()
             ->where('reference_number', $reference)

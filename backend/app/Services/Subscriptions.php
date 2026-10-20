@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Plans for accounts: which plan applies, what is in use, and putting an account on a plan
- * (when the superadmin approves a payment, or sets a plan by hand).
+ * (when the superadmin approves a payment).
  */
 final class Subscriptions
 {

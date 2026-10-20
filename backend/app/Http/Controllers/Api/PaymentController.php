@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\PaymentResource;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Services\Payments;
 use Illuminate\Http\JsonResponse;
@@ -21,10 +22,14 @@ class PaymentController extends Controller
     {
         $data = $request->validate([
             'plan' => ['required', 'string', 'exists:plans,code'],
+            // Only a method the superadmin has turned on.
+            'payment_method' => ['required', 'integer', 'exists:payment_methods,id,enabled,1'],
             'reference_number' => ['required', 'string', 'max:40'],
             'proof' => ['required', 'file', 'mimetypes:image/png,image/jpeg,image/webp', 'max:5120'],
         ], [
-            'proof.required' => 'Attach a screenshot of your GCash receipt.',
+            'payment_method.required' => 'Choose how you paid.',
+            'payment_method.exists' => 'That payment method isn’t available. Choose another.',
+            'proof.required' => 'Attach a screenshot of your receipt.',
             'proof.mimetypes' => 'The receipt must be a PNG, JPG or WEBP screenshot.',
             'proof.max' => 'The receipt must be 5 MB or smaller.',
         ]);
@@ -33,6 +38,7 @@ class PaymentController extends Controller
             $request->user()->accountOwner(),
             $request->user(),
             Plan::query()->where('code', $data['plan'])->firstOrFail(),
+            PaymentMethod::query()->findOrFail($data['payment_method']),
             $data['reference_number'],
             $request->file('proof'),
         );

@@ -166,6 +166,8 @@ export interface SubscriptionSummary {
   trial_ends_at: string | null
   usage: { subusers: number; live_setups: number }
   plans: Plan[]
+  /** The ways to pay the superadmin has turned on; empty means plans can't be paid for yet. */
+  payment_methods: PaymentMethod[]
   /** A payment the superadmin hasn't checked yet (one at a time). */
   pending_payment: Payment | null
   /** The next month of the current paid plan, which can be paid ahead. */
@@ -192,6 +194,8 @@ export interface Payment {
   amount: number
   currency: string
   method: string
+  /** Where the money went (method, number, name), copied when it was sent. */
+  method_label: string | null
   reference_number: string
   status: PaymentStatus
   /** Why it was rejected. */
@@ -204,6 +208,32 @@ export interface Payment {
 }
 
 /** A payment on the superadmin's review list. */
+export type PaymentMethodType = 'gcash' | 'maya' | 'bank'
+
+/** A GCash, Maya or bank account sellers can pay into. */
+export interface PaymentMethod {
+  id: number
+  type: PaymentMethodType
+  /** The bank's name for a bank; optional for GCash / Maya. */
+  label: string | null
+  /** What sellers see: the label, or "GCash" / "Maya". */
+  name: string
+  account_name: string
+  account_number: string
+  instructions: string | null
+  enabled: boolean
+  sort_order: number
+}
+
+export interface PaymentMethodInput {
+  type: PaymentMethodType
+  label: string
+  account_name: string
+  account_number: string
+  instructions: string
+  enabled: boolean
+}
+
 export interface AdminPayment extends Payment {
   account: { id: number; name: string; email: string }
   submitted_by: string | null
@@ -223,19 +253,6 @@ export interface TeamState {
   seats: number
   plan_name: string
   members: TeamMember[]
-}
-
-export interface AdminAccount {
-  id: number
-  name: string
-  email: string
-  role: User['role']
-  plan: Plan
-  ends_at: string | null
-  /** Set while the account is in its free week. */
-  trial_ends_at: string | null
-  members: number
-  joined_at: string | null
 }
 
 export interface CameraSettings {

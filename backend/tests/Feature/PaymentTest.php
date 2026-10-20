@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Enums\UserRole;
 use App\Models\Payment;
+use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\User;
 use App\Notifications\PaymentReviewed;
@@ -28,7 +29,15 @@ class PaymentTest extends TestCase
         Notification::fake();
         Storage::fake(Payment::PROOF_DISK);
         $this->travelTo(Carbon::parse('2026-03-10 09:00:00'));
+
+        $this->gcash = PaymentMethod::query()->create([
+            'type' => 'gcash',
+            'account_name' => 'Test Business',
+            'account_number' => '0917 123 4567',
+        ]);
     }
+
+    private PaymentMethod $gcash;
 
     private function admin(): User
     {
@@ -45,6 +54,7 @@ class PaymentTest extends TestCase
 
         return $this->actingAs($as)->post('/api/payments', array_merge([
             'plan' => $plan,
+            'payment_method' => $this->gcash->id,
             'reference_number' => $reference,
             'proof' => UploadedFile::fake()->image('receipt.png', 400, 800),
         ], $overrides), ['Accept' => 'application/json']);
@@ -109,17 +119,83 @@ class PaymentTest extends TestCase
         $this->assertSame([], Storage::disk(Payment::PROOF_DISK)->allFiles());
     }
 
-    public function test_the_app_keeps_no_bank_details_and_payments_are_always_open(): void
+    public function test_the_seller_picks_a_method_and_the_payment_keeps_where_the_money_went(): void
     {
+        $maya = PaymentMethod::query()->create(['type' => 'maya', 'account_name' => 'Test Business', 'account_number' => '0918 000 1111', 'sort_order' => 1]);
+        PaymentMethod::query()->create(['type' => 'bank', 'label' => 'BDO', 'account_name' => 'Test Business', 'account_number' => '0012 3456', 'enabled' => false]);
         $seller = User::factory()->create();
 
-        $this->pay($seller, 'solo', 'REF123456')->assertCreated();
-        $this->getJson('/api/subscription')->assertJsonMissingPath('data.payment_details');
+        // Only the enabled methods are offered, in order.
+        $this->actingAs($seller)->getJson('/api/subscription')
+            ->assertJsonPath('data.payment_methods.*.name', ['GCash', 'Maya'])
+            ->assertJsonPath('data.payment_methods.1.account_number', '0918 000 1111');
+
+        $id = $this->pay($seller, 'solo', 'REF123456', ['payment_method' => $maya->id])
+            ->assertCreated()
+            ->assertJsonPath('data.method', 'maya')
+            ->assertJsonPath('data.method_label', 'Maya · 0918 000 1111 · Test Business')
+            ->json('data.id');
+
+        // Deleting the method later keeps the payment's copy of it.
+        $this->flushSession();
+        $this->actingAs($this->admin())->deleteJson("/api/admin/payment-methods/{$maya->id}")->assertNoContent();
+        $this->getJson('/api/admin/payments')
+            ->assertJsonPath('data.0.id', $id)
+            ->assertJsonPath('data.0.method_label', 'Maya · 0918 000 1111 · Test Business');
+        $this->assertNull(Payment::query()->findOrFail($id)->payment_method_id);
+    }
+
+    public function test_a_method_must_be_chosen_and_turned_on(): void
+    {
+        $off = PaymentMethod::query()->create(['type' => 'bank', 'label' => 'BDO', 'account_name' => 'Shop', 'account_number' => '0012', 'enabled' => false]);
+        $seller = User::factory()->create();
+
+        $this->pay($seller, 'solo', 'REF123456', ['payment_method' => null])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        $this->pay($seller, 'solo', 'REF123456', ['payment_method' => $off->id])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        $this->pay($seller, 'solo', 'REF123456', ['payment_method' => 9999])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        $this->assertSame(0, Payment::query()->count());
+    }
+
+    public function test_with_no_method_turned_on_plans_cannot_be_paid_for(): void
+    {
+        $this->gcash->update(['enabled' => false]);
+        $seller = User::factory()->create();
+
+        $this->actingAs($seller)->getJson('/api/subscription')->assertJsonPath('data.payment_methods', []);
+        $this->pay($seller, 'solo', 'REF123456')->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        $this->assertFalse(Schema::hasTable('app_settings'));
+    }
+
+    public function test_the_superadmin_manages_payment_methods(): void
+    {
+        $seller = User::factory()->create();
+        $this->actingAs($seller)->getJson('/api/admin/payment-methods')->assertForbidden();
+        $this->postJson('/api/admin/payment-methods', ['type' => 'gcash', 'account_name' => 'X', 'account_number' => '1'])->assertForbidden();
+        $this->putJson("/api/admin/payment-methods/{$this->gcash->id}", ['type' => 'gcash', 'account_name' => 'X', 'account_number' => '1'])->assertForbidden();
+        $this->deleteJson("/api/admin/payment-methods/{$this->gcash->id}")->assertForbidden();
 
         $this->flushSession();
         $this->actingAs($this->admin());
-        $this->getJson('/api/admin/payment-settings')->assertNotFound();
-        $this->assertFalse(Schema::hasTable('app_settings'));
+        $this->postJson('/api/admin/payment-methods', ['type' => 'paypal', 'account_name' => 'Shop', 'account_number' => '1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('type');
+        $this->postJson('/api/admin/payment-methods', ['type' => 'bank', 'account_name' => 'Shop', 'account_number' => '0012'])
+            ->assertUnprocessable()->assertJsonValidationErrors('label'); // a bank needs its name
+        $this->postJson('/api/admin/payment-methods', ['type' => 'maya', 'account_name' => 'Shop', 'account_number' => 'abc'])
+            ->assertUnprocessable()->assertJsonValidationErrors('account_number');
+
+        $id = $this->postJson('/api/admin/payment-methods', ['type' => 'bank', 'label' => ' Metrobank ', 'account_name' => 'Shop', 'account_number' => '142 314 2564', 'instructions' => 'InstaPay is fine.'])
+            ->assertCreated()
+            ->assertJsonPath('data.name', 'Metrobank')
+            ->assertJsonPath('data.enabled', true)
+            ->json('data.id');
+
+        // Editing without "enabled" leaves it as it was; turning it off hides it from sellers.
+        $this->putJson("/api/admin/payment-methods/{$id}", ['type' => 'bank', 'label' => 'Metrobank', 'account_name' => 'Shop Inc', 'account_number' => '142 314 2564'])
+            ->assertOk()->assertJsonPath('data.account_name', 'Shop Inc')->assertJsonPath('data.enabled', true)->assertJsonPath('data.instructions', null);
+        $this->putJson("/api/admin/payment-methods/{$id}", ['type' => 'bank', 'label' => 'Metrobank', 'account_name' => 'Shop Inc', 'account_number' => '142 314 2564', 'enabled' => false])
+            ->assertOk()->assertJsonPath('data.enabled', false);
+        $this->getJson('/api/admin/payment-methods')->assertJsonPath('data.*.name', ['GCash', 'Metrobank']);
+        $this->getJson('/api/subscription')->assertJsonPath('data.payment_methods.*.name', ['GCash']);
     }
 
     public function test_paying_during_the_free_trial_starts_the_plan_on_approval_and_ends_the_trial(): void

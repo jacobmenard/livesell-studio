@@ -1,7 +1,7 @@
 <?php
 
-use App\Http\Controllers\Api\Admin\AccountController as AdminAccountController;
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Api\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastController;
@@ -84,8 +84,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::get('payments/pending-count', [AdminPaymentController::class, 'pendingCount']);
         Route::post('payments/{payment}/approve', [AdminPaymentController::class, 'approve']);
         Route::post('payments/{payment}/reject', [AdminPaymentController::class, 'reject']);
-        Route::get('accounts', [AdminAccountController::class, 'index']);
-        Route::put('accounts/{account}/plan', [AdminAccountController::class, 'updatePlan']);
+        Route::apiResource('payment-methods', AdminPaymentMethodController::class)->except('show');
         Route::get('plans', [AdminPlanController::class, 'index']);
         Route::put('plans/{plan}', [AdminPlanController::class, 'update']);
     });

@@ -1,6 +1,5 @@
 import { http } from './api'
 import type {
-  AdminAccount,
   AdminPayment,
   Destination,
   MediaItem,
@@ -8,6 +7,8 @@ import type {
   Orientation,
   OutputLinkState,
   Payment,
+  PaymentMethod,
+  PaymentMethodInput,
   PaymentStatus,
   Plan,
   Platform,
@@ -108,9 +109,10 @@ export const subscriptionApi = {
 
 /** Paying for a plan: GCash → bank transfer, then the reference number and receipt (owner only). */
 export const paymentsApi = {
-  submit: (body: { plan: string; reference_number: string; proof: File }) => {
+  submit: (body: { plan: string; payment_method: number; reference_number: string; proof: File }) => {
     const form = new FormData()
     form.append('plan', body.plan)
+    form.append('payment_method', String(body.payment_method))
     form.append('reference_number', body.reference_number)
     form.append('proof', body.proof)
     return http.post<Wrapped<Payment>>('/api/payments', form).then((r) => r.data.data)
@@ -126,12 +128,6 @@ export const teamApi = {
 }
 
 export const adminApi = {
-  accounts: (params: { search: string; page: number }) =>
-    http
-      .get<{ data: AdminAccount[]; meta: { current_page: number; last_page: number; total: number } }>('/api/admin/accounts', { params })
-      .then((r) => r.data),
-  setPlan: (accountId: number, body: { plan: string; ends_at: string | null }) =>
-    http.put<Wrapped<AdminAccount>>(`/api/admin/accounts/${accountId}/plan`, body).then((r) => r.data.data),
   plans: () => http.get<Wrapped<Plan[]>>('/api/admin/plans').then((r) => r.data.data),
   updatePlan: (planId: number, body: Pick<Plan, 'name' | 'price_monthly' | 'max_subusers' | 'max_live_setups'>) =>
     http.put<Wrapped<Plan>>(`/api/admin/plans/${planId}`, body).then((r) => r.data.data),
@@ -142,6 +138,11 @@ export const adminApi = {
   pendingPayments: () => http.get<Wrapped<{ pending: number }>>('/api/admin/payments/pending-count').then((r) => r.data.data.pending),
   approvePayment: (paymentId: number) =>
     http.post<Wrapped<AdminPayment>>(`/api/admin/payments/${paymentId}/approve`).then((r) => r.data.data),
+  paymentMethods: () => http.get<Wrapped<PaymentMethod[]>>('/api/admin/payment-methods').then((r) => r.data.data),
+  createPaymentMethod: (body: PaymentMethodInput) => http.post<Wrapped<PaymentMethod>>('/api/admin/payment-methods', body).then((r) => r.data.data),
+  updatePaymentMethod: (id: number, body: PaymentMethodInput) =>
+    http.put<Wrapped<PaymentMethod>>(`/api/admin/payment-methods/${id}`, body).then((r) => r.data.data),
+  deletePaymentMethod: (id: number) => http.delete(`/api/admin/payment-methods/${id}`),
   rejectPayment: (paymentId: number, reason: string) =>
     http.post<Wrapped<AdminPayment>>(`/api/admin/payments/${paymentId}/reject`, { reason }).then((r) => r.data.data),
 }

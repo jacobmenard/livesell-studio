@@ -9,6 +9,7 @@ import { adminApi, paymentsApi } from '../../lib/endpoints'
 import { formatDate, formatPrice } from '../../lib/format'
 import type { AdminPayment, PaymentStatus } from '../../lib/types'
 import { notifyPaymentsChanged } from '../../lib/pendingPayments'
+import { PaymentMethodsAdmin } from './PaymentMethodsAdmin'
 
 type Filter = PaymentStatus | 'all'
 
@@ -25,14 +26,15 @@ export function AdminPaymentsPage() {
   return (
     <AppPage
       title="Payments"
-      subtitle="Check each receipt against what you received. Approving switches the plan on for a month from today."
+      subtitle="Check each receipt against what reached your account. Approving switches the plan on for a month from today."
       actions={
         <Link to="/admin" className="text-sm font-semibold">
-          Accounts and plans
+          Plans
         </Link>
       }
     >
       <PaymentList />
+      <PaymentMethodsAdmin />
     </AppPage>
   )
 }
@@ -161,6 +163,7 @@ function PaymentRow({ payment: p, onReviewed }: { payment: AdminPayment; onRevie
         <p className="m-0 text-sm">
           <strong>{formatPrice(p.amount, p.currency)}</strong> for {p.plan.name} · ref <span className="font-semibold select-all">{p.reference_number}</span>
         </p>
+        {p.method_label && <p className="m-0 text-[13px] text-text-2">Paid to {p.method_label}</p>}
         <p className="m-0 text-[13px] text-muted">
           Sent {formatDate(p.submitted_at)}
           {p.submitted_by && p.submitted_by !== p.account.name && ` by ${p.submitted_by}`}
@@ -182,7 +185,8 @@ function PaymentRow({ payment: p, onReviewed }: { payment: AdminPayment; onRevie
         {p.status === 'pending' && mode === 'approve' && (
           <div className="flex flex-col gap-2 rounded-xl border border-line-strong bg-surface-2 p-3">
             <p className="m-0 text-[13px] text-text-2">
-              Did {formatPrice(p.amount, p.currency)} with reference {p.reference_number} reach the bank account? Approving switches {p.account.name} to {p.plan.name}.
+              Did {formatPrice(p.amount, p.currency)} with reference {p.reference_number} reach {p.method_label ?? 'your account'}? Approving switches {p.account.name} to{' '}
+              {p.plan.name}.
             </p>
             <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="primary" loading={busy} onClick={() => act(() => adminApi.approvePayment(p.id), "We couldn't approve the payment.")}>

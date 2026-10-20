@@ -10,8 +10,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Superadmin: payments to check against what was received. Approving a payment puts its
- * plan in force; rejecting it tells the seller why.
+ * Superadmin: payments to check against what reached the payment method. Approving a
+ * payment puts its plan in force; rejecting it tells the seller why.
  */
 class PaymentController extends Controller
 {

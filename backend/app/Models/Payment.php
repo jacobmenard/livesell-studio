@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
- * A seller's payment for a plan (sent from GCash to the business's bank account), waiting
+ * A seller's payment for a plan (sent to one of the superadmin's payment methods), waiting
  * for the superadmin to check the receipt. Approving it puts the plan in force for a month.
  *
  * @property int $id
@@ -17,7 +17,9 @@ use Illuminate\Support\Carbon;
  * @property int $plan_id
  * @property int $amount whole units of $currency, set from the plan's price (never from the seller)
  * @property string $currency
- * @property string $method
+ * @property string $method gcash | maya | bank (gcash_bank for payments made before methods)
+ * @property int|null $payment_method_id null once that method is deleted
+ * @property string|null $method_label where the money went, copied when it was sent
  * @property string $reference_number
  * @property string $proof_path on the private disk
  * @property string $status pending | approved | rejected
@@ -35,13 +37,12 @@ class Payment extends Model
 
     public const REJECTED = 'rejected';
 
-    /** Sent from GCash to a bank account (InstaPay). */
-    public const METHOD_GCASH_BANK = 'gcash_bank';
-
     public const PROOF_DISK = 'local';
 
     protected $attributes = [
         'status' => self::PENDING,
+        'payment_method_id' => null,
+        'method_label' => null,
         'review_note' => null,
         'reviewed_by' => null,
         'reviewed_at' => null,

@@ -1,14 +1,13 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { AppPage } from '../../components/AppPage'
-import { Alert, Button, Spinner, TextField } from '../../components/ui'
+import { Alert, Button, TextField } from '../../components/ui'
 import { errorMessage, fieldErrors } from '../../lib/api'
 import { adminApi } from '../../lib/endpoints'
-import { formatDate } from '../../lib/format'
-import type { AdminAccount, Plan } from '../../lib/types'
+import type { Plan } from '../../lib/types'
 
-/** Superadmin: change an account's plan by hand, edit prices and limits (payments are on /admin/payments). */
+/** Superadmin: what each plan costs and allows (payments, which switch plans on, are on /admin/payments). */
 export function AdminPage() {
   const { user } = useAuth()
   if (user?.role !== 'superadmin') {
@@ -39,14 +38,13 @@ function AdminScreens() {
   return (
     <AppPage
       title="Admin"
-      subtitle="Set an account’s plan by hand, and what each plan costs and allows."
+      subtitle="What each plan costs and allows. Plans switch on when you approve a payment."
       actions={
         <Link to="/admin/payments" className="text-sm font-semibold">
           Review payments
         </Link>
       }
     >
-      <Accounts plans={plans} />
       <section aria-labelledby="plans-h" className="flex flex-col gap-3 rounded-[20px] border border-line bg-surface p-[18px]">
         <h2 id="plans-h" className="m-0 font-display text-xl font-semibold">
           Plans
@@ -57,138 +55,6 @@ function AdminScreens() {
         ))}
       </section>
     </AppPage>
-  )
-}
-
-function Accounts({ plans }: { plans: Plan[] }) {
-  const [search, setSearch] = useState('')
-  // What the list shows. A new object (even with the same values) loads it again.
-  const [request, setRequest] = useState<{ search: string; page: number }>({ search: '', page: 1 })
-  const [rows, setRows] = useState<AdminAccount[] | null>(null)
-  const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
-  const [error, setError] = useState('')
-  const { page } = request
-  // After changing a plan.
-  const reload = useCallback(() => setRequest((r) => ({ ...r })), [])
-  const setPage = (next: number) => setRequest((r) => ({ ...r, page: next }))
-
-  useEffect(() => {
-    let cancelled = false
-    adminApi
-      .accounts(request)
-      .then((result) => {
-        if (cancelled) return
-        setRows(result.data)
-        setMeta(result.meta)
-        setError('')
-      })
-      .catch((e) => !cancelled && setError(errorMessage(e, "We couldn't load the accounts.")))
-    return () => {
-      cancelled = true
-    }
-  }, [request])
-
-  const submitSearch = (e: FormEvent) => {
-    e.preventDefault()
-    setRequest((r) => ({ ...r, search: search.trim(), page: 1 }))
-  }
-
-  return (
-    <section aria-labelledby="accounts-h" className="flex flex-col gap-3 rounded-[20px] border border-line bg-surface p-[18px]">
-      <h2 id="accounts-h" className="m-0 font-display text-xl font-semibold">
-        Accounts
-      </h2>
-      <form role="search" onSubmit={submitSearch} className="flex items-end gap-2">
-        <div className="flex-1">
-          <TextField label="Search by name or email" value={search} maxLength={100} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <Button type="submit">Search</Button>
-      </form>
-
-      {error && <Alert>{error}</Alert>}
-      {rows === null && !error && <Spinner label="Loading accounts…" />}
-      {rows?.length === 0 && <p className="m-0 text-sm text-muted">No accounts match.</p>}
-
-      {rows && rows.length > 0 && (
-        <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
-          {rows.map((a) => (
-            <AccountRow key={a.id} account={a} plans={plans} onChanged={reload} />
-          ))}
-        </ul>
-      )}
-
-      {meta.last_page > 1 && (
-        <div className="flex items-center justify-between gap-2 text-sm">
-          <Button size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
-            Previous
-          </Button>
-          <span className="text-muted">
-            Page {meta.current_page} of {meta.last_page} · {meta.total} accounts
-          </span>
-          <Button size="sm" disabled={page >= meta.last_page} onClick={() => setPage(page + 1)}>
-            Next
-          </Button>
-        </div>
-      )}
-    </section>
-  )
-}
-
-function AccountRow({ account, plans, onChanged }: { account: AdminAccount; plans: Plan[]; onChanged: () => void }) {
-  const [plan, setPlan] = useState(account.plan.code)
-  const [endsAt, setEndsAt] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  // The earliest end date the date picker offers (fixed when the row appears).
-  const [today] = useState(() => new Date().toISOString().slice(0, 10))
-
-  const save = async () => {
-    setBusy(true)
-    setError('')
-    try {
-      await adminApi.setPlan(account.id, { plan, ends_at: endsAt || null })
-      onChanged()
-    } catch (e) {
-      const fields = fieldErrors(e)
-      setError(fields.ends_at ?? fields.plan ?? errorMessage(e, "We couldn't change the plan."))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <li className="flex flex-col gap-2 py-3">
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="font-semibold">{account.name}</span>
-        <span className="text-[13px] text-muted">{account.email}</span>
-        {account.role === 'superadmin' && <span className="rounded-full bg-raised px-2 py-0.5 text-xs font-semibold">Superadmin</span>}
-        <span className="flex-1" />
-        <span className="text-[13px] text-text-2">
-          {account.trial_ends_at ? `Free trial (${account.plan.name}) until ${formatDate(account.trial_ends_at)}` : account.plan.name}
-          {account.ends_at && ` until ${formatDate(account.ends_at)}`} · {account.members} sub-user{account.members === 1 ? '' : 's'}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-end gap-2">
-        <label className="flex flex-col gap-1 text-[13px] text-muted">
-          Plan
-          <select value={plan} onChange={(e) => setPlan(e.target.value)} className="min-h-10 rounded-xl border border-line-strong bg-field px-2.5 text-text">
-            {plans.map((p) => (
-              <option key={p.code} value={p.code}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-[13px] text-muted">
-          Until (optional)
-          <input type="date" min={today} value={endsAt} onChange={(e) => setEndsAt(e.target.value)} className="min-h-10 rounded-xl border border-line-strong bg-field px-2.5 text-text" />
-        </label>
-        <Button size="sm" variant="primary" onClick={save} loading={busy}>
-          Save plan
-        </Button>
-      </div>
-      {error && <Alert>{error}</Alert>}
-    </li>
   )
 }
 

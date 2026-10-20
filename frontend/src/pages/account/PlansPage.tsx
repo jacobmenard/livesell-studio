@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react'
+import { Link } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { AppPage } from '../../components/AppPage'
 import { Icon } from '../../components/Icon'
@@ -67,6 +68,12 @@ export function PlansPage() {
 
           {notice && <Alert tone={notice.tone}>{notice.text}</Alert>}
 
+          {summary.payment_methods.length === 0 && user?.role === 'superadmin' && (
+            <Alert tone="info">
+              Sellers can’t pay for a plan yet. <Link to="/admin/payments">Add a payment method</Link> (GCash, Maya or bank) to turn payments on.
+            </Alert>
+          )}
+
           {owner && (summary.next_payment || summary.payments.length > 0) && (
             <Billing summary={summary} onRenew={(plan) => setPaying({ plan, kind: 'renew' })} />
           )}
@@ -79,7 +86,7 @@ export function PlansPage() {
 
           <p className="m-0 text-[13px] text-muted">
             {owner
-              ? 'Pay by GCash, then send the reference number and a screenshot of the receipt. Your plan starts the day the payment is approved and runs for a month. Renew anytime in the last month; switching plans starts a fresh month (days left aren’t carried over).'
+              ? 'Pay by GCash, Maya or bank transfer, then send the reference number and a screenshot of the receipt. Your plan starts the day the payment is approved and runs for a month. Renew anytime in the last month; switching plans starts a fresh month (days left aren’t carried over).'
               : `Only ${user?.account_name} can change the plan.`}
           </p>
 
@@ -88,6 +95,7 @@ export function PlansPage() {
           {paying && (
             <PayDialog
               plan={paying.plan}
+              methods={summary.payment_methods}
               title={paying.kind === 'renew' ? `Renew ${paying.plan.name}` : `Pay for ${paying.plan.name}`}
               note={payNote(paying, summary)}
               onClose={closeDialog}
@@ -144,11 +152,13 @@ function CurrentPlan({ summary, owner, accountName }: { summary: SubscriptionSum
 function Billing({ summary, onRenew }: { summary: SubscriptionSummary; onRenew: (plan: Plan) => void }) {
   const next = summary.next_payment
   const pending = summary.pending_payment
-  const canRenew = next !== null && !pending && next.renewable_from === null
+  const canPay = summary.payment_methods.length > 0
+  const canRenew = next !== null && !pending && next.renewable_from === null && canPay
 
   let renewHint = 'Renew'
   if (pending) renewHint = 'Payment being checked'
   else if (next?.renewable_from) renewHint = `Renew from ${formatDate(next.renewable_from)}`
+  else if (!canPay) renewHint = 'Payments open soon'
 
   return (
     <section aria-labelledby="billing-h" className="flex flex-col gap-2 rounded-[20px] border border-line bg-surface p-[18px]">
@@ -216,6 +226,7 @@ function PlanAction({ plan, summary, owner, onPay }: { plan: Plan; summary: Subs
   // Free isn't bought: a paid account goes back to it when the paid month ends.
   if (!plan.purchasable) return current ? <Button disabled>Your plan</Button> : null
   if (pending) return <Button disabled>{pending.plan.code === plan.code ? 'Being checked' : marketingFor(plan).cta}</Button>
+  if (summary.payment_methods.length === 0) return <Button disabled>Payments open soon</Button>
 
   if (current) {
     const next = summary.next_payment

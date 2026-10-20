@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Http\Resources\PaymentMethodResource;
 use App\Http\Resources\PaymentResource;
 use App\Http\Resources\PlanResource;
 use App\Models\Payment;
@@ -15,7 +16,7 @@ use Illuminate\Http\Request;
 
 /**
  * The account's plan: what it has (or the free trial and when it ends), what is in use, the
- * next month's payment (renewal), and the payments sent so far (owner only).
+ * ways to pay, the next month's payment (renewal), and the payments sent so far (owner only).
  */
 class SubscriptionController extends Controller
 {
@@ -58,6 +59,8 @@ class SubscriptionController extends Controller
             'trial_ends_at' => ! $current && $account->onTrial() ? $account->trial_ends_at?->toIso8601String() : null,
             'usage' => $this->subscriptions->usage($account),
             'plans' => PlanResource::collection(Plan::query()->ordered()->get()),
+            // Empty until the superadmin adds one: plans can't be paid for yet.
+            'payment_methods' => PaymentMethodResource::collection($this->payments->methods()),
             'pending_payment' => $pending ? new PaymentResource($pending) : null,
             'next_payment' => $nextPayment,
             'payments' => $isOwner

@@ -72,20 +72,14 @@ class SubscriptionTest extends TestCase
         $this->assertSame(now()->addDays(7)->toIso8601String(), $trialEndsAt?->toIso8601String());
     }
 
-    public function test_the_superadmin_sees_the_trial_and_setting_a_plan_ends_it(): void
+    public function test_putting_a_plan_in_place_ends_the_trial(): void
     {
         $seller = User::factory()->create();
         $seller->forceFill(['trial_ends_at' => now()->addDays(3)])->save();
-        $admin = $this->admin();
 
-        // Newest first: the admin, then the seller.
-        $this->actingAs($admin)->getJson('/api/admin/accounts')
-            ->assertJsonPath('data.1.email', $seller->email)
-            ->assertJsonPath('data.1.plan.code', 'solo')
-            ->assertJsonPath('data.1.trial_ends_at', now()->addDays(3)->toIso8601String());
+        app(Subscriptions::class)->apply($seller, Plan::query()->where('code', 'team')->firstOrFail(), null);
 
-        $this->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team', 'ends_at' => null])
-            ->assertOk()
+        $this->actingAs($seller)->getJson('/api/subscription')
             ->assertJsonPath('data.plan.code', 'team')
             ->assertJsonPath('data.trial_ends_at', null);
         $this->assertNull($seller->fresh()->trial_ends_at);
@@ -123,20 +117,24 @@ class SubscriptionTest extends TestCase
             ->assertJsonPath('data.*.max_subusers', [0, 0, 1, 3]);
     }
 
-    public function test_the_superadmin_sets_a_plan_by_hand_and_a_plan_with_an_end_date_runs_out(): void
+    public function test_a_plan_with_an_end_date_runs_out(): void
     {
         $seller = User::factory()->create();
+        app(Subscriptions::class)->apply($seller, Plan::query()->where('code', 'duo')->firstOrFail(), now()->addMonth());
 
-        $endsAt = now()->addMonth()->toDateString();
-        $this->actingAs($this->admin())->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'duo', 'ends_at' => $endsAt])
-            ->assertOk()
-            ->assertJsonPath('data.plan.code', 'duo');
-
-        $this->flushSession();
         $this->actingAs($seller)->getJson('/api/subscription')->assertJsonPath('data.plan.code', 'duo');
 
         $this->travel(32)->days();
         $this->actingAs($seller)->getJson('/api/subscription')->assertJsonPath('data.plan.code', 'trial');
+    }
+
+    public function test_plans_cannot_be_set_by_hand_any_more(): void
+    {
+        $seller = User::factory()->create();
+
+        $this->actingAs($this->admin())->getJson('/api/admin/accounts')->assertNotFound();
+        $this->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team', 'ends_at' => null])->assertNotFound();
+        $this->assertNull($seller->subscription()->first());
     }
 
     public function test_only_the_superadmin_reaches_the_admin_screens(): void
@@ -144,8 +142,7 @@ class SubscriptionTest extends TestCase
         $seller = User::factory()->create();
         $plan = Plan::query()->where('code', 'duo')->firstOrFail();
 
-        $this->actingAs($seller)->getJson('/api/admin/accounts')->assertForbidden();
-        $this->actingAs($seller)->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team'])->assertForbidden();
+        $this->actingAs($seller)->getJson('/api/admin/plans')->assertForbidden();
         $this->actingAs($seller)->putJson("/api/admin/plans/{$plan->id}", ['name' => 'Free', 'price_monthly' => 0, 'max_subusers' => 9, 'max_live_setups' => 9])->assertForbidden();
     }
 

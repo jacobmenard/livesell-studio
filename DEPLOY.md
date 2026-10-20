@@ -189,8 +189,9 @@ Your site → **Cron Jobs** → **Add Cron Job**: every minute (`* * * * *`), co
 ## 12. Check that everything works
 
 1. Open `https://APP_DOMAIN` and log in with your superadmin email and password.
-2. Sign up a test seller in a private window: their **Plan** page shows the free week, and
-   choosing a plan sends a payment to your **Payments** page to approve.
+2. **Payments** → **Payment methods**: add your GCash, Maya or bank account. Then sign up a
+   test seller in a private window: their **Plan** page shows the free week, and paying for a
+   plan sends the receipt to your **Payments** page to approve.
 3. Open a setup → turn on the camera → tap a popup: it should appear on the clean screen at once
    (that's Reverb working).
 4. **Go live → Stream straight**: save a stream key and start a short test live.
