@@ -7,7 +7,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
-/** Tells the superadmin a seller sent a payment to check. */
+/** Tells the superadmin (and the business inbox) a seller sent a payment to check. */
 class PaymentSubmitted extends Notification
 {
     use Queueable;
@@ -25,12 +25,17 @@ class PaymentSubmitted extends Notification
         $payment = $this->payment;
         $amount = $payment->currency.' '.number_format($payment->amount);
 
-        return (new MailMessage)
+        $message = (new MailMessage)
             ->subject("Payment to check: {$amount} for {$payment->plan->name}")
             ->line("{$payment->account->name} ({$payment->account->email}) paid for the {$payment->plan->name} plan.")
-            ->line("Amount: {$amount}")
+            ->line("Amount: {$amount}");
+        if ($payment->method_label) {
+            $message->line("Paid to: {$payment->method_label}");
+        }
+
+        return $message
             ->line("Reference number: {$payment->reference_number}")
-            ->line('Check the receipt against your bank account before approving it.')
+            ->line('Check that the money reached that account before approving it.')
             ->action('Review payments', rtrim((string) config('livesell.frontend_url'), '/').'/admin/payments');
     }
 }

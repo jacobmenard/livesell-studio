@@ -137,8 +137,10 @@ and the superadmin checks each payment:
    copy of where it was sent, even if the method is edited or deleted later.
    The amount always comes from the plan, and receipts are stored on the private disk
    (`storage/app/private/payment-proofs`), shown only to the account owner and the superadmin.
-3. The superadmin gets an email and a badge on **Payments**, checks the receipt against what
-   reached that account, then **Approves** (the plan runs one month from the approval date and any
+3. The seller gets a "we received your payment" email. The superadmin, and the business
+   inbox in `LIVESELL_PAYMENTS_EMAIL` (e.g. support@), get an email and a badge on
+   **Payments**; the superadmin checks the receipt against what reached that account, then
+   **Approves** (the plan runs one month from the approval date and any
    free week ends) or **Rejects** with a reason the seller sees. The seller gets an email
    either way.
 4. Renewing: the Plan page shows the next month as a row to click. It can be paid anytime in

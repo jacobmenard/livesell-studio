@@ -7,6 +7,7 @@ use App\Models\Payment;
 use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\User;
+use App\Notifications\PaymentReceived;
 use App\Notifications\PaymentReviewed;
 use App\Notifications\PaymentSubmitted;
 use App\Services\Subscriptions;
@@ -101,6 +102,53 @@ class PaymentTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.id', $id)
             ->assertJsonPath('data.0.account.email', $seller->email);
+    }
+
+    public function test_sending_a_payment_emails_the_seller_and_the_business_inbox(): void
+    {
+        config(['livesell.payments_email' => 'support@negosyoworks.test', 'mail.from.address' => 'no-reply@negosyoworks.test']);
+        $admin = $this->admin();
+        $seller = User::factory()->create();
+
+        $this->pay($seller, 'solo', 'REF200001')->assertCreated();
+
+        // The seller: their payment arrived and is being checked.
+        Notification::assertSentTo($seller, PaymentReceived::class, function (PaymentReceived $n) use ($seller): bool {
+            $mail = $n->toMail($seller);
+            $text = implode("\n", $mail->introLines);
+
+            return str_contains($mail->subject, 'Solo')
+                && str_contains($text, 'PHP 299')
+                && str_contains($text, 'REF200001')
+                && str_contains($text, 'GCash · 0917 123 4567 · Test Business')
+                && $mail->replyTo === [['support@negosyoworks.test', null]];
+        });
+
+        // The superadmin account and the business inbox: a payment to check.
+        Notification::assertSentTo($admin, PaymentSubmitted::class);
+        Notification::assertSentOnDemand(PaymentSubmitted::class, fn ($n, array $channels, object $notifiable): bool => $notifiable->routes['mail'] === 'support@negosyoworks.test');
+        Notification::assertNotSentTo($seller, PaymentSubmitted::class);
+    }
+
+    public function test_the_business_inbox_gets_one_email_when_a_superadmin_already_uses_it(): void
+    {
+        config(['livesell.payments_email' => 'Support@negosyoworks.test']);
+        $admin = $this->admin();
+        $admin->forceFill(['email' => 'support@negosyoworks.test'])->save();
+
+        $this->pay(User::factory()->create(), 'solo', 'REF200002')->assertCreated();
+
+        Notification::assertSentTo($admin, PaymentSubmitted::class);
+        Notification::assertSentOnDemandTimes(PaymentSubmitted::class, 0);
+    }
+
+    public function test_a_mail_server_failure_does_not_lose_the_payment(): void
+    {
+        Notification::shouldReceive('send')->andThrow(new \RuntimeException('SMTP down'));
+        Notification::shouldReceive('route')->andReturnUsing(fn () => new \Illuminate\Notifications\AnonymousNotifiable);
+
+        $this->pay(User::factory()->create(), 'solo', 'REF200003')->assertCreated();
+        $this->assertSame(1, Payment::query()->count());
     }
 
     public function test_bad_submissions_are_refused(): void

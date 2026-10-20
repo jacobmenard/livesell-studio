@@ -7,6 +7,7 @@ use App\Models\PaymentMethod;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\User;
+use App\Notifications\PaymentReceived;
 use App\Notifications\PaymentReviewed;
 use App\Notifications\PaymentSubmitted;
 use Illuminate\Http\UploadedFile;
@@ -104,7 +105,8 @@ final class Payments
         }
 
         $payment->setRelation('plan', $plan)->setRelation('account', $account);
-        $this->notify(User::query()->where('role', 'superadmin')->get(), new PaymentSubmitted($payment));
+        $this->notify($account, new PaymentReceived($payment));
+        $this->notifyAdmins($payment);
 
         return $payment;
     }
@@ -217,6 +219,18 @@ final class Payments
      *
      * @param  mixed  $notifiables
      */
+    private function notifyAdmins(Payment $payment): void
+    {
+        $admins = User::query()->where('role', 'superadmin')->get();
+        $this->notify($admins, new PaymentSubmitted($payment));
+
+        // The business inbox too (e.g. support@), unless a superadmin account already uses it.
+        $inbox = trim((string) config('livesell.payments_email'));
+        if ($inbox !== '' && ! $admins->contains(fn (User $admin): bool => strcasecmp($admin->email, $inbox) === 0)) {
+            $this->notify(Notification::route('mail', $inbox), new PaymentSubmitted($payment));
+        }
+    }
+
     private function notify($notifiables, object $notification): void
     {
         try {

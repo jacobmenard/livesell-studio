@@ -41,6 +41,13 @@ return [
     'broadcast_ticket_ttl' => (int) env('LIVESELL_BROADCAST_TICKET_TTL', 60),
 
     /*
+    | The business inbox (e.g. support@yourdomain): it gets an email for every payment to
+    | check, and sellers' replies to payment emails go there (they are sent from the
+    | MAIL_FROM_ADDRESS, e.g. a no-reply address). Empty: superadmin accounts only.
+    */
+    'payments_email' => env('LIVESELL_PAYMENTS_EMAIL'),
+
+    /*
     | The superadmin account made by SuperAdminSeeder. Leave the password empty locally
     | to have one generated and printed; production refuses to seed without one.
     */
