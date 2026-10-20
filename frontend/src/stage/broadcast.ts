@@ -1,7 +1,7 @@
 import { errorMessage } from '../lib/api'
 import { broadcastApi } from '../lib/endpoints'
 import type { Orientation, Platform, Resolution } from '../lib/types'
-import { routeSoundsToLive, soundContext } from './sounds'
+import { routeSoundsToLive, soundContext, unlockAudio } from './sounds'
 
 /**
  * Streaming straight to Facebook / YouTube. Browsers can't speak RTMP, so the clean
@@ -39,6 +39,8 @@ export function pickMimeType(isSupported: (type: string) => boolean): string | n
 
 // Small chunks keep the relay (and so the platform) close behind the picture.
 const CHUNK_MS = 250
+// No recorded data this long after recording starts: something stopped it (see record()).
+const NO_RECORDING_MS = 10_000
 // If sending to the relay backs up this far (≈ 10 s of video), stop rather than fall ever further behind.
 const MAX_BUFFERED_BYTES = 12 * 1024 * 1024
 
@@ -69,11 +71,16 @@ export interface BroadcastOptions extends BroadcastTarget {
  * Returns a function that stops the live (safe to call at any point, even mid-start).
  */
 export function startBroadcast(options: BroadcastOptions): () => void {
+  // The live's sound is mixed on the sound engine, and Chrome only lets it start during a
+  // click: now, before the share-this-tab picker uses that click up. While it's suspended,
+  // Chrome's recorder waits for sound and records nothing at all (no video either).
+  unlockAudio()
   let finished = false
   let capture: MediaStream | null = null
   let socket: WebSocket | null = null
   let recorder: MediaRecorder | null = null
   let voiceSource: MediaStreamAudioSourceNode | null = null
+  let silence: ConstantSourceNode | null = null
   // Only closed when this live made its own (the shared sound engine stays open).
   let ownMixer: AudioContext | null = null
 
@@ -88,6 +95,8 @@ export function startBroadcast(options: BroadcastOptions): () => void {
     capture?.getTracks().forEach((t) => t.stop())
     routeSoundsToLive(null)
     voiceSource?.disconnect()
+    silence?.stop()
+    silence?.disconnect()
     void ownMixer?.close()
     if (socket && socket.readyState <= WebSocket.OPEN) socket.close(1000)
   }
@@ -158,8 +167,23 @@ export function startBroadcast(options: BroadcastOptions): () => void {
     const shared = soundContext()
     const mixer = shared ?? new AudioContext()
     if (!shared) ownMixer = mixer
-    void mixer.resume()
+    if (mixer.state !== 'running') {
+      // A resume Chrome doesn't allow stays pending, so don't wait for it forever.
+      await Promise.race([mixer.resume(), new Promise((resolve) => setTimeout(resolve, 2000))])
+    }
+    if (finished) return release()
+    if (mixer.state !== 'running') {
+      return fail('Chrome didn’t let the live’s sound start, so nothing could be recorded. Click Start streaming again.')
+    }
     const bus = mixer.createMediaStreamDestination()
+    // A steady silent signal under everything. With nothing else in the mix (camera sound off,
+    // no effect played yet) the sound track carries no audio at all, and Chrome's recorder then
+    // waits for it and records nothing, not even the picture: the relay got no video.
+    silence = mixer.createConstantSource()
+    const mute = mixer.createGain()
+    mute.gain.value = 0
+    silence.connect(mute).connect(bus)
+    silence.start()
     if (voice.length > 0) {
       voiceSource = mixer.createMediaStreamSource(new MediaStream(voice))
       voiceSource.connect(bus)
@@ -187,7 +211,13 @@ export function startBroadcast(options: BroadcastOptions): () => void {
 
     const record = () => {
       recorder = new MediaRecorder(media, { mimeType, videoBitsPerSecond: 8_000_000, audioBitsPerSecond: 128_000 })
+      // Recording normally starts within a second; never wait silently for a live that isn't coming.
+      let recording = false
+      window.setTimeout(() => {
+        if (!recording && !finished) fail('Nothing was recorded from this window. Keep it open and in front, then click Start streaming again.')
+      }, NO_RECORDING_MS)
       recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recording = true
         if (event.data.size === 0 || ws.readyState !== WebSocket.OPEN) return
         if (ws.bufferedAmount > MAX_BUFFERED_BYTES) {
           fail('This computer can’t keep up with streaming. Close other apps or choose 720p, then try again.')

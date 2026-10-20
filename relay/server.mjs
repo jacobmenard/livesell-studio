@@ -27,6 +27,9 @@ const FFMPEG = process.env.FFMPEG_PATH || 'ffmpeg'
 const RETRY_DELAYS_MS = [3000, 6000, 10000]
 // Video kept for a retry while waiting (≈ 60 s at the browser's 8 Mbit/s).
 const MAX_BACKLOG_BYTES = 64 * 1024 * 1024
+// No video from the browser this long after asking for it: stop, instead of keeping an idle
+// FFmpeg (and a seller waiting) forever.
+const NO_DATA_MS = 20_000
 
 if (!SECRET) {
   console.error('[relay] RELAY_SECRET is not set. Copy .env.example to .env and use the same value as backend/.env.')
@@ -81,6 +84,8 @@ async function handleLive(ws, ticket) {
   let stopping = false
   let attempt = 0
   let retryTimer
+  let noDataTimer
+  let received = false // any video from the browser yet
   // Everything recorded until the platform accepts the stream, so a retry can start the
   // video from its beginning (FFmpeg needs the WebM header). Dropped once live.
   let backlog = []
@@ -129,7 +134,14 @@ async function handleLive(ws, ticket) {
       console.log(`[relay] starting: ${label}${attempt > 1 ? ` (try ${attempt} of ${attempts})` : ''}`)
       for (const chunk of backlog) proc.stdin.write(chunk)
       accepting = true
-      if (attempt === 1) send('ready')
+      if (attempt === 1) {
+        send('ready')
+        noDataTimer = setTimeout(() => {
+          if (received || stopping) return
+          console.log(`[relay] no video from the browser after ${NO_DATA_MS / 1000} s: ${label}`)
+          fail('No video reached the streaming server. Keep the clean-screen window open and in front, then click Start streaming again.')
+        }, NO_DATA_MS)
+      }
     })
 
     proc.on('close', (code) => {
@@ -158,6 +170,7 @@ async function handleLive(ws, ticket) {
 
   ws.on('message', (data, isBinary) => {
     if (!isBinary || stopping) return
+    received = true
     if (!live) {
       backlog.push(data)
       backlogBytes += data.length
@@ -169,6 +182,7 @@ async function handleLive(ws, ticket) {
   ws.on('close', () => {
     stopping = true
     clearTimeout(retryTimer)
+    clearTimeout(noDataTimer)
     backlog = []
     if (!ffmpeg || ffmpeg.exitCode !== null) return
     // Ending stdin lets FFmpeg flush and close the stream cleanly; force it after 5 s.
