@@ -32,6 +32,14 @@ return [
     'trial_plan' => env('LIVESELL_TRIAL_PLAN', 'solo'),
 
     /*
+    | "Ending soon" emails (plans:send-reminders): this many days before a paid plan or the
+    | free trial ends. Each is sent once, between 8 am and 8 pm (APP_TIMEZONE).
+    */
+    'plan_reminder_days' => (int) env('LIVESELL_PLAN_REMINDER_DAYS', 3),
+
+    'trial_reminder_days' => (int) env('LIVESELL_TRIAL_REMINDER_DAYS', 2),
+
+    /*
     | Streaming straight to Facebook / YouTube goes through the local relay (relay/),
     | which swaps a one-time ticket for the saved server and key. The relay must use the
     | same secret; leave it empty to turn direct streaming off.

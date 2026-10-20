@@ -172,4 +172,33 @@ class SubscriptionTest extends TestCase
         $this->actingAs($member)->getJson('/api/subscription')->assertOk()->assertJsonPath('data.plan.code', 'trial');
         $this->actingAs($member)->post('/api/payments', ['plan' => 'team'], ['Accept' => 'application/json'])->assertForbidden();
     }
+
+    public function test_when_a_plan_runs_out_the_hourly_check_pauses_sub_users_beyond_its_seats(): void
+    {
+        $owner = User::factory()->create();
+        app(Subscriptions::class)->apply($owner, Plan::query()->where('code', 'duo')->firstOrFail(), now()->addMonth());
+        $member = $this->member($owner);
+        $soloOwner = User::factory()->create(); // no team: nothing to do
+
+        // Still paid: the member keeps their seat.
+        $this->artisan('plans:fit-seats')->assertSuccessful();
+        $this->assertNull($member->fresh()->deactivated_at);
+
+        // The month ran out (nobody changed the plan): Free has no seats.
+        $this->travel(32)->days();
+        $this->artisan('plans:fit-seats')->expectsOutput('Checked 1 team.')->assertSuccessful();
+        $this->assertNotNull($member->fresh()->deactivated_at);
+        $this->actingAs($member->fresh())->getJson('/api/auth/me')->assertForbidden();
+
+        // Paying again brings them back.
+        $this->flushSession();
+        app(Subscriptions::class)->apply($owner, Plan::query()->where('code', 'duo')->firstOrFail(), now()->addMonth());
+        $this->assertNull($member->fresh()->deactivated_at);
+        $this->assertNull($soloOwner->fresh()->deactivated_at);
+    }
+
+    public function test_the_seat_check_runs_every_hour(): void
+    {
+        $this->artisan('schedule:list')->expectsOutputToContain('plans:fit-seats')->assertSuccessful();
+    }
 }

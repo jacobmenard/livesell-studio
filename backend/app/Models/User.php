@@ -40,6 +40,7 @@ class User extends Authenticatable
         'owner_id' => null,
         'deactivated_at' => null,
         'trial_ends_at' => null,
+        'trial_reminded_at' => null,
         'completed_tours' => null,
     ];
 
@@ -52,6 +53,7 @@ class User extends Authenticatable
             'owner_id' => 'integer',
             'deactivated_at' => 'datetime',
             'trial_ends_at' => 'datetime',
+            'trial_reminded_at' => 'datetime',
             'completed_tours' => 'array',
         ];
     }

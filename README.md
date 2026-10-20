@@ -143,7 +143,12 @@ and the superadmin checks each payment:
    **Approves** (the plan runs one month from the approval date and any
    free week ends) or **Rejects** with a reason the seller sees. The seller gets an email
    either way.
-4. Renewing: the Plan page shows the next month as a row to click. It can be paid anytime in
+4. Reminders: 3 days before a paid plan ends and 2 days before the free week ends, the
+   owner gets an "ends soon" email (`LIVESELL_PLAN_REMINDER_DAYS`,
+   `LIVESELL_TRIAL_REMINDER_DAYS`), once each and not while a payment is being checked. This
+   and pausing sub-users when a plan runs out need the scheduler (`php artisan schedule:run`
+   every minute; DEPLOY.md step 11).
+5. Renewing: the Plan page shows the next month as a row to click. It can be paid anytime in
    the last month of the current one, and adds a month after it (never more than one ahead).
    Switching to another plan starts a fresh month on approval; days left aren't carried over.
 

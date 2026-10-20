@@ -186,6 +186,12 @@ Your site → **Cron Jobs** → **Add Cron Job**: every minute (`* * * * *`), co
 /usr/bin/php8.4 /home/SITE_USER/htdocs/DOMAIN/backend/artisan schedule:run >> /dev/null 2>&1
 ```
 
+It runs Laravel's scheduled jobs: hourly, it pauses sub-users when a team's plan ran out
+(plans and free trials themselves end on their own) and, between 8 am and 8 pm, emails
+"your plan / free trial ends soon" reminders (once each); daily, it clears old password-reset
+links.
+Check it with `php8.4 artisan schedule:list` in the `backend` folder.
+
 ## 12. Check that everything works
 
 1. Open `https://APP_DOMAIN` and log in with your superadmin email and password.

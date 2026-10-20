@@ -13,18 +13,21 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property int $plan_id
  * @property Carbon|null $ends_at null = no end date (set by the superadmin)
+ * @property Carbon|null $reminded_ends_at the end date an "ending soon" email was sent for
  */
 class Subscription extends Model
 {
     // Read before a reload on new models too (models are strict outside production).
     protected $attributes = [
         'ends_at' => null,
+        'reminded_ends_at' => null,
     ];
 
     protected function casts(): array
     {
         return [
             'ends_at' => 'datetime',
+            'reminded_ends_at' => 'datetime',
         ];
     }
 
