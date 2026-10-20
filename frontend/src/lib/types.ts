@@ -142,6 +142,21 @@ export interface User {
   account_name: string
   /** Walkthroughs already finished or skipped (they start once, on first visit). */
   completed_tours: TourName[]
+  /** The superadmin's name while they're signed in as this owner (impersonation), else null. */
+  impersonated_by: string | null
+}
+
+/** A seller account owner, on the superadmin's Admin page. */
+export interface AdminAccount {
+  id: number
+  name: string
+  email: string
+  plan: Plan
+  ends_at: string | null
+  /** Set while the account is in its free week. */
+  trial_ends_at: string | null
+  members: number
+  joined_at: string | null
 }
 
 export type TourName = 'dashboard' | 'editor'

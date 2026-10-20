@@ -1,5 +1,6 @@
 import { http } from './api'
 import type {
+  AdminAccount,
   AdminPayment,
   Destination,
   MediaItem,
@@ -41,6 +42,8 @@ export const authApi = {
   saveTheme: (theme: ThemePref) =>
     http.patch<Wrapped<User>>('/api/me/preferences', { theme }).then((r) => r.data.data),
   completeTour: (tour: TourName) => http.put<Wrapped<User>>(`/api/me/tours/${tour}`).then((r) => r.data.data),
+  /** The superadmin, signed in as an owner, goes back to their own account. */
+  stopImpersonating: () => http.post<Wrapped<User>>('/api/auth/impersonation/stop').then((r) => r.data.data),
 }
 
 export const setupsApi = {
@@ -128,6 +131,12 @@ export const teamApi = {
 }
 
 export const adminApi = {
+  accounts: (params: { search: string; page: number }) =>
+    http
+      .get<{ data: AdminAccount[]; meta: { current_page: number; last_page: number; total: number } }>('/api/admin/accounts', { params })
+      .then((r) => r.data),
+  /** Signs the superadmin in as this account owner. */
+  impersonate: (accountId: number) => http.post<Wrapped<User>>(`/api/admin/accounts/${accountId}/impersonate`).then((r) => r.data.data),
   plans: () => http.get<Wrapped<Plan[]>>('/api/admin/plans').then((r) => r.data.data),
   updatePlan: (planId: number, body: Pick<Plan, 'name' | 'price_monthly' | 'max_subusers' | 'max_live_setups'>) =>
     http.put<Wrapped<Plan>>(`/api/admin/plans/${planId}`, body).then((r) => r.data.data),

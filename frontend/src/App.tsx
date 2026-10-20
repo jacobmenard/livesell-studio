@@ -1,5 +1,6 @@
 import { Navigate, Outlet, createBrowserRouter, useLocation } from 'react-router'
 import { useAuth } from './auth/AuthProvider'
+import { ImpersonationBanner } from './components/ImpersonationBanner'
 import { RouteError } from './components/RouteError'
 import { Spinner } from './components/ui'
 import { DashboardPage } from './pages/DashboardPage'
@@ -29,7 +30,14 @@ function RequireAuth() {
     )
   }
   if (state.status === 'guest') return <Navigate to="/login" replace state={{ from: location.pathname }} />
-  return <Outlet />
+  // Never on the clean screen: OBS / TikTok LIVE Studio would capture it.
+  const cleanScreen = location.pathname.endsWith('/screen')
+  return (
+    <>
+      {!cleanScreen && <ImpersonationBanner />}
+      <Outlet />
+    </>
+  )
 }
 
 function GuestOnly() {

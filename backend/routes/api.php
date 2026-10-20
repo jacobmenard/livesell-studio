@@ -1,11 +1,13 @@
 <?php
 
+use App\Http\Controllers\Api\Admin\AccountController as AdminAccountController;
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastController;
 use App\Http\Controllers\Api\DestinationController;
+use App\Http\Controllers\Api\ImpersonationController;
 use App\Http\Controllers\Api\LiveSessionController;
 use App\Http\Controllers\Api\MediaController;
 use App\Http\Controllers\Api\OutputController;
@@ -36,6 +38,8 @@ Route::prefix('auth')->group(function () {
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me'])->middleware('account.active');
         Route::post('logout', [AuthController::class, 'logout']);
+        // The superadmin, signed in as an owner, goes back to their own account.
+        Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])->middleware('throttle:api');
     });
 });
 
@@ -85,6 +89,8 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::post('payments/{payment}/approve', [AdminPaymentController::class, 'approve']);
         Route::post('payments/{payment}/reject', [AdminPaymentController::class, 'reject']);
         Route::apiResource('payment-methods', AdminPaymentMethodController::class)->except('show');
+        Route::get('accounts', [AdminAccountController::class, 'index']);
+        Route::post('accounts/{account}/impersonate', [AdminAccountController::class, 'impersonate']);
         Route::get('plans', [AdminPlanController::class, 'index']);
         Route::put('plans/{plan}', [AdminPlanController::class, 'update']);
     });

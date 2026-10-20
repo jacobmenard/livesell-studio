@@ -132,8 +132,8 @@ class SubscriptionTest extends TestCase
     {
         $seller = User::factory()->create();
 
-        $this->actingAs($this->admin())->getJson('/api/admin/accounts')->assertNotFound();
-        $this->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team', 'ends_at' => null])->assertNotFound();
+        // The account list is read only: plans change through approved payments.
+        $this->actingAs($this->admin())->putJson("/api/admin/accounts/{$seller->id}/plan", ['plan' => 'team', 'ends_at' => null])->assertNotFound();
         $this->assertNull($seller->subscription()->first());
     }
 

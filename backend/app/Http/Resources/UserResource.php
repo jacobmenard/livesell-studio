@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Models\User;
+use App\Services\Impersonation;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,6 +23,8 @@ class UserResource extends JsonResource
             // A team member works in the owner's account (setups, uploads, plan).
             'is_subuser' => $this->isSubUser(),
             'account_name' => $this->accountOwner()->name,
+            // The superadmin's name while they're signed in as this owner (the app shows a banner).
+            'impersonated_by' => app(Impersonation::class)->impersonatorName($request),
         ];
     }
 }

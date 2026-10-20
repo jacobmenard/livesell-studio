@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Resources\UserResource;
 use App\Models\User;
+use App\Services\Impersonation;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
@@ -23,6 +24,8 @@ use Illuminate\Validation\ValidationException;
  */
 class AuthController extends Controller
 {
+    public function __construct(private readonly Impersonation $impersonation) {}
+
     public function register(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -44,6 +47,7 @@ class AuthController extends Controller
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
+        $this->impersonation->forget($request);
 
         return (new UserResource($user))->response()->setStatusCode(201);
     }
@@ -79,6 +83,7 @@ class AuthController extends Controller
         }
 
         $request->session()->regenerate();
+        $this->impersonation->forget($request);
 
         return new UserResource($user);
     }

@@ -101,7 +101,7 @@ async function handleLive(ws, ticket) {
     let errorTail = []
 
     proc.on('error', (error) => {
-      console.error(`[relay] FFmpeg could not start at "${FFMPEG}": ${error.message}. Install it (apt install ffmpeg) or fix FFMPEG_PATH in relay/.env, then restart the relay.`)
+        console.error(`[relay] FFmpeg could not start at "${FFMPEG}": ${error.message}. Install it (apt install ffmpeg) or fix FFMPEG_PATH in relay/.env, then restart the relay.`)
       // Shown to the seller, but only the server's admin can fix it.
       fail(
         error.code === 'ENOENT'
