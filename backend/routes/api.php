@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\DestinationController;
 use App\Http\Controllers\Api\ImpersonationController;
 use App\Http\Controllers\Api\LiveSessionController;
 use App\Http\Controllers\Api\MediaController;
+use App\Http\Controllers\Api\MobileAuthController;
 use App\Http\Controllers\Api\OutputController;
 use App\Http\Controllers\Api\OutputLinkController;
 use App\Http\Controllers\Api\PaymentController;
@@ -41,6 +42,16 @@ Route::prefix('auth')->group(function () {
         // The superadmin, signed in as an owner, goes back to their own account.
         Route::post('impersonation/stop', [ImpersonationController::class, 'stop'])->middleware('throttle:api');
     });
+});
+
+// The Android app signs in with a bearer token instead of the cookie session (same rate limits).
+// "me" for the app is GET /api/auth/me above: auth:sanctum accepts the token there too.
+Route::prefix('mobile')->group(function () {
+    Route::post('login', [MobileAuthController::class, 'login'])->middleware('throttle:login');
+    Route::post('register', [MobileAuthController::class, 'register'])->middleware('throttle:register');
+    Route::post('logout', [MobileAuthController::class, 'logout'])->middleware('auth:sanctum');
+    // The newest APK on the website (no login: the app checks before and after sign-in).
+    Route::get('version', [MobileAuthController::class, 'version'])->middleware('throttle:60,1');
 });
 
 Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(function () {

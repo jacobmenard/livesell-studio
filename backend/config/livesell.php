@@ -62,6 +62,24 @@ return [
     'payment_alert_emails' => array_values(array_filter(array_map('trim', explode(',', (string) env('LIVESELL_PAYMENT_ALERT_EMAILS', ''))))),
 
     /*
+    | The Android app (mobile/), shipped as an APK from your website rather than Google Play.
+    | The app reads these from GET /api/mobile/version: when its own versionCode is below
+    | `version_code` it offers the download; below `min_version_code` it must update first
+    | (raise that only when an API change would break older apps). The APK must be signed with
+    | the same key every time, or phones refuse to install the update.
+    */
+    'android_app' => [
+        'version_code' => (int) env('ANDROID_APP_VERSION_CODE', 1),
+        'version_name' => env('ANDROID_APP_VERSION_NAME', '1.0.0'),
+        'min_version_code' => (int) env('ANDROID_APP_MIN_VERSION_CODE', 1),
+        // An https link to the .apk on your site, e.g. https://negosyowork.ph/app/negosyowork-studio.apk
+        'apk_url' => env('ANDROID_APP_APK_URL'),
+        'size_mb' => env('ANDROID_APP_SIZE_MB') !== null ? (float) env('ANDROID_APP_SIZE_MB') : null,
+        // What changed, one line per item separated by "|".
+        'notes' => array_values(array_filter(array_map('trim', explode('|', (string) env('ANDROID_APP_NOTES', ''))))),
+    ],
+
+    /*
     | The superadmin account made by SuperAdminSeeder. Leave the password empty locally
     | to have one generated and printed; production refuses to seed without one.
     */

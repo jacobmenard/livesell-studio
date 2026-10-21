@@ -5,6 +5,7 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -19,8 +20,13 @@ class EnsureAccountIsActive
     {
         $user = $request->user();
         if ($user !== null && $user->isDeactivated()) {
-            Auth::guard('web')->logout();
+            $token = $user->currentAccessToken();
+            if ($token instanceof PersonalAccessToken) {
+                // The Android app: every phone of this member is signed out, not only this one.
+                $user->tokens()->delete();
+            }
             if ($request->hasSession()) {
+                Auth::guard('web')->logout();
                 $request->session()->invalidate();
                 $request->session()->regenerateToken();
             }
