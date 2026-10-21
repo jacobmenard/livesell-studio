@@ -9,7 +9,8 @@ This repository turns the NegosyoWork Studio design prototype into a working web
 | Part | Stack |
 | --- | --- |
 | `frontend/` | React 19 + TypeScript, Vite 8, Tailwind CSS 4, React Router 7, Laravel Echo + Pusher JS, MediaPipe (background removal) — **Node 22.13.1** |
-| `backend/` | Laravel 12 (PHP 8.2+), Sanctum (cookie sessions + CSRF), Reverb (WebSockets) |
+| `backend/` | Laravel 12 (PHP 8.2+), Sanctum (cookie sessions + CSRF for the website, bearer tokens for the Android app), Reverb (WebSockets) |
+| `mobile/` | Android app: React Native 0.88 + Expo SDK 58, Expo Router, a Kotlin streaming module (RootEncoder) — see **[mobile/README.md](mobile/README.md)** |
 | Database | MySQL 8 |
 
 ## What works
@@ -233,6 +234,10 @@ npm test                        # node --test
 - Clean-screen tokens: 48 random characters, stored as SHA-256 only, read-only, and each
   link can join only its own private channel.
 - Stream keys: `encrypted` cast at rest, hidden from serialization, only a hint returned.
+- Android app: signs in at `/api/mobile/login` for a Sanctum token (90 days, newest 5 phones
+  kept, only its SHA-256 stored), kept in the phone's Keystore-backed secure storage. Logging
+  out, a password reset or a paused team seat turns the token off. The app's stream keys
+  never reach the server, and video goes from the phone straight to the platform.
 
 ## Production checklist
 
