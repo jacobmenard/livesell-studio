@@ -63,8 +63,10 @@ export const mediaApi = {
     body.append('kind', kind)
     // React Native's FormData takes { uri, name, type } for a file on the phone.
     body.append('file', file as unknown as Blob)
-    return request<Wrapped<MediaItem>>('/api/media', { method: 'POST', body, timeoutMs: 60_000 }).then((r) => r.data)
+    // Up to 5 MB on slow mobile data.
+    return request<Wrapped<MediaItem>>('/api/media', { method: 'POST', body, timeoutMs: 120_000 }).then((r) => r.data)
   },
+  /** Setups using a deleted background go back to their built-in one; a foreground turns off. */
   remove: (id: number) => request<void>(`/api/media/${id}`, { method: 'DELETE' }),
 }
 

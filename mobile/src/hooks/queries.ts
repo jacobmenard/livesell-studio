@@ -52,7 +52,7 @@ export function useUploadMedia() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: ({ kind, file }: { kind: MediaKind; file: PickedFile }) => mediaApi.upload(kind, file),
-    onSuccess: (item: MediaItem) => client.setQueryData<MediaItem[]>(keys.media, (list) => [...(list ?? []), item]),
+    onSuccess: (item: MediaItem) => client.setQueryData<MediaItem[]>(keys.media, (list) => [item, ...(list ?? [])]),
   })
 }
 
@@ -60,7 +60,11 @@ export function useRemoveMedia() {
   const client = useQueryClient()
   return useMutation({
     mutationFn: (id: number) => mediaApi.remove(id),
-    onSuccess: (_: unknown, id: number) => client.setQueryData<MediaItem[]>(keys.media, (list) => (list ?? []).filter((m) => m.id !== id)),
+    onSuccess: (_: unknown, id: number) => {
+      client.setQueryData<MediaItem[]>(keys.media, (list) => (list ?? []).filter((m) => m.id !== id))
+      // The server also resets the setups that used it, so those are fetched again.
+      void client.invalidateQueries({ queryKey: keys.setups })
+    },
   })
 }
 

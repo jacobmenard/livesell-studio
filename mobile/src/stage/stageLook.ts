@@ -1,5 +1,6 @@
 import type { BackgroundMode, BackgroundSettings, CameraSettings, ForegroundDock, ForegroundSettings, MediaItem } from '@/api/types'
-import { BACKGROUND_PRESETS, DEFAULT_BACKGROUND, DEFAULT_CAMERA, DEFAULT_FOREGROUND, isBackgroundPreset, KEY_COLORS } from './backgrounds'
+import { absoluteUrl } from '@/config'
+import { BACKGROUND_MODES, BACKGROUND_PRESETS, DEFAULT_BACKGROUND, DEFAULT_CAMERA, DEFAULT_FOREGROUND, isBackgroundPreset, KEY_COLORS } from './backgrounds'
 import { DEFAULT_FILTER_STRENGTH, filterGrade, isCameraFilter } from './filters'
 
 /**
@@ -65,24 +66,46 @@ export function cameraWithDefaults(camera: Partial<CameraSettings> | undefined):
   return { ...DEFAULT_CAMERA, ...(camera ?? {}) }
 }
 
+const level = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(100, Math.max(0, Math.round(v))) : fallback)
+
+/** A setup's background with every field set and checked (unknown values get the API's defaults). */
 export function backgroundWithDefaults(background: Partial<BackgroundSettings> | undefined): BackgroundSettings {
-  const b = { ...DEFAULT_BACKGROUND, ...(background ?? {}) }
-  return isBackgroundPreset(b.preset) ? b : { ...b, preset: DEFAULT_BACKGROUND.preset }
+  const b: Partial<Record<keyof BackgroundSettings, unknown>> = background ?? {}
+  return {
+    mode: BACKGROUND_MODES.some((m) => m.id === b.mode) ? (b.mode as BackgroundMode) : DEFAULT_BACKGROUND.mode,
+    preset: isBackgroundPreset(b.preset) ? b.preset : DEFAULT_BACKGROUND.preset,
+    media_id: typeof b.media_id === 'number' ? b.media_id : null,
+    key_color: b.key_color === 'blue' ? 'blue' : 'green',
+    similarity: level(b.similarity, DEFAULT_BACKGROUND.similarity),
+    smoothness: level(b.smoothness, DEFAULT_BACKGROUND.smoothness),
+  }
 }
 
+/** A setup's foreground; off until it has a picture (setups from before foregrounds have none). */
 export function foregroundWithDefaults(foreground: Partial<ForegroundSettings> | undefined): ForegroundSettings {
-  return { ...DEFAULT_FOREGROUND, ...(foreground ?? {}) }
+  const f: Partial<Record<keyof ForegroundSettings, unknown>> = foreground ?? {}
+  const mediaId = typeof f.media_id === 'number' ? f.media_id : null
+  return { enabled: f.enabled === true && mediaId !== null, media_id: mediaId, dock: f.dock === 'top' ? 'top' : DEFAULT_FOREGROUND.dock }
+}
+
+/**
+ * The full address of one of the seller's pictures, if it still exists and is of the right kind.
+ * The API gives uploads as "/storage/…", which the phone can't load without the server's address.
+ */
+export function mediaUrl(media: Pick<MediaItem, 'id' | 'url' | 'kind'>[], id: number | null, kind: MediaItem['kind']): string | null {
+  if (id === null) return null
+  const item = media.find((m) => m.id === id && m.kind === kind)
+  return item ? absoluteUrl(item.url) : null
 }
 
 /** The look as the shader takes it. */
 export function nativeLook(
   input: { camera: Partial<CameraSettings> | undefined; background: Partial<BackgroundSettings> | undefined; foreground: Partial<ForegroundSettings> | undefined },
-  media: Pick<MediaItem, 'id' | 'url'>[],
+  media: Pick<MediaItem, 'id' | 'url' | 'kind'>[],
 ): NativeLook {
   const camera = cameraWithDefaults(input.camera)
   const background = backgroundWithDefaults(input.background)
   const foreground = foregroundWithDefaults(input.foreground)
-  const urls = new Map(media.map((m) => [m.id, m.url]))
 
   const filterId = isCameraFilter(camera.filter) ? camera.filter : 'none'
   const strength = clamp(num(camera.filter_strength, DEFAULT_FILTER_STRENGTH), 0, 100)
@@ -91,9 +114,9 @@ export function nativeLook(
 
   const preset = BACKGROUND_PRESETS.find((b) => b.id === background.preset) ?? BACKGROUND_PRESETS[1]!
   // A deleted photo falls back to the built-in picture, like the website.
-  const photo = background.media_id ? (urls.get(background.media_id) ?? null) : null
+  const photo = mediaUrl(media, background.media_id, 'background')
   const key = (KEY_COLORS.find((k) => k.id === background.key_color) ?? KEY_COLORS[0]!).rgb
-  const foregroundUrl = foreground.enabled && foreground.media_id ? (urls.get(foreground.media_id) ?? null) : null
+  const foregroundUrl = foreground.enabled ? mediaUrl(media, foreground.media_id, 'foreground') : null
 
   return {
     mirror: camera.mirror,

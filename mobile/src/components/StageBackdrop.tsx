@@ -2,6 +2,7 @@ import { Image, StyleSheet, View } from 'react-native'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import type { BackgroundSettings } from '@/api/types'
+import { absoluteUrl } from '@/config'
 import { BACKGROUND_PRESETS } from '@/stage/backgrounds'
 
 /**
@@ -58,7 +59,8 @@ export function SetupBackdrop({ background }: { background: (Partial<BackgroundS
   const mode = background?.mode
   if (mode !== 'image' && mode !== 'green') return <StageBackdrop tone={backdropTone(background)} />
   const preset = BACKGROUND_PRESETS.find((p) => p.id === background?.preset) ?? BACKGROUND_PRESETS[1]!
-  const source = background?.media_url ? { uri: background.media_url } : preset.thumb
+  const photo = absoluteUrl(background?.media_url)
+  const source = photo ? { uri: photo } : preset.thumb
   return (
     <View style={StyleSheet.absoluteFill}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: preset.tone }]} />

@@ -3,6 +3,7 @@ import { Text, View } from 'react-native'
 import type { ForegroundSettings, MediaItem } from '@/api/types'
 import { Card, Notice, Segmented } from '@/components/ui'
 import { FOREGROUND_DOCKS } from '@/stage/backgrounds'
+import { absoluteUrl } from '@/config'
 import { foregroundWithDefaults } from '@/stage/stageLook'
 import { space } from '@/theme'
 import { PictureTile, SectionTitle, styles, SwitchRow, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
@@ -22,7 +23,8 @@ export function ForegroundSection({
   const images = media.filter((m) => m.kind === 'foreground')
   const pickedId = foreground.media_id && images.some((m) => m.id === foreground.media_id) ? foreground.media_id : null
   const upload = usePictureUpload('foreground', (item) => onChange({ enabled: true, media_id: item.id }))
-  const confirmRemove = useConfirmRemove((id) => id === foreground.media_id && onChange({ media_id: null }))
+  // The server turns the foreground off in setups that used it; the unsaved copy does the same.
+  const confirmRemove = useConfirmRemove((id) => id === foreground.media_id && onChange({ media_id: null, enabled: false }))
 
   return (
     <View style={{ padding: space.lg, gap: space.xl }}>
@@ -51,7 +53,7 @@ export function ForegroundSection({
               {images.map((m) => (
                 <PictureTile
                   key={m.id}
-                  source={{ uri: m.url }}
+                  source={{ uri: absoluteUrl(m.url) ?? undefined }}
                   label={m.label || 'Your foreground'}
                   selected={pickedId === m.id}
                   onPress={() => onChange({ media_id: m.id })}

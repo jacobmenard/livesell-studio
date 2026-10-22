@@ -152,6 +152,7 @@ export interface ForegroundSettings {
   dock: ForegroundDock
 }
 
+/** One of the seller's uploads (GET /api/media). `url` may be "/storage/…": see absoluteUrl(). */
 export interface MediaItem {
   id: number
   kind: MediaKind
@@ -161,6 +162,7 @@ export interface MediaItem {
   size: number
   width: number | null
   height: number | null
+  created_at: string | null
 }
 
 export interface Scene {

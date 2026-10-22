@@ -24,8 +24,9 @@ export function documentFromSetup(setup: SetupFull): SetupDocument {
     orientation: setup.orientation,
     resolution: setup.resolution,
     camera: { ...setup.camera },
-    background: { ...setup.background },
-    foreground: { ...setup.foreground },
+    // Every field set, so a setup saved before a field existed still passes the API's checks.
+    background: backgroundWithDefaults(setup.background),
+    foreground: foregroundWithDefaults(setup.foreground),
     sound_settings: { ...setup.sound_settings },
     output_settings: { ...setup.output_settings },
     popups: setup.popups.map((p) => ({ ...p })),

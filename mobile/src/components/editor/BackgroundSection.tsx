@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import type { BackgroundSettings, MediaItem } from '@/api/types'
 import { Notice } from '@/components/ui'
 import { BACKGROUND_MODES, BACKGROUND_PRESETS, KEY_COLORS } from '@/stage/backgrounds'
+import { absoluteUrl } from '@/config'
 import { backgroundWithDefaults } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 import { LookSlider, PictureTile, SectionTitle, styles, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
@@ -78,7 +79,7 @@ export function BackgroundSection({
             {photos.map((p) => (
               <PictureTile
                 key={p.id}
-                source={{ uri: p.url }}
+                source={{ uri: absoluteUrl(p.url) ?? undefined }}
                 label={p.label || 'Your photo'}
                 selected={photoId === p.id}
                 onPress={() => onChange({ media_id: p.id })}

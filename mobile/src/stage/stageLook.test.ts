@@ -1,11 +1,15 @@
 import { CAMERA_FILTERS } from './filters'
-import { nativeLook } from './stageLook'
+import type { BackgroundSettings, ForegroundSettings } from '@/api/types'
+import { absoluteUrl, API_URL } from '@/config'
+import { backgroundWithDefaults, foregroundWithDefaults, mediaUrl, nativeLook } from './stageLook'
 
 jest.mock('react-native', () => ({}))
+jest.mock('expo-application', () => ({ nativeBuildVersion: '1' }))
 
 const media = [
-  { id: 7, url: 'https://cdn.test/bg.jpg' },
-  { id: 9, url: 'https://cdn.test/banner.png' },
+  { id: 7, kind: 'background' as const, url: 'https://cdn.test/bg.jpg' },
+  { id: 9, kind: 'foreground' as const, url: 'https://cdn.test/banner.png' },
+  { id: 11, kind: 'background' as const, url: '/storage/media/1/11.png' },
 ]
 
 describe('native look (same formulas as the website)', () => {
@@ -82,5 +86,41 @@ describe('native look (same formulas as the website)', () => {
 
   it('keeps the same 17 filters as the website', () => {
     expect(CAMERA_FILTERS.map((f) => f.id)).toEqual(['none', 'fair', 'soft', 'glow', 'clear', 'warm', 'cool', 'vivid', 'pastel', 'dreamy', 'neon', 'vintage', 'film', 'retro', 'cinematic', 'bw', 'noir'])
+  })
+})
+
+describe('setups saved before a field existed, or with odd values', () => {
+  it('fills in the background and refuses unknown values', () => {
+    expect(backgroundWithDefaults({})).toEqual({ mode: 'image', preset: 'rack', media_id: null, key_color: 'green', similarity: 42, smoothness: 18 })
+    const odd = { mode: 'party', preset: 'beach', key_color: 'red', similarity: 140, smoothness: -3 } as unknown as BackgroundSettings
+    expect(backgroundWithDefaults(odd)).toEqual(expect.objectContaining({ mode: 'image', preset: 'rack', key_color: 'green', similarity: 100, smoothness: 0 }))
+    expect(backgroundWithDefaults({ mode: 'green', preset: 'white', media_id: 4 })).toEqual(expect.objectContaining({ mode: 'green', preset: 'white', media_id: 4 }))
+  })
+
+  it('reads a foreground as off until it has a picture', () => {
+    expect(foregroundWithDefaults(undefined)).toEqual({ enabled: false, media_id: null, dock: 'bottom' })
+    expect(foregroundWithDefaults({ enabled: true, media_id: null, dock: 'top' })).toEqual({ enabled: false, media_id: null, dock: 'top' })
+    const sideways = { enabled: true, media_id: 3, dock: 'sideways' } as unknown as ForegroundSettings
+    expect(foregroundWithDefaults(sideways)).toEqual({ enabled: true, media_id: 3, dock: 'bottom' })
+  })
+})
+
+describe('picture addresses', () => {
+  it('gives the phone full addresses for "/storage/…" uploads', () => {
+    const look = nativeLook({ camera: undefined, background: { mode: 'image', preset: 'loft', media_id: 11, key_color: 'green', similarity: 42, smoothness: 18 }, foreground: undefined }, media)
+    expect(look.background.imageUrl).toBe(`${API_URL}/storage/media/1/11.png`)
+  })
+
+  it('only uses a picture of the right kind', () => {
+    expect(mediaUrl(media, 9, 'background')).toBeNull()
+    expect(mediaUrl(media, 9, 'foreground')).toBe('https://cdn.test/banner.png')
+    expect(mediaUrl(media, null, 'foreground')).toBeNull()
+  })
+
+  it('keeps full addresses and refuses anything else', () => {
+    expect(absoluteUrl('/storage/a.png')).toBe(`${API_URL}/storage/a.png`)
+    expect(absoluteUrl('https://cdn.test/a.png')).toBe('https://cdn.test/a.png')
+    expect(absoluteUrl(null)).toBeNull()
+    expect(absoluteUrl('javascript:alert(1)')).toBeNull()
   })
 })

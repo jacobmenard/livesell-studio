@@ -194,8 +194,10 @@ PCM WAVs of the same names (any sample rate; mono or stereo).
 ## Pictures from the server
 
 Background and foreground photos are loaded by the phone from the URLs the API gives
-(`GET /api/media`). Those URLs are built from the server's `APP_URL`, so it must be an
-address the phone can reach (in development, your computer's LAN IP, not `localhost`).
+(`GET /api/media`). A path like `/storage/…` is completed with `EXPO_PUBLIC_API_URL`
+(`absoluteUrl()` in `src/config.ts`); a full URL is built from the server's `APP_URL` and is
+used as it is, so then `APP_URL` must be an address the phone can reach (in development,
+your computer's LAN IP, not `localhost`).
 Uploads from the phone go to `POST /api/media` (PNG, JPG, WEBP or GIF, 5 MB at most).
 
 ## Fonts
