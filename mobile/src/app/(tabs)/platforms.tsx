@@ -17,6 +17,7 @@ import {
   type StreamDestination,
 } from '@/stream/streamKeys'
 import { colors, radius, space } from '@/theme'
+import { readable } from '@/layout/readable'
 
 /** Platforms whose server address never changes (filled in and locked). */
 const FIXED_SERVER: Platform[] = ['facebook', 'youtube']
@@ -88,7 +89,7 @@ export default function PlatformsScreen() {
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
-        <ScrollView contentContainerStyle={{ padding: space.xl, gap: 18, paddingBottom: 40 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[{ padding: space.xl, gap: 18, paddingBottom: 40 }, readable]} keyboardShouldPersistTaps="handled">
           <View style={{ gap: 4 }}>
             <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 }} accessibilityRole="header">
               Platforms

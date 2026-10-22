@@ -2,6 +2,7 @@ package expo.modules.livestreamer
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Typeface
 import android.os.Build
@@ -9,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Surface
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import android.view.ViewGroup
@@ -78,6 +80,8 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   private var landscape = false
   private var resolution = Resolution.P720
   private var front = true
+  /** Tablets: the app turns with the device, so the camera follows the screen's rotation. */
+  private var followScreen = false
   private var prepared: Pair<Boolean, Resolution>? = null
   private var audioPrepared = false
 
@@ -133,6 +137,11 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     resolution = value
   }
 
+  fun setFollowRotation(follow: Boolean) {
+    followScreen = follow
+    applyFraming()
+  }
+
   fun setFacing(front: Boolean) {
     this.front = front
     applyFacing()
@@ -162,6 +171,8 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     }
     if (ok) {
       prepared = landscape to resolution
+      // prepareVideo sets RootEncoder's phone-only rotation: put ours back.
+      applyFraming()
     } else {
       emitError("prepare", "This phone's camera can't record at ${resolution.short}p. Try 720p.")
     }
@@ -204,12 +215,38 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     }
     previewAttempts = 0
     if (freshPipeline || !filtersAttached) attachFilters()
+    applyFraming()
     applyFacing()
     applyLensZoomSoon()
     applyPicture()
     renderOverlay()
     ensureAnimating()
     emitStatus(if (stream.isStreaming) "live" else "previewing")
+  }
+
+  /** Turns and crops the camera so the live is upright (CameraFraming). */
+  private fun applyFraming() {
+    if (released) return
+    val screenRotation = when (display?.rotation ?: Surface.ROTATION_0) {
+      Surface.ROTATION_90 -> 90
+      Surface.ROTATION_180 -> 180
+      Surface.ROTATION_270 -> 270
+      else -> 0
+    }
+    val screenIsPortrait = resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
+    val live = prepared?.first ?: landscape
+    val rotation = CameraFraming.cameraRotation(CameraFraming.deviceRotation(followScreen, screenRotation, live))
+    val natural = CameraFraming.naturalPortrait(screenRotation, screenIsPortrait)
+    stream.getGlInterface().setCameraOrientation(rotation)
+    val shape = prepared?.second ?: resolution
+    stageFilter.crop = CameraFraming.crop(natural, rotation, live, shape.long, shape.short)
+  }
+
+  override fun onConfigurationChanged(newConfig: Configuration?) {
+    super.onConfigurationChanged(newConfig)
+    // The tablet was turned: the screen's rotation is settled by the next frame.
+    applyFraming()
+    main.post { applyFraming() }
   }
 
   private fun attachFilters() {

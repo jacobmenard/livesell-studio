@@ -279,16 +279,18 @@ export function Sheet({ visible, onClose, title, children }: { visible: boolean;
   const insets = useSafeAreaInsets()
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
-      <Pressable style={styles.scrim} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
-      <View style={[styles.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
-        <View style={styles.handle} />
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} accessibilityRole="header">
-            {title}
-          </Text>
-          <IconButton icon="close" label={`Close ${title.toLowerCase()}`} onPress={onClose} size={44} />
+      <View style={styles.scrim}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" accessibilityRole="button" />
+        <View style={[styles.sheet, { paddingBottom: space.xl + insets.bottom }]} accessibilityViewIsModal>
+          <View style={styles.handle} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '700' }} accessibilityRole="header">
+              {title}
+            </Text>
+            <IconButton icon="close" label={`Close ${title.toLowerCase()}`} onPress={onClose} size={44} />
+          </View>
+          {children}
         </View>
-        {children}
       </View>
     </Modal>
   )
@@ -328,8 +330,12 @@ const styles = StyleSheet.create({
   rowLine: { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   notice: { flexDirection: 'row', gap: 12, padding: 14, borderRadius: radius.lg, backgroundColor: colors.surface },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.bg },
-  scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.55)' },
+  scrim: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.55)' },
   sheet: {
+    // On tablets a sheet stays phone-width, centred, instead of spanning the screen.
+    width: '100%',
+    maxWidth: 640,
+    alignSelf: 'center',
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,

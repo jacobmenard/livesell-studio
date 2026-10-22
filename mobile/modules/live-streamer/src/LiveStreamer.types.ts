@@ -35,6 +35,12 @@ export interface LiveStreamerProps extends ViewProps {
   orientation: 'portrait' | 'landscape'
   resolution: '720p' | '1080p'
   facing: 'front' | 'back'
+  /**
+   * Tablets (the app turns with the device): turn the camera with the screen, and fill the live
+   * with the middle of the picture when the tablet is held across the live's shape. Phones
+   * leave it off: they stay upright and are held the way the live is shaped.
+   */
+  followRotation?: boolean
   onStatus?: (event: NativeSyntheticEvent<LiveStatusEvent>) => void
   onStats?: (event: NativeSyntheticEvent<LiveStatsEvent>) => void
   onError?: (event: NativeSyntheticEvent<LiveErrorEvent>) => void

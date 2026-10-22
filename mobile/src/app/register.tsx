@@ -7,6 +7,7 @@ import { ApiError, errorMessage } from '@/api/client'
 import { useAuth } from '@/auth/AuthProvider'
 import { Button, Field, Notice, ScreenHeader } from '@/components/ui'
 import { colors, space } from '@/theme'
+import { readableForm } from '@/layout/readable'
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -43,7 +44,7 @@ export default function RegisterScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Create an account" onBack={() => router.back()} />
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
-        <ScrollView contentContainerStyle={{ flexGrow: 1, padding: space.xl, gap: 18 }} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[{ flexGrow: 1, padding: space.xl, gap: 18 }, readableForm]} keyboardShouldPersistTaps="handled">
           <Text style={{ color: colors.text2, fontSize: 15, lineHeight: 22 }}>
             Your first week is free: set up your popups and sounds, then choose a plan to go live.
           </Text>

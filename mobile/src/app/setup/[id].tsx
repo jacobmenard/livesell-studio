@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router'
 import { useMemo, useRef, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View, type LayoutChangeEvent } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { errorMessage } from '@/api/client'
@@ -12,24 +12,19 @@ import { CameraSection } from '@/components/editor/CameraSection'
 import { ForegroundSection } from '@/components/editor/ForegroundSection'
 import { LookSlider } from '@/components/editor/parts'
 import { StagePreview, type PopupGestureHandlers } from '@/components/editor/StagePreview'
+import { stepSummaries, STEPS, type Step } from '@/components/editor/steps'
 import { Button, Card, ErrorState, Field, Loading, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
 import { AUTO_HIDES, EFFECTS, isBuiltinSound, POPUP_SIZE, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
 import { useMedia, useSaveSetup, useSetup } from '@/hooks/queries'
+import { editorPreviewSize, useDeviceLayout } from '@/layout/device'
+import { readable } from '@/layout/readable'
 import { isFreelyPlaced, popupText, resolveLook } from '@/stage/look'
 import { checkPopupText, MAX_TEXT_LENGTH, newTextPopup, removePopup, updatePopup } from '@/stage/popups'
 import { documentForApi, documentFromSetup } from '@/stage/scene'
 import { nativeLook } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 
-type Tab = 'camera' | 'background' | 'popups' | 'foreground' | 'sounds'
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: 'camera', label: 'Camera' },
-  { id: 'background', label: 'Background' },
-  { id: 'popups', label: 'Popups' },
-  { id: 'foreground', label: 'Foreground' },
-  { id: 'sounds', label: 'Sounds' },
-]
+type Tab = Step
 type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'text' | null
 
 /** The size slider's top end; pinching on the preview goes up to the API's 1500%. */
@@ -98,6 +93,9 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [touching, setTouching] = useState(false)
   const pinchFrom = useRef<number>(POPUP_SIZE.default)
   const media = useMedia()
+  const layout = useDeviceLayout()
+  /** The tablet editor's preview pane, measured so the picture fills it. */
+  const [pane, setPane] = useState<{ width: number; height: number } | null>(null)
 
   const dirty = stable(doc) !== base
 
@@ -147,8 +145,9 @@ function Editor({ setup }: { setup: SetupFull }) {
   }
 
   const portrait = doc.orientation === 'portrait'
-  const stageW = portrait ? 168 : 320
-  const stageH = portrait ? 300 : 180
+  // Tablets side by side: steps | preview | settings. Phones and upright tablets: one column.
+  const threePanes = layout.tablet && layout.wide
+  const { stageW, stageH } = editorPreviewSize(portrait, threePanes ? pane : null, layout.tablet ? layout.width : 0)
   const mediaList = useMemo(() => media.data ?? [], [media.data])
   // Only while nothing was ever fetched: a failed refresh keeps showing the pictures it has.
   const mediaError = media.isError && !media.data ? errorMessage(media.error, 'Check your internet and try again.') : null
@@ -169,205 +168,181 @@ function Editor({ setup }: { setup: SetupFull }) {
         }
       : undefined
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScreenHeader
-        title={doc.name}
-        subtitle={save.isPending ? 'Saving…' : dirty ? 'Not saved yet' : 'All changes saved'}
-        onBack={() => router.back()}
-        right={<Button label="Save" variant="secondary" size="md" onPress={() => void persist()} disabled={!dirty} busy={save.isPending} />}
-      />
-
-      <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} scrollEnabled={!touching}>
-        <View style={styles.previewBox} accessibilityLabel={popup ? `Preview of ${popupText(popup)}` : 'Preview'}>
-          <StagePreview
-            width={stageW}
-            height={stageH}
-            orientation={doc.orientation}
-            resolution={doc.resolution}
-            look={look}
-            overlay={overlay}
-            onSegmentationMissing={() => setSegmentationMissing(true)}
-            onZoomLimit={setZoomLimit}
-            popupGestures={popupGestures}
-          />
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md }}
-          accessibilityRole="tablist"
-        >
-          {TABS.map((t) => {
-            const on = t.id === tab
-            return (
-              <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.tabChip, on && styles.tabChipOn]}>
-                <Text style={{ color: on ? colors.ink : colors.text, fontSize: 14, fontWeight: on ? '700' : '500' }}>{t.label}</Text>
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-
-        {tab === 'popups' && (
-          <View style={{ padding: space.lg, gap: space.md }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={styles.h2}>Tap a popup to style it</Text>
-              <Pressable onPress={() => setSheet('text')} accessibilityRole="button" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
-                <Text style={{ color: colors.link, fontSize: 14, fontWeight: '500' }}>+ Make your own</Text>
-              </Pressable>
-            </View>
-            <View style={styles.grid}>
-              {doc.popups.map((p) => {
-                const on = p.key === selected
-                return (
-                  <Pressable
-                    key={p.key}
-                    onPress={() => {
-                      setSelected(p.key)
-                      replay()
-                    }}
-                    accessibilityRole="button"
-                    accessibilityLabel={popupText(p)}
-                    accessibilityState={{ selected: on }}
-                    style={[styles.tile, on && { borderColor: colors.link }]}
-                  >
-                    <PopupArt spec={resolveLook({ ...p, size: 100 })} unit={2.1} />
-                    {on && (
-                      <View style={styles.check}>
-                        <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.4} />
-                      </View>
-                    )}
-                  </Pressable>
-                )
-              })}
-            </View>
-
-            {popup && (
-              <Card>
-                <Row label={`Effect for ${popupText(popup)}`} value={EFFECTS.find((e) => e.id === popup.effect)?.label ?? 'None'} onPress={() => setSheet('effect')} />
-                <Row label="Sound" value={soundLabel(popup.sound)} onPress={() => setSheet('sound')} />
-                <Row label="Hide after" value={AUTO_HIDES.find((a) => a.id === popup.auto_hide)?.label ?? 'Never'} onPress={() => setSheet('hide')} />
-                <Row
-                  label="Position"
-                  value={isFreelyPlaced(popup) ? 'Placed by hand' : POSITION_LABELS[popup.position]}
-                  onPress={() => setSheet('position')}
-                  last={popup.kind === 'preset' && popup.effect === 'none' && popup.entrance === 'none'}
-                />
-                {(popup.effect !== 'none' || popup.entrance !== 'none') && <Row label="Play it again" onPress={replay} last={popup.kind === 'preset'} />}
-                {popup.kind !== 'preset' && (
-                  <Row
-                    label="Remove this popup"
-                    danger
-                    last
-                    onPress={() => {
-                      setDoc((d) => ({ ...d, popups: removePopup(d.popups, popup.key) }))
-                      setSelected(doc.popups[0]?.key ?? null)
-                    }}
-                  />
-                )}
-              </Card>
-            )}
-
-            {popup && (
-              <View style={{ gap: space.xs }}>
-                <LookSlider
-                  label="Size"
-                  value={Math.min(SLIDER_MAX_SIZE, popup.size)}
-                  min={POPUP_SIZE.min}
-                  max={SLIDER_MAX_SIZE}
-                  onChange={(size) => changePopup({ size })}
-                  low="Smaller"
-                  high="Bigger"
-                  format={() => `${popup.size}%`}
-                />
-                <Text style={styles.help}>On the preview: drag to put the popup anywhere, pinch with two fingers to resize it.</Text>
-              </View>
-            )}
+  const settings = (
+    <>
+      {tab === 'popups' && (
+        <View style={{ padding: space.lg, gap: space.md }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={styles.h2}>Tap a popup to style it</Text>
+            <Pressable onPress={() => setSheet('text')} accessibilityRole="button" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: colors.link, fontSize: 14, fontWeight: '500' }}>+ Make your own</Text>
+            </Pressable>
           </View>
-        )}
+          <View style={styles.grid}>
+            {doc.popups.map((p) => {
+              const on = p.key === selected
+              return (
+                <Pressable
+                  key={p.key}
+                  onPress={() => {
+                    setSelected(p.key)
+                    replay()
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={popupText(p)}
+                  accessibilityState={{ selected: on }}
+                  style={[styles.tile, on && { borderColor: colors.link }]}
+                >
+                  <PopupArt spec={resolveLook({ ...p, size: 100 })} unit={2.1} />
+                  {on && (
+                    <View style={styles.check}>
+                      <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.4} />
+                    </View>
+                  )}
+                </Pressable>
+              )
+            })}
+          </View>
 
-        {tab === 'camera' && (
-          <CameraSection
-            camera={doc.camera}
-            orientation={doc.orientation}
-            resolution={doc.resolution}
-            zoomLimit={zoomLimit}
-            onCamera={changeCamera}
-            onShape={(c) => change(c)}
-          />
-        )}
+          {popup && (
+            <Card>
+              <Row label={`Effect for ${popupText(popup)}`} value={EFFECTS.find((e) => e.id === popup.effect)?.label ?? 'None'} onPress={() => setSheet('effect')} />
+              <Row label="Sound" value={soundLabel(popup.sound)} onPress={() => setSheet('sound')} />
+              <Row label="Hide after" value={AUTO_HIDES.find((a) => a.id === popup.auto_hide)?.label ?? 'Never'} onPress={() => setSheet('hide')} />
+              <Row
+                label="Position"
+                value={isFreelyPlaced(popup) ? 'Placed by hand' : POSITION_LABELS[popup.position]}
+                onPress={() => setSheet('position')}
+                last={popup.kind === 'preset' && popup.effect === 'none' && popup.entrance === 'none'}
+              />
+              {(popup.effect !== 'none' || popup.entrance !== 'none') && <Row label="Play it again" onPress={replay} last={popup.kind === 'preset'} />}
+              {popup.kind !== 'preset' && (
+                <Row
+                  label="Remove this popup"
+                  danger
+                  last
+                  onPress={() => {
+                    setDoc((d) => ({ ...d, popups: removePopup(d.popups, popup.key) }))
+                    setSelected(doc.popups[0]?.key ?? null)
+                  }}
+                />
+              )}
+            </Card>
+          )}
 
-        {tab === 'background' && (
-          <BackgroundSection
-            background={doc.background}
-            media={mediaList}
-            mediaLoading={media.isPending}
-            mediaError={mediaError}
-            onRetryMedia={retryMedia}
-            segmentationMissing={segmentationMissing}
-            onChange={changeBackground}
-          />
-        )}
+          {popup && (
+            <View style={{ gap: space.xs }}>
+              <LookSlider
+                label="Size"
+                value={Math.min(SLIDER_MAX_SIZE, popup.size)}
+                min={POPUP_SIZE.min}
+                max={SLIDER_MAX_SIZE}
+                onChange={(size) => changePopup({ size })}
+                low="Smaller"
+                high="Bigger"
+                format={() => `${popup.size}%`}
+              />
+              <Text style={styles.help}>On the preview: drag to put the popup anywhere, pinch with two fingers to resize it.</Text>
+            </View>
+          )}
+        </View>
+      )}
 
-        {tab === 'foreground' && (
-          <ForegroundSection
-            foreground={doc.foreground}
-            media={mediaList}
-            mediaLoading={media.isPending}
-            mediaError={mediaError}
-            onRetryMedia={retryMedia}
-            onChange={changeForeground}
-          />
-        )}
+      {tab === 'camera' && (
+        <CameraSection
+          camera={doc.camera}
+          orientation={doc.orientation}
+          resolution={doc.resolution}
+          zoomLimit={zoomLimit}
+          onCamera={changeCamera}
+          onShape={(c) => change(c)}
+        />
+      )}
 
-        {tab === 'sounds' && (
-          <View style={{ padding: space.lg, gap: space.lg }}>
-            <View style={{ gap: space.sm }}>
-              <Text style={styles.h2}>Volume</Text>
-              <Segmented
-                label="Volume"
-                value={String(VOLUMES.reduce((best, v) => (Math.abs(Number(v.id) - doc.sound_settings.volume) < Math.abs(Number(best.id) - doc.sound_settings.volume) ? v : best)).id)}
-                onChange={(v) => change({ sound_settings: { ...doc.sound_settings, volume: Number(v) } })}
-                options={VOLUMES.map((v) => ({ id: v.id, label: v.label }))}
+      {tab === 'background' && (
+        <BackgroundSection
+          background={doc.background}
+          media={mediaList}
+          mediaLoading={media.isPending}
+          mediaError={mediaError}
+          onRetryMedia={retryMedia}
+          segmentationMissing={segmentationMissing}
+          onChange={changeBackground}
+        />
+      )}
+
+      {tab === 'foreground' && (
+        <ForegroundSection
+          foreground={doc.foreground}
+          media={mediaList}
+          mediaLoading={media.isPending}
+          mediaError={mediaError}
+          onRetryMedia={retryMedia}
+          onChange={changeForeground}
+        />
+      )}
+
+      {tab === 'sounds' && (
+        <View style={{ padding: space.lg, gap: space.lg }}>
+          <View style={{ gap: space.sm }}>
+            <Text style={styles.h2}>Volume</Text>
+            <Segmented
+              label="Volume"
+              value={String(VOLUMES.reduce((best, v) => (Math.abs(Number(v.id) - doc.sound_settings.volume) < Math.abs(Number(best.id) - doc.sound_settings.volume) ? v : best)).id)}
+              onChange={(v) => change({ sound_settings: { ...doc.sound_settings, volume: Number(v) } })}
+              options={VOLUMES.map((v) => ({ id: v.id, label: v.label }))}
+            />
+          </View>
+          <Card>
+            <View style={styles.switchRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchLabel}>Viewers hear sounds</Text>
+                <Text style={styles.help}>Mixed into the live. Off: sounds play only on your phone, to test.</Text>
+              </View>
+              <Switch
+                value={doc.sound_settings.to_stream}
+                onValueChange={(to_stream) => change({ sound_settings: { ...doc.sound_settings, to_stream } })}
+                trackColor={{ true: colors.success, false: colors.raised }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="Viewers hear sounds"
               />
             </View>
-            <Card>
-              <View style={styles.switchRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchLabel}>Viewers hear sounds</Text>
-                  <Text style={styles.help}>Mixed into the live. Off: sounds play only on your phone, to test.</Text>
-                </View>
-                <Switch
-                  value={doc.sound_settings.to_stream}
-                  onValueChange={(to_stream) => change({ sound_settings: { ...doc.sound_settings, to_stream } })}
-                  trackColor={{ true: colors.success, false: colors.raised }}
-                  thumbColor="#FFFFFF"
-                  accessibilityLabel="Viewers hear sounds"
-                />
+            <View style={[styles.switchRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }]}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.switchLabel}>Also play on my speaker</Text>
+                <Text style={styles.help}>Use earphones, or the microphone picks it up a second time.</Text>
               </View>
-              <View style={[styles.switchRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }]}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.switchLabel}>Also play on my speaker</Text>
-                  <Text style={styles.help}>Use earphones, or the microphone picks it up a second time.</Text>
-                </View>
-                <Switch
-                  value={doc.sound_settings.monitor}
-                  onValueChange={(monitor) => change({ sound_settings: { ...doc.sound_settings, monitor } })}
-                  trackColor={{ true: colors.success, false: colors.raised }}
-                  thumbColor="#FFFFFF"
-                  accessibilityLabel="Also play on my speaker"
-                />
-              </View>
-            </Card>
-          </View>
-        )}
-      </ScrollView>
+              <Switch
+                value={doc.sound_settings.monitor}
+                onValueChange={(monitor) => change({ sound_settings: { ...doc.sound_settings, monitor } })}
+                trackColor={{ true: colors.success, false: colors.raised }}
+                thumbColor="#FFFFFF"
+                accessibilityLabel="Also play on my speaker"
+              />
+            </View>
+          </Card>
+        </View>
+      )}
+    </>
+  )
 
-      <View style={styles.footer}>
-        <Button label="Go live with this setup" variant="danger" dot onPress={() => void goLive()} busy={save.isPending} />
-      </View>
-
+  const preview = (
+    <StagePreview
+      width={stageW}
+      height={stageH}
+      orientation={doc.orientation}
+      resolution={doc.resolution}
+      look={look}
+      overlay={overlay}
+      onSegmentationMissing={() => setSegmentationMissing(true)}
+      onZoomLimit={setZoomLimit}
+      popupGestures={popupGestures}
+    />
+  )
+  const previewLabel = popup ? `Preview of ${popupText(popup)}` : 'Preview'
+  const subtitle = save.isPending ? 'Saving…' : dirty ? 'Not saved yet' : 'All changes saved'
+  const sheets = (
+    <>
       {/* ---- popup settings ---- */}
       <Sheet visible={sheet === 'effect'} onClose={() => setSheet(null)} title="Effect">
         <Options<EffectId>
@@ -465,6 +440,91 @@ function Editor({ setup }: { setup: SetupFull }) {
         </View>
         <Button label="Add popup" onPress={addText} />
       </Sheet>
+    </>
+  )
+
+  if (threePanes) {
+    const summaries = stepSummaries(doc, mediaList)
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+        <ScreenHeader
+          title={doc.name}
+          subtitle={subtitle}
+          onBack={() => router.back()}
+          right={
+            <View style={{ flexDirection: 'row', gap: space.sm }}>
+              <Button label="Save" variant="secondary" size="md" onPress={() => void persist()} disabled={!dirty} busy={save.isPending} />
+              <Button label="Go live" variant="danger" dot size="md" onPress={() => void goLive()} busy={save.isPending} accessibilityLabel="Go live with this setup" />
+            </View>
+          }
+        />
+        <View style={styles.panes}>
+          <View style={styles.steps} accessibilityRole="tablist" accessibilityLabel="Setup steps">
+            {STEPS.map((t) => {
+              const on = t.id === tab
+              return (
+                <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.step, on && styles.stepOn]}>
+                  <Text style={{ color: on ? colors.link : colors.text, fontSize: 16, fontWeight: on ? '700' : '500' }}>{t.label}</Text>
+                  <Text style={{ color: on ? colors.text2 : colors.muted, fontSize: 13 }} numberOfLines={1}>
+                    {summaries[t.id]}
+                  </Text>
+                </Pressable>
+              )
+            })}
+          </View>
+          <View style={styles.previewPane} onLayout={(e: LayoutChangeEvent) => setPane({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })} accessibilityLabel={previewLabel}>
+            {pane && preview}
+          </View>
+          <ScrollView style={styles.settingsPane} contentContainerStyle={{ paddingBottom: space.xl }} scrollEnabled={!touching}>
+            <Text style={styles.paneTitle} accessibilityRole="header">
+              {STEPS.find((t) => t.id === tab)?.label}
+            </Text>
+            {settings}
+          </ScrollView>
+        </View>
+        {sheets}
+      </SafeAreaView>
+    )
+  }
+
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
+      <ScreenHeader
+        title={doc.name}
+        subtitle={subtitle}
+        onBack={() => router.back()}
+        right={<Button label="Save" variant="secondary" size="md" onPress={() => void persist()} disabled={!dirty} busy={save.isPending} />}
+      />
+
+      <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} scrollEnabled={!touching}>
+        <View style={[styles.previewBox, layout.tablet && { height: stageH + 32 }]} accessibilityLabel={previewLabel}>
+          {preview}
+        </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md }}
+          accessibilityRole="tablist"
+        >
+          {STEPS.map((t) => {
+            const on = t.id === tab
+            return (
+              <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.tabChip, on && styles.tabChipOn]}>
+                <Text style={{ color: on ? colors.ink : colors.text, fontSize: 14, fontWeight: on ? '700' : '500' }}>{t.label}</Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+
+        <View style={layout.tablet ? readable : undefined}>{settings}</View>
+      </ScrollView>
+
+      <View style={styles.footer}>
+        <Button label="Go live with this setup" variant="danger" dot onPress={() => void goLive()} busy={save.isPending} />
+      </View>
+
+      {sheets}
     </SafeAreaView>
   )
 }
@@ -492,6 +552,14 @@ function Options<T extends string>({ options, value, onPick }: { options: { id: 
 }
 
 const styles = StyleSheet.create({
+  // Tablet editor: steps | preview | settings.
+  panes: { flex: 1, flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.surface },
+  steps: { width: 240, paddingVertical: space.lg, paddingHorizontal: space.md, gap: space.xs, borderRightWidth: StyleSheet.hairlineWidth, borderRightColor: colors.surface },
+  step: { minHeight: 64, justifyContent: 'center', gap: 2, paddingHorizontal: space.md, borderRadius: radius.md },
+  stepOn: { backgroundColor: colors.tint },
+  previewPane: { flex: 1, margin: space.lg, borderRadius: radius.xl, backgroundColor: colors.field, alignItems: 'center', justifyContent: 'center' },
+  settingsPane: { width: 420, borderLeftWidth: StyleSheet.hairlineWidth, borderLeftColor: colors.surface },
+  paneTitle: { color: colors.text, fontSize: 22, fontWeight: '700', paddingHorizontal: space.lg, paddingTop: space.xl },
   previewBox: { height: 316, marginHorizontal: space.lg, marginTop: space.sm, borderRadius: 18, backgroundColor: colors.field, alignItems: 'center', justifyContent: 'center' },
   h2: { color: colors.text, fontSize: 15, fontWeight: '700' },
   tabChip: { minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
