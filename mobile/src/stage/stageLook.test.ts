@@ -123,4 +123,19 @@ describe('picture addresses', () => {
     expect(absoluteUrl(null)).toBeNull()
     expect(absoluteUrl('javascript:alert(1)')).toBeNull()
   })
+
+  it('sends pictures a localhost server hands out to the API address the phone uses', () => {
+    expect(absoluteUrl('http://localhost:8000/storage/media/1/bg.jpg')).toBe(`${API_URL}/storage/media/1/bg.jpg`)
+    expect(absoluteUrl('http://127.0.0.1/storage/a.png')).toBe(`${API_URL}/storage/a.png`)
+    expect(absoluteUrl('https://[::1]:8443/storage/a.png')).toBe(`${API_URL}/storage/a.png`)
+    // Real hosts are kept, including ones that only start like "localhost".
+    expect(absoluteUrl('https://localhost.shop.ph/storage/a.png')).toBe('https://localhost.shop.ph/storage/a.png')
+    expect(absoluteUrl('http://192.168.1.20:8000/storage/a.png')).toBe('http://192.168.1.20:8000/storage/a.png')
+  })
+
+  it('loads a localhost background photo from the API address in the live', () => {
+    const local = [{ id: 21, kind: 'background' as const, url: 'http://localhost:8000/storage/media/1/21.jpg' }]
+    const look = nativeLook({ camera: undefined, background: { mode: 'green', preset: 'rack', media_id: 21, key_color: 'green', similarity: 42, smoothness: 18 }, foreground: undefined }, local)
+    expect(look.background.imageUrl).toBe(`${API_URL}/storage/media/1/21.jpg`)
+  })
 })
