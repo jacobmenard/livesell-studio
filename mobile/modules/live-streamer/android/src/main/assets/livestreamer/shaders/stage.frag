@@ -28,6 +28,7 @@ uniform vec2 uBgScale;          // the part of the picture that fills the stage 
 
 uniform float uZoom;
 uniform float uMirror;
+uniform vec2 uCrop;             // the middle part of the camera that fills the live (1 = all)
 
 uniform vec2 uStep;             // face-enhance radius, in camera texture units
 uniform float uBrightness;      // 0.5–1.5
@@ -58,7 +59,7 @@ const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
 
 vec2 cameraUv(vec2 uv) {
   if (uMirror > 0.5) uv.x = 1.0 - uv.x;
-  return 0.5 + (uv - 0.5) / uZoom;
+  return 0.5 + (uv - 0.5) * uCrop / uZoom;
 }
 
 // ---- enhance.ts ------------------------------------------------------------------------

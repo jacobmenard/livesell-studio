@@ -42,6 +42,9 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
   /** Written from the UI thread, read on the GL thread. */
   @Volatile var look: LookSpec = LookSpec()
 
+  /** CameraFraming.crop: the middle part of the camera that fills the live (1, 1 = all of it). */
+  @Volatile var crop: FloatArray = floatArrayOf(1f, 1f)
+
   private val pendingPicture = AtomicReference<Picture?>(null)
   private var picture: Picture? = null
   private var pictureDirty = false
@@ -218,8 +221,10 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     GLES20.glUniform3f(stage.u("uTone"), Color.red(bg.tone) / 255f, Color.green(bg.tone) / 255f, Color.blue(bg.tone) / 255f)
     val cover = coverScale(pictureWidth, pictureHeight, width, height)
     GLES20.glUniform2f(stage.u("uBgScale"), cover[0], cover[1])
+    val crop = crop
     GLES20.glUniform1f(stage.u("uZoom"), look.zoom)
     GLES20.glUniform1f(stage.u("uMirror"), if (look.mirror) 1f else 0f)
+    GLES20.glUniform2f(stage.u("uCrop"), crop[0], crop[1])
 
     // Face enhance: about 5 px at 1080 px on the short side, like the website.
     val radius = max(2f, min(width, height) / 216f)
@@ -270,10 +275,12 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     val a = target(low, lw, lh).also { low = it }
     val b = target(lowB, lw, lh).also { lowB = it }
 
+    val crop = crop
     drawPass(view, a, camera, identity) {
       GLES20.glUniform1f(view.u("uZoom"), look.zoom)
       GLES20.glUniform1f(view.u("uMirror"), if (look.mirror) 1f else 0f)
-      GLES20.glUniform2f(view.u("uSpread"), 1f / (4f * lw * look.zoom), 1f / (4f * lh * look.zoom))
+      GLES20.glUniform2f(view.u("uCrop"), crop[0], crop[1])
+      GLES20.glUniform2f(view.u("uSpread"), crop[0] / (4f * lw * look.zoom), crop[1] / (4f * lh * look.zoom))
     }
     // The website's blur: a standard deviation of width / 90 pixels (CSS blur()).
     val sigma = max(1f, width / 90f / 4f)
@@ -295,6 +302,7 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     drawPass(view, keep, previousTexId, identity) {
       GLES20.glUniform1f(view.u("uZoom"), 1f)
       GLES20.glUniform1f(view.u("uMirror"), 0f)
+      GLES20.glUniform2f(view.u("uCrop"), 1f, 1f)
       GLES20.glUniform2f(view.u("uSpread"), 0f, 0f)
     }
     val frameId = ++nextFrameId
@@ -305,10 +313,12 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     val sw = max(1, (width * short).roundToInt())
     val sh = max(1, (height * short).roundToInt())
     val t = target(seg, sw, sh).also { seg = it }
+    val crop = crop
     drawPass(view, t, previousTexId, flipY) {
       GLES20.glUniform1f(view.u("uZoom"), look.zoom)
       GLES20.glUniform1f(view.u("uMirror"), if (look.mirror) 1f else 0f)
-      GLES20.glUniform2f(view.u("uSpread"), 1f / (4f * sw * look.zoom), 1f / (4f * sh * look.zoom))
+      GLES20.glUniform2f(view.u("uCrop"), crop[0], crop[1])
+      GLES20.glUniform2f(view.u("uSpread"), crop[0] / (4f * sw * look.zoom), crop[1] / (4f * sh * look.zoom))
     }
 
     val bytes = sw * sh * 4

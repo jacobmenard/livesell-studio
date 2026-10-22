@@ -7,6 +7,7 @@ import { errorMessage } from '@/api/client'
 import { authApi } from '@/api/endpoints'
 import { Button, Field, Notice, ScreenHeader } from '@/components/ui'
 import { colors, space } from '@/theme'
+import { readableForm } from '@/layout/readable'
 
 /** Sends the website's reset link by email; the new password then works in the app too. */
 export default function ForgotPasswordScreen() {
@@ -34,7 +35,7 @@ export default function ForgotPasswordScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScreenHeader title="Forgot password" onBack={() => router.back()} />
-      <View style={{ flex: 1, padding: space.xl, gap: 18 }}>
+      <View style={[{ flex: 1, padding: space.xl, gap: 18 }, readableForm]}>
         <Text style={{ color: colors.text2, fontSize: 15, lineHeight: 22 }}>
           We’ll email you a link to choose a new password. Open it on this phone or a computer, then log in here.
         </Text>

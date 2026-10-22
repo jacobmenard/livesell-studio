@@ -6,13 +6,14 @@ precision mediump float;
 uniform sampler2D uSampler;
 uniform float uZoom;    // 1 = fills the stage, 2 = zoomed in twice
 uniform float uMirror;  // 1 = flip left/right
+uniform vec2 uCrop;     // the middle part of the camera that fills the live (1 = all)
 uniform vec2 uSpread;   // a quarter of one output pixel, in camera texture units
 
 varying vec2 vTextureCoord;
 
 vec2 cameraUv(vec2 uv) {
   if (uMirror > 0.5) uv.x = 1.0 - uv.x;
-  return 0.5 + (uv - 0.5) / uZoom;
+  return 0.5 + (uv - 0.5) * uCrop / uZoom;
 }
 
 void main() {

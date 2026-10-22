@@ -8,6 +8,7 @@ import { Button, Notice } from '@/components/ui'
 import { PLATFORM_BY_ID } from '@/catalog'
 import { duration } from '@/live/format'
 import { colors, radius, space } from '@/theme'
+import { readableForm } from '@/layout/readable'
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'good' }) {
   return (
@@ -25,7 +26,7 @@ export default function LiveEndedScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ flex: 1, padding: space.xl, paddingTop: 48, gap: 22 }}>
+      <View style={[{ flex: 1, padding: space.xl, paddingTop: 48, gap: 22 }, readableForm]}>
         <View style={{ alignItems: 'center', gap: space.md }}>
           <View style={styles.icon}>
             <Icon name="check" size={34} color={colors.successText} strokeWidth={2.6} />

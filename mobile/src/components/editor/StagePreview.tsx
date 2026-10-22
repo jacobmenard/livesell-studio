@@ -1,6 +1,6 @@
 import { useIsFocused } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native'
 
 import type { Orientation, Resolution } from '@/api/types'
 import { Icon } from '@/components/Icon'
@@ -8,12 +8,16 @@ import { Picture } from '@/components/Picture'
 import { PopupLayer } from '@/components/PopupArt'
 import { StageBackdrop, StagePerson } from '@/components/StageBackdrop'
 import { IconButton } from '@/components/ui'
+import { isTabletScreen } from '@/layout/device'
 import { checkPermissions, openAppSettings, requestCamera, type PermissionState } from '@/live/permissions'
 import { BACKGROUND_PRESETS } from '@/stage/backgrounds'
 import type { PopupDrawSpec } from '@/stage/look'
 import type { NativeLook } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 import { LiveStreamerView, type LiveStreamerHandle } from '../../../modules/live-streamer'
+
+/** Tablets turn freely (src/layout/orientation.ts); a device doesn't change class while running. */
+const TABLET = isTabletScreen(Dimensions.get('screen'))
 
 /**
  * The editor's preview. With the camera allowed it is the real camera, drawn by the same
@@ -91,6 +95,8 @@ export function StagePreview({
           style={StyleSheet.absoluteFill}
           orientation={orientation}
           resolution={resolution}
+          // Tablets turn freely: the camera follows the screen (as on the live screen).
+          followRotation={TABLET}
           facing={facing}
           onStatus={(e) => e.nativeEvent.status === 'previewing' && setPreviews((n) => n + 1)}
           onError={(e) => {

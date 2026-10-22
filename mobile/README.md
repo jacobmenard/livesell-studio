@@ -89,6 +89,7 @@ mobile/
    ├─ media/                photo picking and checks before upload
    ├─ stream/streamKeys.ts  stream keys in secure storage
    ├─ live/                 live-session heartbeat, permissions, formatting
+   ├─ layout/               phone or tablet, orientation, the live screen's layouts
    └─ components/           UI kit, popup art, setup cards, update sheet
 ```
 
@@ -183,6 +184,29 @@ platform you support before publishing.
    [Android Developer Console](https://developer.android.com/developer-verification) and add
    the package name `ph.negosyowork.studio` with this same upload key, so sellers can keep
    installing without extra warnings.
+
+## Tablets
+
+The same APK runs on phones and tablets. A screen whose shorter side is at least 600 dp is a
+tablet (`src/layout/device.ts`); the design is the **Tablet** page of the UI/UX canvas.
+
+- **Orientation**: phones are locked upright at start-up; tablets turn freely
+  (`src/layout/orientation.ts`, expo-screen-orientation). Android 16 ignores orientation locks on
+  tablets for apps targeting API 36 anyway, so every tablet screen works both ways round.
+- **Screens**: a navigation rail instead of bottom tabs; setups in a 2–3 column grid; the editor
+  as steps | preview | settings when held sideways; the go-live check with the setup's picture
+  beside the settings; one-column screens and bottom sheets kept to a readable width.
+- **Live**: hold the tablet the way the live is shaped. Upright with a portrait live, the camera
+  fills the screen and every popup plus six sounds stay on screen. Sideways, the picture sits on
+  the left with a control panel on the right (a landscape live gets its popups under the
+  picture). Held across the live's shape, the live gets the middle of the camera picture and
+  the seller is asked to turn the tablet. The camera view keeps one place in the view tree in
+  every layout, so turning the tablet never restarts the camera or the live.
+- **Camera**: Android's preview transform makes the camera upright for the device's *natural*
+  orientation, which is landscape on most tablets; RootEncoder's own rotation assumes a phone.
+  `CameraFraming.kt` turns the picture by the screen's real rotation on tablets
+  (`followRotation`) and crops the middle when the tablet is held across the live's shape,
+  instead of stretching it. Phones get exactly the rotation they had before.
 
 ## Sounds
 

@@ -6,9 +6,11 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { AuthProvider, useAuth } from '@/auth/AuthProvider'
 import { UpdateGate } from '@/components/UpdateSheet'
+import { applyOrientationPolicy } from '@/layout/orientation'
 import { colors } from '@/theme'
 
 void SplashScreen.preventAutoHideAsync()
+void applyOrientationPolicy()
 
 const queryClient = new QueryClient({
   defaultOptions: {
