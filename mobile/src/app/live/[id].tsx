@@ -11,7 +11,7 @@ import { Icon } from '@/components/Icon'
 import { PopupArt } from '@/components/PopupArt'
 import { Button, ErrorState, IconButton, Loading, Notice, Segmented, Sheet } from '@/components/ui'
 import { isBuiltinSound, PLATFORM_BY_ID, SOUNDS } from '@/catalog'
-import { useSetup } from '@/hooks/queries'
+import { useMedia, useSetup } from '@/hooks/queries'
 import { clock, failureMessage, signal } from '@/live/format'
 import { useLiveSession } from '@/live/useLiveSession'
 import { popupText, resolveLook } from '@/stage/look'
@@ -32,6 +32,8 @@ export default function LiveScreen() {
   const platform: Platform = params.platform in PLATFORM_BY_ID ? params.platform : 'facebook'
   const platformLabel = PLATFORM_BY_ID[platform].label
   const setup = useSetup(setupId)
+  // The foreground's picture comes from the account's uploads (the live goes on without it if this fails).
+  const media = useMedia()
   const session = useLiveSession(setupId)
   const insets = useSafeAreaInsets()
   const window = useWindowDimensions()
@@ -78,10 +80,11 @@ export default function LiveScreen() {
     void streamer.current?.startStream(streamUrl(destination))
   }, [destination, session.state.kind, status?.status])
 
-  // The popups showing, drawn into the video by the native streamer.
+  // The foreground and the popups showing, drawn into the video by the native streamer.
+  const foregroundSettings = setup.data?.foreground
   useEffect(() => {
-    void streamer.current?.setOverlay(JSON.stringify(overlayFor(popups, active)))
-  }, [popups, active, status?.status])
+    void streamer.current?.setOverlay(JSON.stringify(overlayFor(popups, active, { settings: foregroundSettings, media: media.data })))
+  }, [popups, active, status?.status, foregroundSettings, media.data])
 
   // Keep the website's copy of "on screen now" in step (best effort, never blocks the live).
   useEffect(() => {

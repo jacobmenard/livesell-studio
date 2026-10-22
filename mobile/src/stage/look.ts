@@ -1,5 +1,6 @@
 import type { PopupLook, Position } from '@/api/types'
 import { POPUP_SIZE, PRESET_BY_ID, TEXT_COLORS, type PopupShape } from '@/catalog'
+import { absoluteUrl } from '@/config'
 
 /**
  * Everything needed to draw one popup, in numbers (the web's frontend/src/stage/look.ts
@@ -98,7 +99,8 @@ export function resolveLook(p: PopupLook): PopupDrawSpec {
       ...base,
       kind: 'image',
       text: p.label ?? 'Image',
-      imageUrl: p.media_url ?? null,
+      // The API returns uploads as "/storage/…"; the native streamer only loads full addresses.
+      imageUrl: absoluteUrl(p.media_url),
       bg: 'transparent',
       fg: '#0D0C10',
       borderColor: null,

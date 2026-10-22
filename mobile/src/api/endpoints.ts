@@ -2,6 +2,8 @@ import { request } from './client'
 import type {
   AppVersion,
   LiveSessionTicket,
+  MediaItem,
+  MediaKind,
   MobileSession,
   Scene,
   SetupDocument,
@@ -45,6 +47,27 @@ export const liveApi = {
   /** Tells an open clean screen (website) to play a sound; the phone plays its own copy. */
   playSound: (setupId: number, sound: SoundRef, volume: number) =>
     request<unknown>(`/api/setups/${setupId}/sounds`, { method: 'POST', body: { sound, volume } }),
+}
+
+/** A picked file on the phone, as React Native's FormData takes it. */
+export interface UploadFile {
+  uri: string
+  name: string
+  type: string
+}
+
+export const mediaApi = {
+  /** The account's uploads: popup images, backgrounds, foregrounds and sounds. */
+  list: () => request<Wrapped<MediaItem[]>>('/api/media').then((r) => r.data),
+  upload: (kind: MediaKind, file: UploadFile) => {
+    const body = new FormData()
+    body.append('kind', kind)
+    // React Native sends { uri, name, type } as the file's contents.
+    body.append('file', file as unknown as Blob)
+    return request<Wrapped<MediaItem>>('/api/media', { method: 'POST', body, timeoutMs: 120_000 }).then((r) => r.data)
+  },
+  /** Setups using a deleted background go back to their built-in one; a foreground turns off. */
+  remove: (id: number) => request<void>(`/api/media/${id}`, { method: 'DELETE' }),
 }
 
 export const accountApi = {

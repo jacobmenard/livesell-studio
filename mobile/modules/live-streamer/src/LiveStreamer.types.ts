@@ -43,7 +43,10 @@ export interface LiveStreamerHandle {
   restartStream(): Promise<void>
   switchCamera(): Promise<void>
   setMicMuted(muted: boolean): Promise<void>
-  /** JSON array of PopupDrawSpec (src/stage/look.ts), bottom to top. */
+  /**
+   * JSON array, bottom to top: an optional ForegroundDrawSpec first (src/stage/background.ts:
+   * a full-width banner docked top or bottom), then PopupDrawSpec items (src/stage/look.ts).
+   */
   setOverlay(json: string): Promise<void>
   playSound(id: string, volume: number, toStream: boolean, monitor: boolean): Promise<void>
 }

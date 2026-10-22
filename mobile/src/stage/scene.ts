@@ -1,5 +1,6 @@
-import type { PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
+import type { MediaItem, PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
 import { MAX_POPUPS_ON_SCREEN } from '@/catalog'
+import { backgroundOf, foregroundOf, foregroundSpec, type ForegroundDrawSpec } from './background'
 import { resolveLook, type PopupDrawSpec } from './look'
 
 /** A popup that is on screen, and when it was shown. */
@@ -15,8 +16,8 @@ export function documentFromSetup(setup: SetupFull): SetupDocument {
     orientation: setup.orientation,
     resolution: setup.resolution,
     camera: { ...setup.camera },
-    background: { ...setup.background },
-    foreground: { ...setup.foreground },
+    background: backgroundOf(setup.background),
+    foreground: foregroundOf(setup.foreground),
     sound_settings: { ...setup.sound_settings },
     output_settings: { ...setup.output_settings },
     popups: setup.popups.map((p) => ({ ...p })),
@@ -60,9 +61,18 @@ function visible(popups: PopupConfig[], active: ActivePopup[]): { popup: PopupCo
   return out
 }
 
-/** What the native streamer draws into the video, bottom to top (last shown on top). */
-export function overlayFor(popups: PopupConfig[], active: ActivePopup[]): PopupDrawSpec[] {
-  return visible(popups, active).map(({ popup }) => resolveLook(popup))
+/**
+ * What the native streamer draws into the video, bottom to top: the foreground first (popups
+ * show on top of it, as on the web), then the popups (last shown on top).
+ */
+export function overlayFor(
+  popups: PopupConfig[],
+  active: ActivePopup[],
+  foreground?: { settings: unknown; media: MediaItem[] | undefined },
+): (ForegroundDrawSpec | PopupDrawSpec)[] {
+  const banner = foreground ? foregroundSpec(foregroundOf(foreground.settings), foreground.media) : null
+  const specs = visible(popups, active).map(({ popup }) => resolveLook(popup))
+  return banner ? [banner, ...specs] : specs
 }
 
 /** The setup's "on screen now" for PUT /api/setups/{id}/scene, so the website can follow along. */
@@ -84,14 +94,14 @@ export function sceneFor(setup: SetupFull, active: ActivePopup[]): Scene {
     effect_repeat: popup.effect_repeat,
     shown_at: shownAt,
   }))
-  const { media_url: _bg, ...background } = setup.scene.background as Record<string, unknown>
-  const { media_url: _fg, ...foreground } = setup.scene.foreground as Record<string, unknown>
+  // The setup's own background and foreground (what the seller chose, on the phone or the web),
+  // not the last live's: the website's clean screen follows what the phone shows now.
   return {
     orientation: setup.orientation,
     see_through: setup.scene.see_through,
     camera: setup.scene.camera,
-    background,
-    foreground,
+    background: { ...backgroundOf(setup.background) },
+    foreground: { ...foregroundOf(setup.foreground) },
     popups,
   }
 }

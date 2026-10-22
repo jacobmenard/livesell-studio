@@ -1,22 +1,26 @@
 import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { errorMessage } from '@/api/client'
-import type { AutoHide, EffectId, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
+import type { AutoHide, BackgroundSettings, EffectId, ForegroundSettings, MediaItem, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
+import { BackgroundSection, ForegroundSection } from '@/components/BackgroundEditor'
 import { Icon } from '@/components/Icon'
 import { PopupArt, PopupLayer } from '@/components/PopupArt'
-import { backdropTone, StageBackdrop } from '@/components/StageBackdrop'
+import { StageBackdrop } from '@/components/StageBackdrop'
 import { Button, Card, ErrorState, Field, Loading, Notice, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
 import { AUTO_HIDES, EFFECTS, isBuiltinSound, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
-import { useSaveSetup, useSetup } from '@/hooks/queries'
+import { absoluteUrl } from '@/config'
+import { useMedia, useRemoveMedia, useSaveSetup, useSetup, useUploadMedia } from '@/hooks/queries'
+import { pickImage } from '@/media/pickImage'
+import { foregroundImage, previewBackground } from '@/stage/background'
 import { popupText, resolveLook } from '@/stage/look'
 import { checkPopupText, MAX_TEXT_LENGTH, newTextPopup, removePopup, updatePopup } from '@/stage/popups'
 import { documentForApi, documentFromSetup } from '@/stage/scene'
 import { colors, radius, space } from '@/theme'
 
-type Tab = 'popups' | 'camera' | 'sounds'
+type Tab = 'popups' | 'background' | 'camera' | 'sounds'
 type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'size' | 'text' | null
 
 const SIZES: { id: number; label: string }[] = [
@@ -80,6 +84,11 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [newColor, setNewColor] = useState<TextColor>('yellow')
   const [textError, setTextError] = useState<string | undefined>()
 
+  const media = useMedia()
+  const upload = useUploadMedia()
+  const removeMedia = useRemoveMedia()
+  const [uploading, setUploading] = useState<'background' | 'foreground' | null>(null)
+
   const dirty = stable(doc) !== base
 
   usePreventRemove(dirty && !save.isPending, ({ data }) => {
@@ -93,6 +102,42 @@ function Editor({ setup }: { setup: SetupFull }) {
 
   const change = (next: Partial<SetupDocument>) => setDoc((d) => ({ ...d, ...next }))
   const changePopup = (c: Partial<PopupConfig>) => selected && setDoc((d) => ({ ...d, popups: updatePopup(d.popups, selected, c) }))
+  const changeBackground = (patch: Partial<BackgroundSettings>) => setDoc((d) => ({ ...d, background: { ...d.background, ...patch } }))
+  const changeForeground = (patch: Partial<ForegroundSettings>) => setDoc((d) => ({ ...d, foreground: { ...d.foreground, ...patch } }))
+
+  /** Gallery → upload → picked straight away (as on the website). */
+  const uploadPicture = async (kind: 'background' | 'foreground') => {
+    const picked = await pickImage()
+    if (picked.kind === 'cancelled') return
+    if (picked.kind === 'invalid') {
+      Alert.alert('Can’t use that picture', picked.message)
+      return
+    }
+    setUploading(kind)
+    try {
+      const item = await upload.mutateAsync({ kind, file: picked.file })
+      if (kind === 'background') changeBackground({ media_id: item.id })
+      else changeForeground({ media_id: item.id, enabled: true })
+    } catch (error) {
+      Alert.alert('Not uploaded', errorMessage(error, 'The picture couldn’t be uploaded. Try again.'))
+    } finally {
+      setUploading(null)
+    }
+  }
+
+  /** The server also resets the setups using it; do the same to the unsaved copy so it still saves. */
+  const removePicture = async (item: MediaItem) => {
+    try {
+      await removeMedia.mutateAsync(item.id)
+      setDoc((d) => ({
+        ...d,
+        background: d.background.media_id === item.id ? { ...d.background, media_id: null } : d.background,
+        foreground: d.foreground.media_id === item.id ? { ...d.foreground, media_id: null, enabled: false } : d.foreground,
+      }))
+    } catch (error) {
+      Alert.alert('Not deleted', errorMessage(error))
+    }
+  }
 
   const persist = async (): Promise<boolean> => {
     try {
@@ -126,6 +171,17 @@ function Editor({ setup }: { setup: SetupFull }) {
   const portrait = doc.orientation === 'portrait'
   const stageW = portrait ? 168 : 320
   const stageH = portrait ? 300 : 180
+  const backdrop = previewBackground(doc.background, media.data)
+  const banner = foregroundImage(doc.foreground, media.data)
+  const bannerUrl = banner ? absoluteUrl(banner.url) : null
+  const bannerH = banner?.width && banner.height ? (stageW * banner.height) / banner.width : stageH * 0.22
+  const library = {
+    media: media.data,
+    mediaError: media.isError ? errorMessage(media.error, 'Your pictures couldn’t be loaded.') : null,
+    uploading,
+    onUpload: (kind: 'background' | 'foreground') => void uploadPicture(kind),
+    onRemove: removePicture,
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -139,7 +195,21 @@ function Editor({ setup }: { setup: SetupFull }) {
       <ScrollView contentContainerStyle={{ paddingBottom: space.lg }}>
         <View style={styles.previewBox} accessibilityLabel={popup ? `Preview of ${popupText(popup)}` : 'Preview'}>
           <View style={{ width: stageW, height: stageH, borderRadius: 4, overflow: 'hidden' }}>
-            <StageBackdrop tone={backdropTone(doc.background)} />
+            {backdrop.imageUrl ? (
+              <View style={[StyleSheet.absoluteFill, { backgroundColor: backdrop.tone }]}>
+                <Image source={{ uri: backdrop.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />
+              </View>
+            ) : (
+              <StageBackdrop tone={backdrop.tone} />
+            )}
+            {bannerUrl && (
+              <Image
+                source={{ uri: bannerUrl }}
+                style={{ position: 'absolute', left: 0, width: stageW, height: bannerH, [doc.foreground.dock]: 0 }}
+                resizeMode="stretch"
+                accessible={false}
+              />
+            )}
             {popup && <PopupLayer specs={[resolveLook(popup)]} width={stageW} height={stageH} />}
           </View>
         </View>
@@ -151,6 +221,7 @@ function Editor({ setup }: { setup: SetupFull }) {
             onChange={setTab}
             options={[
               { id: 'popups', label: 'Popups' },
+              { id: 'background', label: 'Background' },
               { id: 'camera', label: 'Camera' },
               { id: 'sounds', label: 'Sounds' },
             ]}
@@ -211,6 +282,13 @@ function Editor({ setup }: { setup: SetupFull }) {
           </View>
         )}
 
+        {tab === 'background' && (
+          <View style={{ padding: space.lg, gap: space.xl }}>
+            <BackgroundSection background={doc.background} onChange={changeBackground} {...library} />
+            <ForegroundSection foreground={doc.foreground} onChange={changeForeground} {...library} />
+          </View>
+        )}
+
         {tab === 'camera' && (
           <View style={{ padding: space.lg, gap: space.lg }}>
             <View style={{ gap: space.sm }}>
@@ -238,8 +316,8 @@ function Editor({ setup }: { setup: SetupFull }) {
                 ]}
               />
             </View>
-            <Notice title="Backgrounds and camera looks">
-              Background blur, pictures, green screen and camera filters are set on the website. The phone’s live uses your real camera picture for now.
+            <Notice title="Camera looks">
+              Camera filters and face effects are set on the website. Backgrounds and the foreground are in the Background tab; the phone’s own live shows the foreground but keeps your real room behind you for now.
             </Notice>
           </View>
         )}

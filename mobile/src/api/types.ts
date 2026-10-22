@@ -29,6 +29,42 @@ export type BuiltinSoundId =
 /** A built-in sound, or "media:<id>" for a seller's own upload. */
 export type SoundRef = BuiltinSoundId | `media:${number}`
 export type Platform = 'facebook' | 'youtube' | 'tiktok' | 'custom'
+export type BackgroundMode = 'none' | 'blur' | 'image' | 'green'
+export type BackgroundPresetId = 'loft' | 'rack' | 'kitchen' | 'vanity' | 'brand' | 'white'
+export type KeyColor = 'green' | 'blue'
+export type ForegroundDock = 'top' | 'bottom'
+/** "foreground" uploads are kept apart from popup "image" uploads. */
+export type MediaKind = 'image' | 'background' | 'foreground' | 'sound'
+
+export interface BackgroundSettings {
+  mode: BackgroundMode
+  preset: BackgroundPresetId
+  /** One of the seller's "background" uploads, shown instead of the preset. */
+  media_id: number | null
+  key_color: KeyColor
+  similarity: number
+  smoothness: number
+}
+
+/** A full-width image (banner, lower third) docked to the top or bottom of the stage. */
+export interface ForegroundSettings {
+  enabled: boolean
+  media_id: number | null
+  dock: ForegroundDock
+}
+
+/** One of the seller's uploads (GET /api/media). `url` may be relative: see absoluteUrl(). */
+export interface MediaItem {
+  id: number
+  kind: MediaKind
+  label: string
+  url: string
+  mime: string
+  size: number
+  width: number | null
+  height: number | null
+  created_at: string | null
+}
 
 export interface User {
   id: number
@@ -117,8 +153,8 @@ export interface SetupSummary {
 
 export interface SetupFull extends SetupSummary {
   camera: Opaque
-  background: Opaque
-  foreground: Opaque
+  background: BackgroundSettings
+  foreground: ForegroundSettings
   sound_settings: SoundSettings
   output_settings: Opaque
   popups: PopupConfig[]
@@ -130,8 +166,8 @@ export interface SetupDocument {
   orientation: Orientation
   resolution: Resolution
   camera: Opaque
-  background: Opaque
-  foreground: Opaque
+  background: BackgroundSettings
+  foreground: ForegroundSettings
   sound_settings: SoundSettings
   output_settings: Opaque
   popups: PopupConfig[]

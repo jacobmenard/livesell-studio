@@ -64,7 +64,10 @@ export function messageFor(status: number, body: Record<string, unknown>): strin
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
+  /** Sent as JSON, or as multipart form data when it's a FormData (uploads). */
   body?: unknown
+  /** Overrides REQUEST_TIMEOUT_MS (uploads on slow mobile data take longer). */
+  timeoutMs?: number
   /** Skip the bearer token (login, register, version check). */
   anonymous?: boolean
   signal?: AbortSignal
@@ -72,12 +75,14 @@ export interface RequestOptions {
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? REQUEST_TIMEOUT_MS)
   const abort = () => controller.abort()
   options.signal?.addEventListener('abort', abort)
 
+  // fetch sets the multipart Content-Type (with its boundary) itself for FormData.
+  const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   const token = options.anonymous ? null : getToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -86,7 +91,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(`${API_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : multipart ? (options.body as FormData) : JSON.stringify(options.body),
       signal: controller.signal,
     })
   } catch {
