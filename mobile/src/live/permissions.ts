@@ -18,6 +18,12 @@ export async function requestPermissions(): Promise<{ camera: PermissionState; m
   return { camera: map(result[CAMERA]), mic: map(result[MIC]) }
 }
 
+/** Just the camera, for the editor's preview (the microphone is only needed to go live). */
+export async function requestCamera(): Promise<PermissionState> {
+  const r = await PermissionsAndroid.request(CAMERA)
+  return r === PermissionsAndroid.RESULTS.GRANTED ? 'granted' : r === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? 'blocked' : 'denied'
+}
+
 export function openAppSettings(): void {
   void Linking.openSettings()
 }

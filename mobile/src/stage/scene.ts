@@ -1,6 +1,15 @@
-import type { PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
+import type { BackgroundSettings, CameraSettings, PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
 import { MAX_POPUPS_ON_SCREEN } from '@/catalog'
 import { resolveLook, type PopupDrawSpec } from './look'
+import { backgroundWithDefaults, cameraWithDefaults, foregroundWithDefaults } from './stageLook'
+
+/** Changes made on the live screen only (not saved to the setup). */
+export interface LiveOverrides {
+  camera?: Partial<CameraSettings>
+  background?: Partial<BackgroundSettings>
+}
+
+const CAMERA_KEYS = ['source', 'device_label', 'mirror', 'brightness', 'contrast', 'saturation', 'warmth', 'smoothing', 'effect', 'filter', 'filter_strength', 'zoom', 'audio'] as const
 
 /** A popup that is on screen, and when it was shown. */
 export interface ActivePopup {
@@ -65,8 +74,13 @@ export function overlayFor(popups: PopupConfig[], active: ActivePopup[]): PopupD
   return visible(popups, active).map(({ popup }) => resolveLook(popup))
 }
 
-/** The setup's "on screen now" for PUT /api/setups/{id}/scene, so the website can follow along. */
-export function sceneFor(setup: SetupFull, active: ActivePopup[]): Scene {
+/**
+ * The setup's "on screen now" for PUT /api/setups/{id}/scene, so the website can follow along.
+ * Built from the setup plus any live-only changes, with only the fields the API accepts
+ * (frontend/src/stage/scene.ts sceneForApi). `mediaIds` are the seller's pictures, when
+ * known: a deleted background photo falls back to the built-in picture, like the website.
+ */
+export function sceneFor(setup: SetupFull, active: ActivePopup[], overrides: LiveOverrides = {}, mediaIds?: ReadonlySet<number>): Scene {
   const popups: ScenePopup[] = visible(setup.popups, active).map(({ popup, shownAt }) => ({
     key: popup.key,
     kind: popup.kind,
@@ -84,14 +98,18 @@ export function sceneFor(setup: SetupFull, active: ActivePopup[]): Scene {
     effect_repeat: popup.effect_repeat,
     shown_at: shownAt,
   }))
-  const { media_url: _bg, ...background } = setup.scene.background as Record<string, unknown>
-  const { media_url: _fg, ...foreground } = setup.scene.foreground as Record<string, unknown>
+  const exists = (id: number | null) => (id && (!mediaIds || mediaIds.has(id)) ? id : null)
+
+  const fullCamera = cameraWithDefaults({ ...setup.camera, ...overrides.camera })
+  const camera = Object.fromEntries(CAMERA_KEYS.filter((k) => fullCamera[k] !== undefined).map((k) => [k, fullCamera[k]])) as unknown as CameraSettings
+  const b = backgroundWithDefaults({ ...setup.background, ...overrides.background })
+  const f = foregroundWithDefaults(setup.foreground)
   return {
     orientation: setup.orientation,
     see_through: setup.scene.see_through,
-    camera: setup.scene.camera,
-    background,
-    foreground,
+    camera,
+    background: { mode: b.mode, preset: b.preset, media_id: exists(b.media_id), key_color: b.key_color, similarity: b.similarity, smoothness: b.smoothness },
+    foreground: { enabled: f.enabled, media_id: exists(f.media_id), dock: f.dock },
     popups,
   }
 }

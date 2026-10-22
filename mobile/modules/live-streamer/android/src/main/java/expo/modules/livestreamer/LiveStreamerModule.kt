@@ -63,6 +63,11 @@ class LiveStreamerModule : Module() {
         view.setOverlay(json)
       }
 
+      /** The camera picture's look, background and foreground (src/stage/stageLook.ts NativeLook). */
+      AsyncFunction("setLook") { view: LiveStreamerView, json: String ->
+        view.setLook(json)
+      }
+
       /**
        * Plays a built-in sound effect. `toStream` mixes it into the live's audio (viewers hear
        * it, the microphone doesn't pick it up again); `monitor` also plays it on the speaker.

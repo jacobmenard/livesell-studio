@@ -4,19 +4,31 @@ import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { errorMessage } from '@/api/client'
-import type { AutoHide, EffectId, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
+import type { AutoHide, BackgroundSettings, CameraSettings, EffectId, ForegroundSettings, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { PopupArt, PopupLayer } from '@/components/PopupArt'
-import { backdropTone, StageBackdrop } from '@/components/StageBackdrop'
-import { Button, Card, ErrorState, Field, Loading, Notice, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
+import { PopupArt } from '@/components/PopupArt'
+import { BackgroundSection } from '@/components/editor/BackgroundSection'
+import { CameraSection } from '@/components/editor/CameraSection'
+import { ForegroundSection } from '@/components/editor/ForegroundSection'
+import { StagePreview } from '@/components/editor/StagePreview'
+import { Button, Card, ErrorState, Field, Loading, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
 import { AUTO_HIDES, EFFECTS, isBuiltinSound, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
-import { useSaveSetup, useSetup } from '@/hooks/queries'
+import { useMedia, useSaveSetup, useSetup } from '@/hooks/queries'
 import { popupText, resolveLook } from '@/stage/look'
 import { checkPopupText, MAX_TEXT_LENGTH, newTextPopup, removePopup, updatePopup } from '@/stage/popups'
 import { documentForApi, documentFromSetup } from '@/stage/scene'
+import { nativeLook } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 
-type Tab = 'popups' | 'camera' | 'sounds'
+type Tab = 'camera' | 'background' | 'popups' | 'foreground' | 'sounds'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'camera', label: 'Camera' },
+  { id: 'background', label: 'Background' },
+  { id: 'popups', label: 'Popups' },
+  { id: 'foreground', label: 'Foreground' },
+  { id: 'sounds', label: 'Sounds' },
+]
 type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'size' | 'text' | null
 
 const SIZES: { id: number; label: string }[] = [
@@ -79,6 +91,8 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [newText, setNewText] = useState('')
   const [newColor, setNewColor] = useState<TextColor>('yellow')
   const [textError, setTextError] = useState<string | undefined>()
+  const [segmentationMissing, setSegmentationMissing] = useState(false)
+  const media = useMedia()
 
   const dirty = stable(doc) !== base
 
@@ -92,6 +106,9 @@ function Editor({ setup }: { setup: SetupFull }) {
   const popup = useMemo(() => doc.popups.find((p) => p.key === selected) ?? null, [doc, selected])
 
   const change = (next: Partial<SetupDocument>) => setDoc((d) => ({ ...d, ...next }))
+  const changeCamera = (c: Partial<CameraSettings>) => setDoc((d) => ({ ...d, camera: { ...d.camera, ...c } }))
+  const changeBackground = (c: Partial<BackgroundSettings>) => setDoc((d) => ({ ...d, background: { ...d.background, ...c } }))
+  const changeForeground = (c: Partial<ForegroundSettings>) => setDoc((d) => ({ ...d, foreground: { ...d.foreground, ...c } }))
   const changePopup = (c: Partial<PopupConfig>) => selected && setDoc((d) => ({ ...d, popups: updatePopup(d.popups, selected, c) }))
 
   const persist = async (): Promise<boolean> => {
@@ -126,6 +143,10 @@ function Editor({ setup }: { setup: SetupFull }) {
   const portrait = doc.orientation === 'portrait'
   const stageW = portrait ? 168 : 320
   const stageH = portrait ? 300 : 180
+  const mediaList = useMemo(() => media.data ?? [], [media.data])
+  const look = useMemo(() => nativeLook(doc, mediaList), [doc, mediaList])
+  // The popup only shows on the Popups step, so the look is easy to judge on the others.
+  const overlay = useMemo(() => (tab === 'popups' && popup ? [resolveLook(popup)] : []), [tab, popup])
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -138,24 +159,32 @@ function Editor({ setup }: { setup: SetupFull }) {
 
       <ScrollView contentContainerStyle={{ paddingBottom: space.lg }}>
         <View style={styles.previewBox} accessibilityLabel={popup ? `Preview of ${popupText(popup)}` : 'Preview'}>
-          <View style={{ width: stageW, height: stageH, borderRadius: 4, overflow: 'hidden' }}>
-            <StageBackdrop tone={backdropTone(doc.background)} />
-            {popup && <PopupLayer specs={[resolveLook(popup)]} width={stageW} height={stageH} />}
-          </View>
-        </View>
-
-        <View style={{ paddingHorizontal: space.lg, paddingTop: space.md }}>
-          <Segmented
-            label="Setup steps"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { id: 'popups', label: 'Popups' },
-              { id: 'camera', label: 'Camera' },
-              { id: 'sounds', label: 'Sounds' },
-            ]}
+          <StagePreview
+            width={stageW}
+            height={stageH}
+            orientation={doc.orientation}
+            resolution={doc.resolution}
+            look={look}
+            overlay={overlay}
+            onSegmentationMissing={() => setSegmentationMissing(true)}
           />
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md }}
+          accessibilityRole="tablist"
+        >
+          {TABS.map((t) => {
+            const on = t.id === tab
+            return (
+              <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.tabChip, on && styles.tabChipOn]}>
+                <Text style={{ color: on ? colors.ink : colors.text, fontSize: 14, fontWeight: on ? '700' : '500' }}>{t.label}</Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
 
         {tab === 'popups' && (
           <View style={{ padding: space.lg, gap: space.md }}>
@@ -212,37 +241,26 @@ function Editor({ setup }: { setup: SetupFull }) {
         )}
 
         {tab === 'camera' && (
-          <View style={{ padding: space.lg, gap: space.lg }}>
-            <View style={{ gap: space.sm }}>
-              <Text style={styles.h2}>Shape</Text>
-              <Segmented
-                label="Shape"
-                value={doc.orientation}
-                onChange={(orientation) => change({ orientation })}
-                options={[
-                  { id: 'portrait', label: 'Portrait 9:16' },
-                  { id: 'landscape', label: 'Landscape 16:9' },
-                ]}
-              />
-              <Text style={styles.help}>Portrait fits TikTok and Facebook on phones. Landscape fits YouTube.</Text>
-            </View>
-            <View style={{ gap: space.sm }}>
-              <Text style={styles.h2}>Quality</Text>
-              <Segmented
-                label="Quality"
-                value={doc.resolution}
-                onChange={(resolution) => change({ resolution })}
-                options={[
-                  { id: '720p', label: '720p · best for data' },
-                  { id: '1080p', label: '1080p · sharper' },
-                ]}
-              />
-            </View>
-            <Notice title="Backgrounds and camera looks">
-              Background blur, pictures, green screen and camera filters are set on the website. The phone’s live uses your real camera picture for now.
-            </Notice>
-          </View>
+          <CameraSection
+            camera={doc.camera}
+            orientation={doc.orientation}
+            resolution={doc.resolution}
+            onCamera={changeCamera}
+            onShape={(c) => change(c)}
+          />
         )}
+
+        {tab === 'background' && (
+          <BackgroundSection
+            background={doc.background}
+            media={mediaList}
+            mediaLoading={media.isPending}
+            segmentationMissing={segmentationMissing}
+            onChange={changeBackground}
+          />
+        )}
+
+        {tab === 'foreground' && <ForegroundSection foreground={doc.foreground} media={mediaList} mediaLoading={media.isPending} onChange={changeForeground} />}
 
         {tab === 'sounds' && (
           <View style={{ padding: space.lg, gap: space.lg }}>
@@ -414,6 +432,8 @@ function Options<T extends string>({ options, value, onPick }: { options: { id: 
 const styles = StyleSheet.create({
   previewBox: { height: 316, marginHorizontal: space.lg, marginTop: space.sm, borderRadius: 18, backgroundColor: colors.field, alignItems: 'center', justifyContent: 'center' },
   h2: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  tabChip: { minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  tabChipOn: { backgroundColor: colors.text },
   help: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   tile: {

@@ -22,7 +22,11 @@ export interface LiveStatsEvent {
 }
 
 export interface LiveErrorEvent {
-  code: 'prepare' | 'camera' | 'sound' | string
+  /**
+   * prepare / camera / sound as before; "microphone" = the mic couldn't start when going live;
+   * "segmentation" = this phone can't find the person, so Blur and Picture backgrounds aren't drawn.
+   */
+  code: 'prepare' | 'camera' | 'sound' | 'microphone' | 'segmentation' | string
   message: string
 }
 
@@ -46,4 +50,6 @@ export interface LiveStreamerHandle {
   /** JSON array of PopupDrawSpec (src/stage/look.ts), bottom to top. */
   setOverlay(json: string): Promise<void>
   playSound(id: string, volume: number, toStream: boolean, monitor: boolean): Promise<void>
+  /** JSON NativeLook (src/stage/stageLook.ts): camera look, colour filter, background, foreground. */
+  setLook(json: string): Promise<void>
 }

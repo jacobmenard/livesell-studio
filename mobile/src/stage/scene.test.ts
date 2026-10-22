@@ -34,17 +34,17 @@ function setup(popups: PopupConfig[], onScreen: { key: string; shown_at: number 
     background_label: 'Boutique rack',
     linked_sounds: 1,
     updated_at: null,
-    camera: {},
-    background: {},
-    foreground: {},
+    camera: { source: 'phone', device_label: null, mirror: true, brightness: 50, zoom: 0, filter: 'warm', filter_strength: 60 },
+    background: { mode: 'image', preset: 'loft', media_id: 9, key_color: 'green', similarity: 42, smoothness: 18 },
+    foreground: { enabled: true, media_id: 4, dock: 'top' },
     sound_settings: { volume: 80, to_stream: true, monitor: false },
     output_settings: {},
     popups,
     scene: {
       orientation: 'portrait',
       see_through: false,
-      camera: { mirror: false },
-      background: { mode: 'image', media_url: 'https://x.test/bg.png' },
+      camera: { source: 'phone', device_label: null, mirror: false, brightness: 50, zoom: 0 },
+      background: { mode: 'image', preset: 'rack', media_id: 9, key_color: 'green', similarity: 42, smoothness: 18, media_url: 'https://x.test/bg.png' },
       foreground: { enabled: false, media_url: null },
       popups: onScreen.map((s) => ({ ...popup(s.key), shown_at: s.shown_at })),
     },
@@ -84,12 +84,27 @@ describe('popups on screen', () => {
     expect(activeFromSetup(s)).toEqual([{ key: 'a', shownAt: 2 }])
   })
 
-  it('builds the scene the API takes, without media URLs', () => {
+  it('builds the scene the API takes from the setup, without media URLs', () => {
     const scene = sceneFor(setup([popup('a')]), [{ key: 'a', shownAt: 5 }])
     expect(scene.popups).toEqual([expect.objectContaining({ key: 'a', shown_at: 5 })])
-    expect(scene.background).toEqual({ mode: 'image' })
-    expect(scene.foreground).toEqual({ enabled: false })
+    expect(scene.camera).toEqual({ source: 'phone', device_label: null, mirror: true, brightness: 50, zoom: 0, filter: 'warm', filter_strength: 60, contrast: 50, saturation: 50, warmth: 50, smoothing: 0, effect: 'none', audio: true })
+    expect(scene.background).toEqual({ mode: 'image', preset: 'loft', media_id: 9, key_color: 'green', similarity: 42, smoothness: 18 })
+    expect(scene.foreground).toEqual({ enabled: true, media_id: 4, dock: 'top' })
     expect('auto_hide' in scene.popups[0]!).toBe(false)
+  })
+
+  it('includes live-only changes and fills in fields older setups lack', () => {
+    const s = { ...setup([]), camera: { source: 'phone', device_label: null, mirror: false, brightness: 50, zoom: 0 } } as SetupFull
+    const scene = sceneFor(s, [], { camera: { filter: 'noir' }, background: { mode: 'blur' } })
+    expect(scene.camera).toMatchObject({ filter: 'noir', contrast: 50, smoothing: 0 })
+    expect(scene.background.mode).toBe('blur')
+    expect(Object.keys(scene.camera).every((k) => !k.includes('url'))).toBe(true)
+  })
+
+  it('drops pictures the seller has deleted', () => {
+    const scene = sceneFor(setup([]), [], {}, new Set([4]))
+    expect(scene.background.media_id).toBeNull()
+    expect(scene.foreground.media_id).toBe(4)
   })
 
   it('trims the name and drops media URLs before saving', () => {

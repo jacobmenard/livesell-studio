@@ -4,7 +4,7 @@ import type { SetupSummary } from '@/api/types'
 import { resolveLook } from '@/stage/look'
 import { colors, radius, space } from '@/theme'
 import { PopupLayer } from './PopupArt'
-import { backdropTone, StageBackdrop } from './StageBackdrop'
+import { SetupBackdrop } from './StageBackdrop'
 import { Button, IconButton } from './ui'
 
 function edited(updatedAt: string | null): string {
@@ -47,7 +47,7 @@ export function SetupCard({
     <View style={styles.card}>
       <View style={styles.thumb} accessible={false} importantForAccessibility="no-hide-descendants">
         <View style={{ width: stageW, height: stageH, overflow: 'hidden' }}>
-          <StageBackdrop tone={backdropTone(setup.scene.background)} />
+          <SetupBackdrop background={setup.scene.background} />
           <PopupLayer specs={specs} width={stageW} height={stageH} />
         </View>
       </View>

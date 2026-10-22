@@ -90,10 +90,22 @@ class OverlayRenderer(private val typeface: Typeface) {
   private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
   private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
-  fun render(specs: List<OverlaySpec>, width: Int, height: Int, image: (String) -> Bitmap?): Bitmap {
+  /**
+   * The foreground banner (if any) and then the popups, bottom to top, like the website:
+   * the foreground sits above the camera and below every popup.
+   */
+  fun render(
+    specs: List<OverlaySpec>,
+    width: Int,
+    height: Int,
+    image: (String) -> Bitmap?,
+    foreground: Bitmap? = null,
+    foregroundTop: Boolean = false,
+  ): Bitmap {
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    if (specs.isEmpty()) return bitmap
+    if (specs.isEmpty() && foreground == null) return bitmap
     val canvas = Canvas(bitmap)
+    if (foreground != null) drawForeground(canvas, foreground, foregroundTop, width, height)
     val unit = min(width, height) / 100f
     for (spec in specs) {
       if (spec.kind == "image") {
@@ -103,6 +115,14 @@ class OverlayRenderer(private val typeface: Typeface) {
       }
     }
     return bitmap
+  }
+
+  /** Full width at its own aspect ratio, docked to the top or bottom (Stage.tsx ForegroundLayer). */
+  private fun drawForeground(canvas: Canvas, picture: Bitmap, top: Boolean, width: Int, height: Int) {
+    if (picture.width <= 0 || picture.height <= 0) return
+    val h = width.toFloat() * picture.height / picture.width
+    val y = if (top) 0f else height - h
+    canvas.drawBitmap(picture, null, RectF(0f, y, width.toFloat(), y + h), imagePaint)
   }
 
   private fun drawText(canvas: Canvas, spec: OverlaySpec, unit: Float, width: Int, height: Int) {

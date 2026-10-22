@@ -1,13 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { accountApi, setupsApi } from '@/api/endpoints'
-import type { SetupDocument, SetupFull } from '@/api/types'
+import { accountApi, mediaApi, setupsApi, type PickedFile } from '@/api/endpoints'
+import type { MediaItem, MediaKind, SetupDocument, SetupFull } from '@/api/types'
 import { appVersionCode } from '@/config'
 
 export const keys = {
   setups: ['setups'] as const,
   setup: (id: number) => ['setups', id] as const,
   subscription: ['subscription'] as const,
+  media: ['media'] as const,
   version: ['app-version'] as const,
 }
 
@@ -39,6 +40,27 @@ export function useCreateSetup() {
       client.setQueryData(keys.setup(created.id), created)
       void client.invalidateQueries({ queryKey: keys.setups, exact: true })
     },
+  })
+}
+
+/** The seller's uploaded pictures (backgrounds, foregrounds, popup images): URLs for the live picture. */
+export function useMedia() {
+  return useQuery({ queryKey: keys.media, queryFn: mediaApi.list, staleTime: 5 * 60 * 1000 })
+}
+
+export function useUploadMedia() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ kind, file }: { kind: MediaKind; file: PickedFile }) => mediaApi.upload(kind, file),
+    onSuccess: (item: MediaItem) => client.setQueryData<MediaItem[]>(keys.media, (list) => [...(list ?? []), item]),
+  })
+}
+
+export function useRemoveMedia() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => mediaApi.remove(id),
+    onSuccess: (_: unknown, id: number) => client.setQueryData<MediaItem[]>(keys.media, (list) => (list ?? []).filter((m) => m.id !== id)),
   })
 }
 

@@ -7,7 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 
 import type { Platform, Resolution } from '@/api/types'
 import { Icon, type IconName } from '@/components/Icon'
-import { backdropTone, StageBackdrop } from '@/components/StageBackdrop'
+import { SetupBackdrop } from '@/components/StageBackdrop'
 import { Button, ErrorState, Loading, Notice, ScreenHeader, Segmented } from '@/components/ui'
 import { PLATFORMS } from '@/catalog'
 import { errorMessage } from '@/api/client'
@@ -120,7 +120,7 @@ export default function GoLiveCheckScreen() {
       <ScrollView contentContainerStyle={{ padding: space.xl, paddingTop: space.sm, gap: space.lg }}>
         <View style={styles.summary}>
           <View style={styles.thumb} accessible={false}>
-            <StageBackdrop tone={backdropTone(s.scene.background)} />
+            <SetupBackdrop background={s.scene.background} />
           </View>
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={{ color: colors.text, fontSize: 16, fontWeight: '700' }} numberOfLines={1}>

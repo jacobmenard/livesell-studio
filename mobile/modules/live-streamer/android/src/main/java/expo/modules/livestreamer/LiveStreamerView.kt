@@ -30,8 +30,12 @@ enum class Resolution(val long: Int, val short: Int, val videoBitrate: Int) {
 
 /**
  * The camera preview the seller sees, which is also exactly what viewers get: the same
- * OpenGL pipeline feeds the screen and the encoder, with the popups drawn in as a filter.
+ * OpenGL pipeline feeds the screen and the encoder. Two filters run on the camera, in order:
+ *  1. StageFilterRender: zoom, mirror, look, colour filter and background;
+ *  2. the overlay: the foreground banner and the popups, drawn as one picture.
  * The app's own buttons are React Native views on top and never reach the stream.
+ *
+ * Used for previews too (the setup editor): the microphone is only opened when a live starts.
  */
 @SuppressLint("ViewConstructor")
 class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(context, appContext), ConnectChecker {
@@ -47,9 +51,19 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   private val surfaceView = SurfaceView(context)
   private val mixer = SoundMixer()
   private val sounds = SoundBank(context.assets)
-  private val images = RemoteImages { main.post { renderOverlay() } }
+  private val popupImages = RemoteImages(context.assets, 1080) { main.post { renderOverlay() } }
+  private val pictures = RemoteImages(context.assets, 1920) {
+    main.post {
+      applyPicture()
+      renderOverlay()
+    }
+  }
   private val renderer = OverlayRenderer(loadTypeface(context))
   private val overlayFilter = ImageFilterRender()
+  private val segmenter = PersonSegmenter {
+    main.post { emitError("segmentation", "Background removal isn't working on this phone right now, so viewers see your real room.") }
+  }
+  private val stageFilter = StageFilterRender(context.assets, segmenter)
 
   private val stream: RtmpStream = RtmpStream(context, this, Camera2Source(context), MicrophoneSource())
 
@@ -58,13 +72,18 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   private var resolution = Resolution.P720
   private var front = true
   private var prepared: Pair<Boolean, Resolution>? = null
+  private var audioPrepared = false
 
   private var surfaceReady = false
-  private var filterAdded = false
+  /** Our two filters are in RootEncoder's chain (it drops them whenever its GL pipeline stops). */
+  private var filtersAttached = false
   private var overlayJson = "[]"
+  private var look = LookSpec()
+  private var shownPicture: String? = null
   private var lastUrl: String? = null
   private var stopRequested = false
   private var attempt = 0
+  private var previewAttempts = 0
   private var lastStatsAt = 0L
   private var released = false
 
@@ -81,6 +100,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     surfaceView.holder.addCallback(object : SurfaceHolder.Callback {
       override fun surfaceCreated(holder: SurfaceHolder) {
         surfaceReady = true
+        previewAttempts = 0
         startPreviewIfReady()
       }
 
@@ -91,7 +111,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
       override fun surfaceDestroyed(holder: SurfaceHolder) {
         surfaceReady = false
         // Leaving the app stops the preview; a running stream keeps its encoder (see README).
-        if (stream.isOnPreview) stream.stopPreview()
+        stopPreview()
       }
     })
   }
@@ -120,48 +140,83 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
       // The shape of a running live can't change; it applies to the next one.
       return
     }
-    if (stream.isOnPreview) stream.stopPreview()
-    prepare()
+    stopPreview()
+    prepareVideo()
     startPreviewIfReady()
   }
 
-  private fun prepare(): Boolean {
+  private fun prepareVideo(): Boolean {
     val ok = try {
       // Portrait: the camera frame is rotated 90°, so the stream comes out short × long.
-      stream.prepareVideo(resolution.long, resolution.short, resolution.videoBitrate, FPS, rotation = if (landscape) 0 else 90) &&
-        stream.prepareAudio(SAMPLE_RATE, STEREO, AUDIO_BITRATE)
+      stream.prepareVideo(resolution.long, resolution.short, resolution.videoBitrate, FPS, rotation = if (landscape) 0 else 90)
     } catch (error: IllegalArgumentException) {
-      Log.w(TAG, "prepare failed", error)
+      Log.w(TAG, "prepare video failed", error)
       false
     }
     if (ok) {
       prepared = landscape to resolution
-      mixer.channels = if (STEREO) 2 else 1
     } else {
-      emitError("prepare", "This phone's camera or microphone can't record at ${resolution.short}p. Try 720p.")
+      emitError("prepare", "This phone's camera can't record at ${resolution.short}p. Try 720p.")
     }
     return ok
   }
 
+  /** The microphone, only when a live starts (a preview needs no microphone permission). */
+  private fun prepareAudio(): Boolean {
+    if (audioPrepared) return true
+    audioPrepared = try {
+      stream.prepareAudio(SAMPLE_RATE, STEREO, AUDIO_BITRATE)
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "prepare audio failed", error)
+      false
+    }
+    if (audioPrepared) {
+      mixer.channels = if (STEREO) 2 else 1
+    } else {
+      emitError("microphone", "The microphone couldn't start. Allow it for NegosyoWork Studio, and close other apps that record sound.")
+    }
+    return audioPrepared
+  }
+
   private fun startPreviewIfReady() {
     if (released || !surfaceReady || stream.isOnPreview) return
-    if (prepared == null && !prepare()) return
+    if (prepared == null && !prepareVideo()) return
+    // A fresh GL pipeline starts with no filters: ours go back in after the preview starts.
+    val freshPipeline = !stream.getGlInterface().isRunning()
     try {
       stream.startPreview(surfaceView)
     } catch (error: Exception) {
       Log.w(TAG, "preview failed", error)
-      emitError("camera", "The camera couldn't start. Close other camera apps and try again.")
+      // The screen we came from may still be letting go of the camera: try again shortly.
+      if (++previewAttempts <= MAX_PREVIEW_ATTEMPTS) {
+        main.postDelayed({ startPreviewIfReady() }, PREVIEW_RETRY_MS)
+      } else {
+        emitError("camera", "The camera couldn't start. Close other camera apps and try again.")
+      }
       return
     }
-    if (!filterAdded) {
-      overlayFilter.setScale(100f, 100f)
-      overlayFilter.setPosition(0f, 0f)
-      stream.getGlInterface().addFilter(overlayFilter)
-      filterAdded = true
-    }
+    previewAttempts = 0
+    if (freshPipeline || !filtersAttached) attachFilters()
     applyFacing()
+    applyPicture()
     renderOverlay()
     emitStatus(if (stream.isStreaming) "live" else "previewing")
+  }
+
+  private fun attachFilters() {
+    val gl = stream.getGlInterface()
+    gl.addFilter(stageFilter)
+    overlayFilter.setScale(100f, 100f)
+    overlayFilter.setPosition(0f, 0f)
+    gl.addFilter(overlayFilter)
+    filtersAttached = true
+  }
+
+  private fun stopPreview() {
+    if (!stream.isOnPreview) return
+    stream.stopPreview()
+    // Not live: RootEncoder stopped its GL pipeline and released every filter.
+    if (!stream.isStreaming) filtersAttached = false
   }
 
   private fun applyFacing() {
@@ -171,12 +226,44 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     if (isFront != front) camera.switchCamera()
   }
 
+  // ---- the look ---------------------------------------------------------------------------
+
+  /** Zoom, mirror, look, filter, background and foreground: src/stage/stageLook.ts NativeLook. */
+  fun setLook(json: String) {
+    val next = LookSpec.parse(json)
+    val foregroundChanged = next.foreground != look.foreground
+    look = next
+    stageFilter.look = next
+    applyPicture()
+    if (foregroundChanged) renderOverlay()
+  }
+
+  /** The picture behind the person: shown once loaded (its tone until then). */
+  private fun applyPicture() {
+    val source = look.background.pictureSource
+    if (source == null) {
+      if (shownPicture != null) stageFilter.setPicture(null, null)
+      shownPicture = null
+      return
+    }
+    val bitmap = pictures.get(source)
+    if (bitmap == null) {
+      // Still loading: drop the old picture so a different one never flashes in its place.
+      if (shownPicture != source) stageFilter.setPicture(null, source)
+      return
+    }
+    if (shownPicture == source) return
+    stageFilter.setPicture(bitmap, source)
+    shownPicture = source
+  }
+
   // ---- streaming -----------------------------------------------------------------------
 
   fun startStream(url: String) {
     if (released) return
     if (stream.isStreaming) return
-    if (prepared == null && !prepare()) return
+    if (prepared == null && !prepareVideo()) return
+    if (!prepareAudio()) return
     lastUrl = url
     stopRequested = false
     attempt = 0
@@ -192,8 +279,15 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
 
   fun stopStream() {
     stopRequested = true
-    if (stream.isStreaming) stream.stopStream()
+    endStream()
     emitStatus("stopped")
+  }
+
+  private fun endStream() {
+    if (!stream.isStreaming) return
+    stream.stopStream()
+    // Without a preview, stopping the live also stopped the GL pipeline and its filters.
+    if (!stream.isOnPreview) filtersAttached = false
   }
 
   /** "Try now": drop the pending retry and connect again straight away. */
@@ -201,7 +295,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     val url = lastUrl ?: return
     if (stream.isStreaming) {
       stopRequested = true
-      stream.stopStream()
+      endStream()
     }
     startStream(url)
   }
@@ -224,11 +318,13 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   }
 
   private fun renderOverlay() {
-    if (released || !filterAdded) return
+    if (released || !filtersAttached) return
     val size = stream.getGlInterface().getEncoderSize()
     if (size.x <= 0 || size.y <= 0) return
     val specs = OverlaySpec.parseList(overlayJson)
-    val bitmap: Bitmap = renderer.render(specs, size.x, size.y) { url -> images.get(url) }
+    val foreground = look.foreground
+    val banner = foreground?.let { pictures.get(it.url) }
+    val bitmap: Bitmap = renderer.render(specs, size.x, size.y, { url -> popupImages.get(url) }, banner, foreground?.dockTop == true)
     overlayFilter.setImage(bitmap)
   }
 
@@ -267,7 +363,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
         attempt += 1
         emitStatus("reconnecting", reason = reason)
       } else {
-        stream.stopStream()
+        endStream()
         emitStatus("failed", reason = reason)
       }
     }
@@ -282,7 +378,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   override fun onAuthError() {
     main.post {
       stopRequested = true
-      stream.stopStream()
+      endStream()
       emitStatus("failed", reason = "auth")
     }
   }
@@ -329,6 +425,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     if (released) return
     released = true
     stopRequested = true
+    main.removeCallbacksAndMessages(null)
     try {
       if (stream.isStreaming) stream.stopStream()
       if (stream.isOnPreview) stream.stopPreview()
@@ -336,9 +433,11 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     } catch (error: Exception) {
       Log.w(TAG, "release failed", error)
     }
+    filtersAttached = false
+    segmenter.close()
     sounds.release()
-    images.release()
-    main.removeCallbacksAndMessages(null)
+    popupImages.release()
+    pictures.release()
   }
 
   companion object {
@@ -351,6 +450,8 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     /** 24 tries, 5 s apart: about 2 minutes before the live is given up. */
     private const val MAX_RETRIES = 24
     private const val RETRY_DELAY_MS = 5_000L
+    private const val MAX_PREVIEW_ATTEMPTS = 4
+    private const val PREVIEW_RETRY_MS = 600L
 
     private fun loadTypeface(context: Context): Typeface =
       try {

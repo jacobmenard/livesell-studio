@@ -22,9 +22,10 @@ from the NegosyoWork website rather than Google Play.
  │   setups, plan, live-session heartbeat       │          │ /api/setups, /subscription│
  │                                              │          │ /api/setups/{id}/live-…  │
  │ LiveStreamerView (Kotlin, RootEncoder)       │          └──────────────────────────┘
- │   camera ─▶ OpenGL ─▶ popups overlay ─┐      │
- │   mic ─▶ sound-effect mixer ──────────┼─ RTMP(S) ──────▶ Facebook / YouTube / TikTok
- │   stream key from secure storage ─────┘      │          (never through our server)
+ │   camera ─▶ OpenGL look/background ─▶        │
+ │            foreground + popups overlay ─┐    │
+ │   mic ─▶ sound-effect mixer ────────────┼─ RTMP(S) ────▶ Facebook / YouTube / TikTok
+ │   stream key from secure storage ───────┘    │          (never through our server)
  └──────────────────────────────────────────────┘
 ```
 
@@ -32,9 +33,21 @@ from the NegosyoWork website rather than Google Play.
   server only handles logins, setups and a heartbeat — cheap at any number of sellers.
 - **Stream keys stay on the phone**, encrypted with an Android Keystore key. They are not
   sent to the server (the website's server-side destinations are not used by the app).
-- **What viewers see** is exactly the preview: the camera, plus the popups drawn into the
-  video frames by `OverlayRenderer.kt`. The app's buttons are React Native views on top and
-  never reach the stream.
+- **What viewers see** is exactly the preview: the camera with the setup's look, colour
+  filter and background (`StageFilterRender.kt`, shaders in the module's
+  `assets/livestreamer/shaders/`), then the foreground banner and popups drawn into the video
+  frames by `OverlayRenderer.kt`. The app's buttons are React Native views on top and never
+  reach the stream.
+- **Camera look, filters and backgrounds match the website.** `src/stage/stageLook.ts` turns
+  a setup into shader-ready numbers using the website's formulas (`enhance.ts`, `chroma.ts`,
+  the 17 filters); the GLSL is a port of the website's shaders and was checked against them
+  pixel by pixel (within 1/255). Blur and Picture find the person with Google ML Kit selfie
+  segmentation, which runs on the phone (the model is bundled, about 4.5 MB of the APK). On a
+  phone where it can't run, the live goes on with the real room and the seller is told;
+  green screen needs no segmentation.
+- **The editor previews with the real camera** (camera permission only; the microphone is
+  asked for when going live), so a look is judged on the actual picture. Without the camera
+  it shows a stand-in.
 - **Sound effects** are mixed into the microphone audio before encoding (`SoundMixer.kt`),
   so viewers hear a clean "ka-ching" and the microphone doesn't pick it up a second time.
 - **The plan's limit** ("setups live at once") is claimed before streaming starts with
@@ -45,8 +58,11 @@ from the NegosyoWork website rather than Google Play.
 
 ### What this first version does not do yet
 
-- Background blur, picture backgrounds, green screen, camera filters, face effects and the
-  foreground banner (all set on the website) are **not** applied in phone lives.
+- **Face effects** (the 70 face-tracked effects set on the website) are not drawn in phone
+  lives yet. The editor says so when a setup has one.
+- **Animated GIF** backgrounds and foregrounds show their first frame on the phone.
+- On the phone, **zoom** goes from 1× to 2×; the website's zoom-out (below 0) shows the whole
+  camera picture, as the phone's camera already fits the shape.
 - Popup **animations and effects** (fireworks, confetti…) are not drawn in the phone's
   stream; the popup appears without them.
 - Sellers' **own uploaded sounds** can't be played from the phone (built-in pads only).
@@ -61,13 +77,16 @@ mobile/
 ├─ app.config.ts            app name, package id, permissions, plugins
 ├─ plugins/withReleaseSigning.js   release APKs use your upload key (never the debug key)
 ├─ modules/live-streamer/   native streaming module (Kotlin) + its TypeScript API
-│  └─ android/src/main/assets/livestreamer/  popup font + the 13 sound effects (WAV)
+│  └─ android/src/main/assets/livestreamer/  popup font, the 13 sound effects (WAV),
+│                              GLSL shaders and the six built-in backgrounds (1920×1080)
 ├─ scripts/render-sounds.mjs   renders the website's synthesized sounds to WAV
 └─ src/
    ├─ app/                  screens (Expo Router): login, (tabs)/…, setup/[id], live/…
    ├─ api/                  fetch client, endpoints, API types
    ├─ auth/                 token storage + AuthProvider
-   ├─ stage/                popup look and placement (same rules as the website)
+   ├─ stage/                popup look and placement, camera look, filters and backgrounds
+   │                        (same rules as the website)
+   ├─ media/                photo picking and checks before upload
    ├─ stream/streamKeys.ts  stream keys in secure storage
    ├─ live/                 live-session heartbeat, permissions, formatting
    └─ components/           UI kit, popup art, setup cards, update sheet
@@ -171,6 +190,13 @@ The 13 sound pads are rendered from the website's synthesis (`frontend/src/stage
 into `modules/live-streamer/android/src/main/assets/livestreamer/sounds/` by
 `npm run render-sounds`. To use licensed recordings instead, replace those files with 16-bit
 PCM WAVs of the same names (any sample rate; mono or stereo).
+
+## Pictures from the server
+
+Background and foreground photos are loaded by the phone from the URLs the API gives
+(`GET /api/media`). Those URLs are built from the server's `APP_URL`, so it must be an
+address the phone can reach (in development, your computer's LAN IP, not `localhost`).
+Uploads from the phone go to `POST /api/media` (PNG, JPG, WEBP or GIF, 5 MB at most).
 
 ## Fonts
 

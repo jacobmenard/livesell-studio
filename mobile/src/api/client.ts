@@ -68,16 +68,20 @@ export interface RequestOptions {
   /** Skip the bearer token (login, register, version check). */
   anonymous?: boolean
   signal?: AbortSignal
+  /** Longer for uploads; the default suits ordinary requests. */
+  timeoutMs?: number
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? REQUEST_TIMEOUT_MS)
   const abort = () => controller.abort()
   options.signal?.addEventListener('abort', abort)
 
+  // A FormData body (an upload) sets its own multipart Content-Type with the boundary.
+  const multipart = options.body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
-  if (options.body !== undefined) headers['Content-Type'] = 'application/json'
+  if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   const token = options.anonymous ? null : getToken()
   if (token) headers.Authorization = `Bearer ${token}`
 
@@ -86,7 +90,7 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     response = await fetch(`${API_URL}${path}`, {
       method: options.method ?? 'GET',
       headers,
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: options.body === undefined ? undefined : multipart ? (options.body as FormData) : JSON.stringify(options.body),
       signal: controller.signal,
     })
   } catch {
