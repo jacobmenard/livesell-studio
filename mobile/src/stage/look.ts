@@ -1,4 +1,4 @@
-import type { PopupLook, Position } from '@/api/types'
+import type { EffectId, Entrance, PopupLook, Position } from '@/api/types'
 import { POPUP_SIZE, PRESET_BY_ID, TEXT_COLORS, type PopupShape } from '@/catalog'
 import { absoluteUrl } from '@/config'
 
@@ -30,6 +30,14 @@ export interface PopupDrawSpec {
   /** How the box hangs off the anchor: 0 = starts there, -0.5 = centred, -1 = ends there. */
   alignX: number
   alignY: number
+  /** The website's entrance animation and effect (frontend/src/stage/Effects.tsx), played by the native renderer. */
+  entrance: Entrance
+  effect: EffectId
+  effectLoop: boolean
+  /** In the top part of the stage: banderitas hang below the popup instead of above it. */
+  topRow: boolean
+  /** When it was shown (Date.now(), the clock the native renderer also reads); 0 = drawn still. */
+  shownAt: number
 }
 
 // Text and image sizes at 100% (the original "Medium"); popup size scales both.
@@ -50,6 +58,11 @@ export function placement(position: Position): { anchorX: number; anchorY: numbe
   const [anchorY, alignY] = ROWS[position.charAt(0)] ?? ROWS.m!
   const [anchorX, alignX] = COLS[position.charAt(1)] ?? COLS.c!
   return { anchorX, anchorY, alignX, alignY }
+}
+
+/** Top part of the stage (web look.ts nearTop): banderitas hang below the popup there. */
+export function nearTop(p: Pick<PopupLook, 'position' | 'x' | 'y'>): boolean {
+  return isFreelyPlaced(p) ? p.y < 34 : p.position.startsWith('t')
 }
 
 export function isFreelyPlaced(p: Pick<PopupLook, 'x' | 'y'>): p is { x: number; y: number } {
@@ -86,9 +99,15 @@ export function popupText(p: Pick<PopupLook, 'kind' | 'preset_key' | 'text' | 'l
   return p.label ?? 'Image'
 }
 
-export function resolveLook(p: PopupLook): PopupDrawSpec {
+/** `shownAt` (Date.now() when it appeared) plays its entrance and effect; left out, it is drawn still. */
+export function resolveLook(p: PopupLook, shownAt = 0): PopupDrawSpec {
   const base = {
     key: p.key,
+    entrance: p.entrance,
+    effect: p.effect,
+    effectLoop: p.effect_repeat === 'loop',
+    topRow: nearTop(p),
+    shownAt,
     fontU: FONT_U * sizeScale(p.size),
     imageU: IMAGE_U * sizeScale(p.size),
     ...popupPlacement(p),

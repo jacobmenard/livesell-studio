@@ -11,10 +11,15 @@ import { DEFAULT_FILTER_STRENGTH, filterGrade, isCameraFilter } from './filters'
  *  - green screen: frontend/src/stage/chroma.ts ChromaKeyer.render
  *  - picture fallback and media URLs: frontend/src/stage/scene.ts buildScene
  */
+/** The widest the phone zooms out: 0.5× (camera.zoom -50), like phone camera apps. */
+export const MIN_PHONE_ZOOM = -50
+
 export interface NativeLook {
   mirror: boolean
-  /** 1 = the camera fills the stage; up to 2 = zoomed in. */
+  /** 1 = the camera fills the stage; up to 2 = zoomed in (cropped by the shader). */
   zoom: number
+  /** The camera's own zoom: 1, or down to 0.5 to show more (the phone's wide lens). */
+  lensZoom: number
   /** Multipliers and offsets exactly as the web shader's uniforms. */
   brightness: number
   contrast: number
@@ -120,8 +125,10 @@ export function nativeLook(
 
   return {
     mirror: camera.mirror,
-    // The phone's camera already has the stage's shape, so zooming out (below 0) changes nothing.
+    // Zooming in crops the picture. Zooming out can't be done by cropping (the camera already
+    // fills the stage), so below 0 the camera itself zooms out: -50 = 0.5×, its wide lens.
     zoom: 1 + clamp(num(camera.zoom, 0), 0, 100) / 100,
+    lensZoom: 1 + clamp(num(camera.zoom, 0), MIN_PHONE_ZOOM, 0) / 100,
     brightness: 0.5 + clamp(num(camera.brightness, 50), 0, 100) / 100,
     contrast: 0.5 + clamp(num(camera.contrast, 50), 0, 100) / 100,
     saturation: clamp(num(camera.saturation, 50), 0, 100) / 50,

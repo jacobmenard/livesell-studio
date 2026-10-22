@@ -1,7 +1,8 @@
-import { Image, StyleSheet, View } from 'react-native'
+import { StyleSheet, View } from 'react-native'
 import Svg, { Circle, Path, Rect } from 'react-native-svg'
 
 import type { BackgroundSettings } from '@/api/types'
+import { Picture } from '@/components/Picture'
 import { absoluteUrl } from '@/config'
 import { BACKGROUND_PRESETS } from '@/stage/backgrounds'
 
@@ -64,7 +65,7 @@ export function SetupBackdrop({ background }: { background: (Partial<BackgroundS
   return (
     <View style={StyleSheet.absoluteFill}>
       <View style={[StyleSheet.absoluteFill, { backgroundColor: preset.tone }]} />
-      <Image source={source} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />
+      <Picture source={source} style={StyleSheet.absoluteFill} accessible={false} />
       <StagePerson />
     </View>
   )

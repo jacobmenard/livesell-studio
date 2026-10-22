@@ -6,17 +6,22 @@ import { FOREGROUND_DOCKS } from '@/stage/backgrounds'
 import { absoluteUrl } from '@/config'
 import { foregroundWithDefaults } from '@/stage/stageLook'
 import { space } from '@/theme'
-import { PictureTile, SectionTitle, styles, SwitchRow, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
+import { MediaError, PictureTile, SectionTitle, styles, SwitchRow, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
 
 export function ForegroundSection({
   foreground: saved,
   media,
   mediaLoading,
+  mediaError,
+  onRetryMedia,
   onChange,
 }: {
   foreground: ForegroundSettings
   media: MediaItem[]
   mediaLoading: boolean
+  /** Why the pictures couldn't be fetched, if they couldn't. */
+  mediaError: string | null
+  onRetryMedia: () => void
   onChange: (change: Partial<ForegroundSettings>) => void
 }) {
   const foreground = foregroundWithDefaults(saved)
@@ -39,36 +44,39 @@ export function ForegroundSection({
         </Card>
       </View>
 
-      {foreground.enabled && (
-        <>
-          <View style={{ gap: space.sm }}>
-            <SectionTitle>Where</SectionTitle>
-            <Segmented label="Where" value={foreground.dock} onChange={(dock) => onChange({ dock })} options={FOREGROUND_DOCKS} />
-            <Text style={styles.help}>TikTok and Facebook show comments near the bottom. Pick Top if they cover your banner.</Text>
-          </View>
+      {/* Always listed, like the website: tapping an image turns the foreground on. */}
+      <View style={{ gap: space.sm }}>
+        <SectionTitle>Image</SectionTitle>
+        <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Foreground image">
+          {images.map((m) => (
+            <PictureTile
+              key={m.id}
+              source={{ uri: absoluteUrl(m.url) ?? undefined }}
+              label={m.label || 'Your foreground'}
+              selected={foreground.enabled && pickedId === m.id}
+              onPress={() => onChange({ enabled: true, media_id: m.id })}
+              onLongPress={() => confirmRemove(m)}
+              aspect={3}
+              width="48.6%"
+              checker
+            />
+          ))}
+          <UploadTile label="Add a foreground image" busy={upload.busy} onPress={upload.start} aspect={3} width="48.6%" />
+        </View>
+        {mediaError ? (
+          <MediaError message={mediaError} onRetry={onRetryMedia} />
+        ) : (
+          <Text style={styles.help}>{mediaLoading ? 'Loading your images…' : 'A wide PNG or GIF with a see-through background works best · 5 MB. Long-press one to delete it.'}</Text>
+        )}
+        {foreground.enabled && !pickedId && !mediaLoading && !mediaError && <Notice tone="warning">Pick or add an image — nothing shows until you do.</Notice>}
+      </View>
 
-          <View style={{ gap: space.sm }}>
-            <SectionTitle>Image</SectionTitle>
-            <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Foreground image">
-              {images.map((m) => (
-                <PictureTile
-                  key={m.id}
-                  source={{ uri: absoluteUrl(m.url) ?? undefined }}
-                  label={m.label || 'Your foreground'}
-                  selected={pickedId === m.id}
-                  onPress={() => onChange({ media_id: m.id })}
-                  onLongPress={() => confirmRemove(m)}
-                  aspect={3}
-                  width="48.6%"
-                  checker
-                />
-              ))}
-              <UploadTile label="Add a foreground image" busy={upload.busy} onPress={upload.start} aspect={3} width="48.6%" />
-            </View>
-            <Text style={styles.help}>{mediaLoading ? 'Loading your images…' : 'A wide PNG or GIF with a see-through background works best · 5 MB'}</Text>
-            {!pickedId && !mediaLoading && <Notice tone="warning">Pick or add an image — nothing shows until you do.</Notice>}
-          </View>
-        </>
+      {foreground.enabled && (
+        <View style={{ gap: space.sm }}>
+          <SectionTitle>Where</SectionTitle>
+          <Segmented label="Where" value={foreground.dock} onChange={(dock) => onChange({ dock })} options={FOREGROUND_DOCKS} />
+          <Text style={styles.help}>TikTok and Facebook show comments near the bottom. Pick Top if they cover your banner.</Text>
+        </View>
       )}
     </View>
   )

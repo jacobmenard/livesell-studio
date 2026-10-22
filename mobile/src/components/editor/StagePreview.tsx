@@ -1,9 +1,10 @@
 import { useIsFocused } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native'
 
 import type { Orientation, Resolution } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { Picture } from '@/components/Picture'
 import { PopupLayer } from '@/components/PopupArt'
 import { StageBackdrop, StagePerson } from '@/components/StageBackdrop'
 import { IconButton } from '@/components/ui'
@@ -29,6 +30,8 @@ export function StagePreview({
   look,
   overlay,
   onSegmentationMissing,
+  onZoomLimit,
+  popupGestures,
 }: {
   width: number
   height: number
@@ -37,6 +40,10 @@ export function StagePreview({
   look: NativeLook
   overlay: PopupDrawSpec[]
   onSegmentationMissing: () => void
+  /** The camera can't zoom out as far as the setup asks (the message says how far it goes). */
+  onZoomLimit: (message: string) => void
+  /** Moving and resizing the selected popup by touch (the Popups step). */
+  popupGestures?: PopupGestureHandlers
 }) {
   const focused = useIsFocused()
   const streamer = useRef<LiveStreamerHandle>(null)
@@ -89,12 +96,15 @@ export function StagePreview({
           onError={(e) => {
             const { code, message } = e.nativeEvent
             if (code === 'segmentation') onSegmentationMissing()
+            else if (code === 'zoom') onZoomLimit(message)
             else if (code === 'camera' || code === 'prepare') setCameraError(message)
           }}
         />
       ) : (
         <StandIn look={look} overlay={overlay} width={width} height={height} />
       )}
+
+      {popupGestures && <PopupGestures width={width} height={height} handlers={popupGestures} />}
 
       {showCamera && (
         <View style={styles.tools}>
@@ -127,6 +137,107 @@ export function StagePreview({
   )
 }
 
+export interface PopupGestureHandlers {
+  /** The popup's centre goes here (% of the stage width and height). */
+  onPlace: (x: number, y: number) => void
+  /** Two fingers: `ratio` = their distance now ÷ when the pinch began. */
+  onPinch: (phase: 'start' | 'move' | 'end', ratio: number) => void
+  /** A finger is down (the editor stops scrolling meanwhile). */
+  onActive: (active: boolean) => void
+}
+
+const clampPercent = (v: number) => Math.round(Math.min(100, Math.max(0, v)) * 100) / 100
+
+function fingerGap(e: GestureResponderEvent): number | null {
+  const [a, b] = e.nativeEvent.touches
+  return a && b ? Math.hypot(a.pageX - b.pageX, a.pageY - b.pageY) : null
+}
+
+/**
+ * Over the whole preview: one finger puts the selected popup's centre where it touches and
+ * drags it along; two fingers pinch it bigger or smaller. Updates are sent at most once per
+ * frame, so the native preview isn't asked to redraw faster than the screen does.
+ */
+function PopupGestures({ width, height, handlers }: { width: number; height: number; handlers: PopupGestureHandlers }) {
+  // This touch's state (changes on every move, so not React state).
+  const touch = useRef<{ pinchFrom: number | null; pinched: boolean; frame: number | null; pending: (() => void) | null }>({
+    pinchFrom: null,
+    // After a pinch, the finger left behind doesn't move the popup (it would jump to it).
+    pinched: false,
+    frame: null,
+    pending: null,
+  })
+
+  useEffect(() => {
+    const t = touch.current
+    return () => {
+      if (t.frame !== null) cancelAnimationFrame(t.frame)
+    }
+  }, [])
+
+  const nextFrame = (run: () => void) => {
+    const t = touch.current
+    t.pending = run
+    t.frame ??= requestAnimationFrame(() => {
+      t.frame = null
+      t.pending?.()
+      t.pending = null
+    })
+  }
+
+  const follow = (e: GestureResponderEvent) => {
+    const t = touch.current
+    const gap = fingerGap(e)
+    if (gap !== null && gap > 0) {
+      if (t.pinchFrom === null) {
+        t.pinchFrom = gap
+        t.pinched = true
+        handlers.onPinch('start', 1)
+      } else {
+        const ratio = gap / t.pinchFrom
+        nextFrame(() => handlers.onPinch('move', ratio))
+      }
+      return
+    }
+    if (t.pinched) return
+    const x = clampPercent((e.nativeEvent.locationX / width) * 100)
+    const y = clampPercent((e.nativeEvent.locationY / height) * 100)
+    nextFrame(() => handlers.onPlace(x, y))
+  }
+
+  const finish = () => {
+    const t = touch.current
+    if (t.frame !== null) cancelAnimationFrame(t.frame)
+    t.frame = null
+    t.pending?.()
+    t.pending = null
+    if (t.pinchFrom !== null) handlers.onPinch('end', 1)
+    t.pinchFrom = null
+    t.pinched = false
+    handlers.onActive(false)
+  }
+
+  return (
+    <View
+      style={StyleSheet.absoluteFill}
+      onStartShouldSetResponder={() => true}
+      onMoveShouldSetResponder={() => true}
+      onResponderTerminationRequest={() => false}
+      onResponderGrant={(e) => {
+        handlers.onActive(true)
+        follow(e)
+        // True keeps the page's scroll view from taking over the drag.
+        return true
+      }}
+      onResponderMove={follow}
+      onResponderRelease={finish}
+      onResponderTerminate={finish}
+      accessibilityLabel="Popup position"
+      accessibilityHint="Drag to move the selected popup. Pinch with two fingers to resize it."
+    />
+  )
+}
+
 /** A stand-in for the camera: the background as set, a person, the foreground and the popup. */
 function StandIn({ look, overlay, width, height }: { look: NativeLook; overlay: PopupDrawSpec[]; width: number; height: number }) {
   const bg = look.background
@@ -137,14 +248,14 @@ function StandIn({ look, overlay, width, height }: { look: NativeLook; overlay: 
       {picture ? (
         <>
           <View style={[StyleSheet.absoluteFill, { backgroundColor: bg.tone }]} />
-          <Image source={picture} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />
+          <Picture source={picture} style={StyleSheet.absoluteFill} accessible={false} />
           <StagePerson />
         </>
       ) : (
         <StageBackdrop />
       )}
       {bg.mode === 'blur' && <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(30,30,36,0.35)' }]} />}
-      {fg && <Image source={{ uri: fg.url }} style={[styles.foreground, fg.dock === 'top' ? { top: 0 } : { bottom: 0 }, { height: width / 3 }]} resizeMode="contain" accessible={false} />}
+      {fg && <Picture source={{ uri: fg.url }} style={[styles.foreground, fg.dock === 'top' ? { top: 0 } : { bottom: 0 }, { height: width / 3 }]} fit="contain" accessible={false} />}
       <PopupLayer specs={overlay} width={width} height={height} />
     </View>
   )

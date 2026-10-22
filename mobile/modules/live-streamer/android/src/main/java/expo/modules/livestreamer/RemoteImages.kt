@@ -3,6 +3,7 @@ package expo.modules.livestreamer
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Build
 import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
@@ -18,6 +19,9 @@ import java.util.concurrent.Executors
  * Loaded once in the background and kept within `maxSide`; `onLoaded` redraws when one
  * arrives. A failed download is tried again after a while (the signal may come back).
  * Bitmaps are never recycled here: the GPU upload may still be reading one.
+ *
+ * A moving GIF or WebP also keeps its animation (animation(source)); get() still returns
+ * its first frame, so anything that only draws stills works as before.
  */
 class RemoteImages(private val assets: AssetManager, private val maxSide: Int, private val onLoaded: () -> Unit) {
 
@@ -27,6 +31,7 @@ class RemoteImages(private val assets: AssetManager, private val maxSide: Int, p
   private val cache = object : LruCache<String, Bitmap>(MAX_BYTES) {
     override fun sizeOf(key: String, value: Bitmap) = value.byteCount
   }
+  private val animations = ConcurrentHashMap<String, AnimatedPicture>()
 
   @Volatile private var released = false
 
@@ -38,6 +43,9 @@ class RemoteImages(private val assets: AssetManager, private val maxSide: Int, p
     return null
   }
 
+  /** The moving version of a loaded GIF / animated WebP, or null for a still (or not loaded yet). */
+  fun animation(source: String): AnimatedPicture? = animations[source]
+
   private fun load(source: String) {
     try {
       val bytes = if (source.startsWith(ASSET)) {
@@ -46,7 +54,9 @@ class RemoteImages(private val assets: AssetManager, private val maxSide: Int, p
         download(source)
       }
       val bitmap = decodeScaled(bytes) ?: throw IOException("not an image")
+      val moving = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) AnimatedPicture.decode(bytes, minOf(maxSide, ANIMATED_MAX_SIDE)) else null
       if (!released) {
+        if (moving != null) animations[source] = moving
         cache.put(source, bitmap)
         failedAt.remove(source)
         onLoaded()
@@ -88,6 +98,8 @@ class RemoteImages(private val assets: AssetManager, private val maxSide: Int, p
   fun release() {
     released = true
     executor.shutdownNow()
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) animations.values.forEach { it.stop() }
+    animations.clear()
     cache.evictAll()
   }
 
@@ -96,5 +108,7 @@ class RemoteImages(private val assets: AssetManager, private val maxSide: Int, p
     private const val MAX_BYTES = 40 * 1024 * 1024
     private const val MAX_DOWNLOAD = 6L * 1024 * 1024
     private const val RETRY_AFTER_MS = 30_000L
+    /** Moving pictures are uploaded every frame: smaller than stills to keep that light. */
+    private const val ANIMATED_MAX_SIDE = 1080
   }
 }

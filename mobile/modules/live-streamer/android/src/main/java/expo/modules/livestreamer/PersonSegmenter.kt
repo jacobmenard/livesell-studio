@@ -13,16 +13,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Finds the person in the camera picture for the Blur and Picture backgrounds, with ML Kit's
  * selfie segmentation (the model ships inside the app: nothing to download). Works like the
  * website's MediaPipe segmenter: one small frame at a time, the newest mask kept; frames that
- * arrive while it's busy are skipped, so it never slows the live down.
+ * arrive while it's busy are skipped, so it never slows the live down. Each mask says which
+ * frame it was found in, so the stage can draw it over that same frame (StageFilterRender).
  */
 class PersonSegmenter(private val onUnavailable: () -> Unit) {
 
-  /** How sure the model is that each pixel is the person, 0–255, rows top first. */
-  class Mask(val bytes: ByteArray, val width: Int, val height: Int, val sequence: Int)
+  /** How sure the model is that each pixel is the person, 0–255, rows top first, in frame `frameId`. */
+  class Mask(val bytes: ByteArray, val width: Int, val height: Int, val frameId: Long)
 
   private val executor = Executors.newSingleThreadExecutor()
   private val busy = AtomicBoolean(false)
-  private var sequence = 0
   private var failures = 0
   private var reportedUnavailable = false
 
@@ -54,8 +54,11 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
    */
   val idle: Boolean get() = !closed && !busy.get() && !reportedUnavailable
 
-  /** Looks for the person in `frame` (upright). The bitmap is read later: don't touch it until idle again. */
-  fun offer(frame: Bitmap) {
+  /**
+   * Looks for the person in `frame` (upright); its mask comes back tagged with `frameId`.
+   * The bitmap is read later: don't touch it until idle again.
+   */
+  fun offer(frame: Bitmap, frameId: Long) {
     val segmenter = client
     if (segmenter == null) {
       reportUnavailable()
@@ -74,7 +77,7 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
             for (i in 0 until minOf(count, floats.remaining())) {
               bytes[i] = (floats.get(i).coerceIn(0f, 1f) * 255f + 0.5f).toInt().toByte()
             }
-            latest = Mask(bytes, mask.width, mask.height, ++sequence)
+            latest = Mask(bytes, mask.width, mask.height, frameId)
             failures = 0
           } finally {
             busy.set(false)

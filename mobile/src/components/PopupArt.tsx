@@ -1,4 +1,6 @@
-import { Image, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
+
+import { Picture } from '@/components/Picture'
 
 import type { PopupDrawSpec } from '@/stage/look'
 import { DISPLAY_FONT } from '@/theme'
@@ -12,7 +14,7 @@ export function PopupArt({ spec, unit }: { spec: PopupDrawSpec; unit: number }) 
   if (spec.kind === 'image') {
     if (!spec.imageUrl) return null
     const h = spec.imageU * unit
-    return <Image source={{ uri: spec.imageUrl }} style={{ height: h, aspectRatio: 1 }} resizeMode="contain" accessibilityLabel={spec.text} />
+    return <Picture source={{ uri: spec.imageUrl }} style={{ height: h, aspectRatio: 1 }} fit="contain" accessibilityLabel={spec.text} />
   }
 
   const font = spec.fontU * unit

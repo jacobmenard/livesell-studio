@@ -26,8 +26,11 @@ import kotlin.math.roundToInt
  * Shaders: assets/livestreamer/shaders (stage.frag is a copy of the website's enhance.ts and
  * chroma.ts maths). Passes per frame, all on the GL thread:
  *  1. Blur only: the camera as drawn, shrunk to a quarter, blurred across then down.
- *  2. Blur and Picture: now and then, a ~256 px copy is read back and handed to ML Kit; its
- *     newest person mask is uploaded as a texture.
+ *  2. Blur and Picture: whenever ML Kit is free, a ~256 px copy is read back and handed to it,
+ *     and the full frame is kept (one of two "held" frames). When that frame's person mask
+ *     comes back, the stage draws that held frame with it, not the newest camera frame: a mask
+ *     laid over a later frame leaves the room showing wherever the seller just moved from.
+ *     So the picture runs a few frames behind the camera, at ML Kit's pace.
  *  3. The stage pass into this filter's own target (RootEncoder draws the quad after this).
  *
  * RootEncoder releases every filter when the preview stops while not live, and initialises it
@@ -70,14 +73,22 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
   private val maskTexture = IntArray(1)
   private val pictureTexture = IntArray(1)
   private var hasMaskTexture = false
-  private var uploadedMaskSequence = -1
+  private var uploadedMaskFrame = -1L
+
+  // Camera frames handed to ML Kit, kept full size until their mask is back: one waiting for
+  // its mask, one on screen with the mask it was found in.
+  private val held = arrayOfNulls<Target>(2)
+  private val heldFrame = LongArray(2) { -1L }
+  private val heldAt = LongArray(2)
+  /** The held frame on screen (the uploaded mask is its own), or -1 for the live camera. */
+  private var shownHeld = -1
+  private var nextFrameId = 0L
   private var pictureWidth = 0
   private var pictureHeight = 0
   private var hasPictureTexture = false
 
   private var segPixels: ByteBuffer? = null
   private var segBitmap: Bitmap? = null
-  private var lastSegmentAt = 0L
 
   private val identity = FloatArray(16).also { Matrix.setIdentityM(it, 0) }
   /** Draws a pass upside down, so glReadPixels (bottom row first) returns an upright picture. */
@@ -122,7 +133,10 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     GLES20.glGenTextures(1, pictureTexture, 0)
     configureTexture(pictureTexture[0])
     hasMaskTexture = false
-    uploadedMaskSequence = -1
+    uploadedMaskFrame = -1L
+    held.fill(null)
+    heldFrame.fill(-1L)
+    shownHeld = -1
     hasPictureTexture = false
     // A picture or mask from before a release goes up again on the next frame.
     pictureDirty = picture != null
@@ -175,8 +189,10 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
 
     uploadPicture()
     if (mode.needsMask) uploadMask()
+    // The camera frame the mask was found in, or the live one (no mask yet, or ML Kit stalled).
+    val camera = if (mode.needsMask) heldCamera() else previousTexId
 
-    if (mode == BackgroundMode.BLUR) blurRoom(look, width, height)
+    if (mode == BackgroundMode.BLUR) blurRoom(look, width, height, camera)
     if (mode.needsMask) maybeSegment(look, width, height)
 
     // The stage pass, into this filter's own target (RootEncoder binds it before calling us,
@@ -186,10 +202,10 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     GLES20.glUseProgram(stage.id)
     attributes(stage, STMatrix)
 
-    bindTexture(0, previousTexId)
-    bindTexture(1, low?.texture?.get(0) ?: previousTexId)
-    bindTexture(2, if (hasMaskTexture) maskTexture[0] else previousTexId)
-    bindTexture(3, if (hasPictureTexture) pictureTexture[0] else previousTexId)
+    bindTexture(0, camera)
+    bindTexture(1, low?.texture?.get(0) ?: camera)
+    bindTexture(2, if (hasMaskTexture) maskTexture[0] else camera)
+    bindTexture(3, if (hasPictureTexture) pictureTexture[0] else camera)
     GLES20.glUniform1i(stage.u("uSampler"), 0)
     GLES20.glUniform1i(stage.u("uBlur"), 1)
     GLES20.glUniform1i(stage.u("uMask"), 2)
@@ -235,8 +251,18 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
   }
 
+  /** The held frame that matches the mask on screen; the live camera if none, or it's too old. */
+  private fun heldCamera(): Int {
+    val slot = shownHeld
+    if (slot < 0 || !hasMaskTexture) return previousTexId
+    val frame = held[slot] ?: return previousTexId
+    // ML Kit stopped answering: keep the picture moving (with the last mask) rather than frozen.
+    if (SystemClock.elapsedRealtime() - heldAt[slot] > MAX_HOLD_MS) return previousTexId
+    return frame.texture[0]
+  }
+
   /** The blurred room: the camera as drawn, at a quarter size, blurred across then down. */
-  private fun blurRoom(look: LookSpec, width: Int, height: Int) {
+  private fun blurRoom(look: LookSpec, width: Int, height: Int, camera: Int) {
     val view = view ?: return
     val blur = blur ?: return
     val lw = max(1, (width / 4f).roundToInt())
@@ -244,7 +270,7 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     val a = target(low, lw, lh).also { low = it }
     val b = target(lowB, lw, lh).also { lowB = it }
 
-    drawPass(view, a, previousTexId, identity) {
+    drawPass(view, a, camera, identity) {
       GLES20.glUniform1f(view.u("uZoom"), look.zoom)
       GLES20.glUniform1f(view.u("uMirror"), if (look.mirror) 1f else 0f)
       GLES20.glUniform2f(view.u("uSpread"), 1f / (4f * lw * look.zoom), 1f / (4f * lh * look.zoom))
@@ -255,13 +281,25 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     drawPass(blur, a, b.texture[0], identity) { GLES20.glUniform2f(blur.u("uDir"), 0f, sigma / 2f / lh) }
   }
 
-  /** Hands a small upright copy of the camera (as drawn) to ML Kit when it's free. */
+  /**
+   * Hands a small upright copy of the camera (as drawn) to ML Kit as soon as it's free, and
+   * keeps the full frame (in the held slot not on screen) to draw once its mask is back.
+   */
   private fun maybeSegment(look: LookSpec, width: Int, height: Int) {
     if (!segmenter.idle) return
-    val now = SystemClock.elapsedRealtime()
-    if (now - lastSegmentAt < MIN_SEGMENT_INTERVAL_MS) return
-    lastSegmentAt = now
     val view = view ?: return
+
+    val slot = if (shownHeld == 0) 1 else 0
+    val keep = target(held[slot], width, height).also { held[slot] = it }
+    // An exact copy: no zoom, mirror or softening (the stage pass applies those).
+    drawPass(view, keep, previousTexId, identity) {
+      GLES20.glUniform1f(view.u("uZoom"), 1f)
+      GLES20.glUniform1f(view.u("uMirror"), 0f)
+      GLES20.glUniform2f(view.u("uSpread"), 0f, 0f)
+    }
+    val frameId = ++nextFrameId
+    heldFrame[slot] = frameId
+    heldAt[slot] = SystemClock.elapsedRealtime()
 
     val short = SEGMENT_SIZE.toFloat() / min(width, height)
     val sw = max(1, (width * short).roundToInt())
@@ -282,7 +320,7 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     // One bitmap, reused: the segmenter is idle, so it isn't reading the previous one.
     val bitmap = segBitmap?.takeIf { it.width == sw && it.height == sh } ?: Bitmap.createBitmap(sw, sh, Bitmap.Config.ARGB_8888).also { segBitmap = it }
     bitmap.copyPixelsFromBuffer(pixels)
-    segmenter.offer(bitmap)
+    segmenter.offer(bitmap, frameId)
   }
 
   private fun drawPass(program: Program, into: Target, source: Int, st: FloatArray, uniforms: () -> Unit) {
@@ -334,10 +372,14 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     hasPictureTexture = true
   }
 
+  /** A new mask goes up with its held frame; one whose frame is no longer held is dropped. */
   private fun uploadMask() {
     val mask = segmenter.latest ?: return
-    if (mask.sequence == uploadedMaskSequence) return
-    uploadedMaskSequence = mask.sequence
+    if (mask.frameId == uploadedMaskFrame) return
+    uploadedMaskFrame = mask.frameId
+    val slot = heldFrame.indexOf(mask.frameId)
+    if (slot < 0) return
+    shownHeld = slot
     GLES20.glPixelStorei(GLES20.GL_UNPACK_ALIGNMENT, 1)
     GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, maskTexture[0])
     GLES20.glTexImage2D(GLES20.GL_TEXTURE_2D, 0, GLES20.GL_LUMINANCE, mask.width, mask.height, 0, GLES20.GL_LUMINANCE, GLES20.GL_UNSIGNED_BYTE, ByteBuffer.wrap(mask.bytes))
@@ -358,10 +400,13 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     stage = null
     view = null
     blur = null
-    listOfNotNull(low, lowB, seg).forEach(::deleteTarget)
+    (listOfNotNull(low, lowB, seg) + held.filterNotNull()).forEach(::deleteTarget)
     low = null
     lowB = null
     seg = null
+    held.fill(null)
+    heldFrame.fill(-1L)
+    shownHeld = -1
     GLES20.glDeleteTextures(1, maskTexture, 0)
     GLES20.glDeleteTextures(1, pictureTexture, 0)
     hasMaskTexture = false
@@ -372,8 +417,8 @@ class StageFilterRender(private val assets: AssetManager, private val segmenter:
     private const val TAG = "LiveStreamer"
     /** The short side of the frames handed to ML Kit (its model works at 256×256). */
     private const val SEGMENT_SIZE = 256
-    /** At most ~20 masks a second; the segmenter's own speed usually limits it first. */
-    private const val MIN_SEGMENT_INTERVAL_MS = 50L
+    /** A held frame older than this (ML Kit stalled) gives way to the live camera. */
+    private const val MAX_HOLD_MS = 300L
 
     /** The part of a picture that fills the stage without stretching ("cover"), as a uv scale. */
     fun coverScale(pictureWidth: Int, pictureHeight: Int, stageWidth: Int, stageHeight: Int): FloatArray {

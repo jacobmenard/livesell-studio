@@ -14,6 +14,8 @@ import org.json.JSONObject
 data class LookSpec(
   val mirror: Boolean = false,
   val zoom: Float = 1f,
+  /** The camera's own zoom: below 1 shows more (0.5 = the wide lens, where the phone has one). */
+  val lensZoom: Float = 1f,
   val brightness: Float = 1f,
   val contrast: Float = 1f,
   val saturation: Float = 1f,
@@ -30,6 +32,7 @@ data class LookSpec(
         LookSpec(
           mirror = o.optBoolean("mirror", false),
           zoom = o.float("zoom", 1f, 1f, 2f),
+          lensZoom = o.float("lensZoom", 1f, 0.5f, 1f),
           brightness = o.float("brightness", 1f, 0.5f, 1.5f),
           contrast = o.float("contrast", 1f, 0.5f, 1.5f),
           saturation = o.float("saturation", 1f, 0f, 2f),

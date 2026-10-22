@@ -76,6 +76,14 @@ describe('popups on screen', () => {
     expect(specs.map((s) => s.key)).toEqual(['c', 'a'])
   })
 
+  it('animates each popup from when it was shown', () => {
+    const specs = overlayFor([popup('a'), popup('b')], [
+      { key: 'a', shownAt: 1000 },
+      { key: 'b', shownAt: 2500 },
+    ])
+    expect(specs.map((s) => s.shownAt)).toEqual([1000, 2500])
+  })
+
   it('restores what was on screen, ignoring popups since removed', () => {
     const s = setup([popup('a')], [
       { key: 'gone', shown_at: 1 },

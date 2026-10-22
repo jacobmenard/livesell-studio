@@ -6,12 +6,14 @@ import { BACKGROUND_MODES, BACKGROUND_PRESETS, KEY_COLORS } from '@/stage/backgr
 import { absoluteUrl } from '@/config'
 import { backgroundWithDefaults } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
-import { LookSlider, PictureTile, SectionTitle, styles, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
+import { LookSlider, MediaError, PictureTile, SectionTitle, styles, UploadTile, useConfirmRemove, usePictureUpload } from './parts'
 
 export function BackgroundSection({
   background: saved,
   media,
   mediaLoading,
+  mediaError,
+  onRetryMedia,
   segmentationMissing,
   onChange,
 }: {
@@ -19,6 +21,9 @@ export function BackgroundSection({
   /** The seller's uploaded pictures (all kinds). */
   media: MediaItem[]
   mediaLoading: boolean
+  /** Why the pictures couldn't be fetched, if they couldn't. */
+  mediaError: string | null
+  onRetryMedia: () => void
   /** This phone can't find the person (Blur and Picture need it). */
   segmentationMissing: boolean
   onChange: (change: Partial<BackgroundSettings>) => void
@@ -27,10 +32,12 @@ export function BackgroundSection({
   const photos = media.filter((m) => m.kind === 'background')
   // A deleted photo shows as the built-in picture, like the live does.
   const photoId = background.media_id && photos.some((p) => p.id === background.media_id) ? background.media_id : null
-  const upload = usePictureUpload('background', (item) => onChange({ media_id: item.id }))
+  const showsPicture = background.mode === 'image' || background.mode === 'green'
+  // The pictures are always listed; picking one while the room shows (None or Blur) switches to Picture.
+  const pick = (change: Partial<BackgroundSettings>) => onChange(showsPicture ? change : { ...change, mode: 'image' })
+  const upload = usePictureUpload('background', (item) => pick({ media_id: item.id }))
   const confirmRemove = useConfirmRemove((id) => id === background.media_id && onChange({ media_id: null }))
   const mode = BACKGROUND_MODES.find((m) => m.id === background.mode) ?? BACKGROUND_MODES[0]!
-  const showsPicture = background.mode === 'image' || background.mode === 'green'
 
   return (
     <View style={{ padding: space.lg, gap: space.xl }}>
@@ -69,28 +76,37 @@ export function BackgroundSection({
         )}
       </View>
 
-      {showsPicture && (
-        <View style={{ gap: space.sm }}>
-          <SectionTitle>Picture</SectionTitle>
-          <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Picture">
-            {BACKGROUND_PRESETS.map((p) => (
-              <PictureTile key={p.id} source={p.thumb} label={p.label} selected={!photoId && background.preset === p.id} onPress={() => onChange({ preset: p.id, media_id: null })} />
-            ))}
-            {photos.map((p) => (
-              <PictureTile
-                key={p.id}
-                source={{ uri: absoluteUrl(p.url) ?? undefined }}
-                label={p.label || 'Your photo'}
-                selected={photoId === p.id}
-                onPress={() => onChange({ media_id: p.id })}
-                onLongPress={() => confirmRemove(p)}
-              />
-            ))}
-            <UploadTile label="Add your own background photo" busy={upload.busy} onPress={upload.start} />
-          </View>
-          <Text style={styles.help}>{mediaLoading ? 'Loading your photos…' : 'Your own photo: PNG, JPG, WEBP or GIF, up to 5 MB. Long-press one of yours to delete it.'}</Text>
+      <View style={{ gap: space.sm }}>
+        <SectionTitle>Picture</SectionTitle>
+        {!showsPicture && <Text style={styles.help}>Tap a picture to show it behind you (switches to Picture).</Text>}
+        <View style={styles.grid} accessibilityRole="radiogroup" accessibilityLabel="Picture">
+          {BACKGROUND_PRESETS.map((p) => (
+            <PictureTile
+              key={p.id}
+              source={p.thumb}
+              label={p.label}
+              selected={showsPicture && !photoId && background.preset === p.id}
+              onPress={() => pick({ preset: p.id, media_id: null })}
+            />
+          ))}
+          {photos.map((p) => (
+            <PictureTile
+              key={p.id}
+              source={{ uri: absoluteUrl(p.url) ?? undefined }}
+              label={p.label || 'Your photo'}
+              selected={showsPicture && photoId === p.id}
+              onPress={() => pick({ media_id: p.id })}
+              onLongPress={() => confirmRemove(p)}
+            />
+          ))}
+          <UploadTile label="Add your own background photo" busy={upload.busy} onPress={upload.start} />
         </View>
-      )}
+        {mediaError ? (
+          <MediaError message={mediaError} onRetry={onRetryMedia} />
+        ) : (
+          <Text style={styles.help}>{mediaLoading ? 'Loading your photos…' : 'Your own photo: PNG, JPG, WEBP or GIF, up to 5 MB. Long-press one of yours to delete it.'}</Text>
+        )}
+      </View>
 
       {background.mode === 'green' && (
         <View style={{ gap: space.md }}>

@@ -32,9 +32,14 @@ describe('native look (same formulas as the website)', () => {
     expect(look.mirror).toBe(true)
   })
 
-  it('ignores zooming out on the phone and clamps bad values', () => {
+  it('zooms out with the camera itself, down to 0.5×, and clamps bad values', () => {
+    const half = nativeLook({ camera: { source: 'camera', device_label: null, mirror: false, brightness: 50, zoom: -50 }, background: undefined, foreground: undefined }, [])
+    expect(half).toMatchObject({ zoom: 1, lensZoom: 0.5 })
+    const zoomedIn = nativeLook({ camera: { source: 'camera', device_label: null, mirror: false, brightness: 50, zoom: 40 }, background: undefined, foreground: undefined }, [])
+    expect(zoomedIn).toMatchObject({ zoom: 1.4, lensZoom: 1 })
     const look = nativeLook({ camera: { source: 'camera', device_label: null, mirror: false, brightness: 999, zoom: -80 }, background: undefined, foreground: undefined }, [])
     expect(look.zoom).toBe(1)
+    expect(look.lensZoom).toBe(0.5)
     expect(look.brightness).toBeCloseTo(1.5)
   })
 

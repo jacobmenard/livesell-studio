@@ -1,20 +1,21 @@
 import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { errorMessage } from '@/api/client'
-import type { AutoHide, BackgroundSettings, CameraSettings, EffectId, ForegroundSettings, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
+import type { AutoHide, BackgroundSettings, CameraSettings, EffectId, EffectRepeat, ForegroundSettings, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { PopupArt } from '@/components/PopupArt'
 import { BackgroundSection } from '@/components/editor/BackgroundSection'
 import { CameraSection } from '@/components/editor/CameraSection'
 import { ForegroundSection } from '@/components/editor/ForegroundSection'
-import { StagePreview } from '@/components/editor/StagePreview'
+import { LookSlider } from '@/components/editor/parts'
+import { StagePreview, type PopupGestureHandlers } from '@/components/editor/StagePreview'
 import { Button, Card, ErrorState, Field, Loading, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
-import { AUTO_HIDES, EFFECTS, isBuiltinSound, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
+import { AUTO_HIDES, EFFECTS, isBuiltinSound, POPUP_SIZE, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
 import { useMedia, useSaveSetup, useSetup } from '@/hooks/queries'
-import { popupText, resolveLook } from '@/stage/look'
+import { isFreelyPlaced, popupText, resolveLook } from '@/stage/look'
 import { checkPopupText, MAX_TEXT_LENGTH, newTextPopup, removePopup, updatePopup } from '@/stage/popups'
 import { documentForApi, documentFromSetup } from '@/stage/scene'
 import { nativeLook } from '@/stage/stageLook'
@@ -29,14 +30,12 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'foreground', label: 'Foreground' },
   { id: 'sounds', label: 'Sounds' },
 ]
-type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'size' | 'text' | null
+type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'text' | null
 
-const SIZES: { id: number; label: string }[] = [
-  { id: 70, label: 'Small' },
-  { id: 100, label: 'Medium' },
-  { id: 140, label: 'Large' },
-  { id: 200, label: 'Extra large' },
-]
+/** The size slider's top end; pinching on the preview goes up to the API's 1500%. */
+const SLIDER_MAX_SIZE = 500
+
+const clampSize = (size: number) => Math.round(Math.min(POPUP_SIZE.max, Math.max(POPUP_SIZE.min, size)))
 
 const POSITION_LABELS: Record<Position, string> = {
   tl: 'Top left',
@@ -92,6 +91,12 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [newColor, setNewColor] = useState<TextColor>('yellow')
   const [textError, setTextError] = useState<string | undefined>()
   const [segmentationMissing, setSegmentationMissing] = useState(false)
+  const [zoomLimit, setZoomLimit] = useState<string | null>(null)
+  /** When the selected popup's entrance and effect last started playing in the preview. */
+  const [playedAt, setPlayedAt] = useState(() => Date.now())
+  /** A finger is on the preview, moving or resizing a popup: the page doesn't scroll meanwhile. */
+  const [touching, setTouching] = useState(false)
+  const pinchFrom = useRef<number>(POPUP_SIZE.default)
   const media = useMedia()
 
   const dirty = stable(doc) !== base
@@ -110,6 +115,7 @@ function Editor({ setup }: { setup: SetupFull }) {
   const changeBackground = (c: Partial<BackgroundSettings>) => setDoc((d) => ({ ...d, background: { ...d.background, ...c } }))
   const changeForeground = (c: Partial<ForegroundSettings>) => setDoc((d) => ({ ...d, foreground: { ...d.foreground, ...c } }))
   const changePopup = (c: Partial<PopupConfig>) => selected && setDoc((d) => ({ ...d, popups: updatePopup(d.popups, selected, c) }))
+  const replay = () => setPlayedAt(Date.now())
 
   const persist = async (): Promise<boolean> => {
     try {
@@ -144,9 +150,24 @@ function Editor({ setup }: { setup: SetupFull }) {
   const stageW = portrait ? 168 : 320
   const stageH = portrait ? 300 : 180
   const mediaList = useMemo(() => media.data ?? [], [media.data])
+  // Only while nothing was ever fetched: a failed refresh keeps showing the pictures it has.
+  const mediaError = media.isError && !media.data ? errorMessage(media.error, 'Check your internet and try again.') : null
+  const retryMedia = () => void media.refetch()
   const look = useMemo(() => nativeLook(doc, mediaList), [doc, mediaList])
   // The popup only shows on the Popups step, so the look is easy to judge on the others.
-  const overlay = useMemo(() => (tab === 'popups' && popup ? [resolveLook(popup)] : []), [tab, popup])
+  const overlay = useMemo(() => (tab === 'popups' && popup ? [resolveLook(popup, playedAt)] : []), [tab, popup, playedAt])
+
+  const popupGestures: PopupGestureHandlers | undefined =
+    tab === 'popups' && popup
+      ? {
+          onPlace: (x, y) => changePopup({ x, y }),
+          onPinch: (phase, ratio) => {
+            if (phase === 'start') pinchFrom.current = popup.size
+            else if (phase === 'move') changePopup({ size: clampSize(pinchFrom.current * ratio) })
+          },
+          onActive: setTouching,
+        }
+      : undefined
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -157,7 +178,7 @@ function Editor({ setup }: { setup: SetupFull }) {
         right={<Button label="Save" variant="secondary" size="md" onPress={() => void persist()} disabled={!dirty} busy={save.isPending} />}
       />
 
-      <ScrollView contentContainerStyle={{ paddingBottom: space.lg }}>
+      <ScrollView contentContainerStyle={{ paddingBottom: space.lg }} scrollEnabled={!touching}>
         <View style={styles.previewBox} accessibilityLabel={popup ? `Preview of ${popupText(popup)}` : 'Preview'}>
           <StagePreview
             width={stageW}
@@ -167,6 +188,8 @@ function Editor({ setup }: { setup: SetupFull }) {
             look={look}
             overlay={overlay}
             onSegmentationMissing={() => setSegmentationMissing(true)}
+            onZoomLimit={setZoomLimit}
+            popupGestures={popupGestures}
           />
         </View>
 
@@ -200,7 +223,10 @@ function Editor({ setup }: { setup: SetupFull }) {
                 return (
                   <Pressable
                     key={p.key}
-                    onPress={() => setSelected(p.key)}
+                    onPress={() => {
+                      setSelected(p.key)
+                      replay()
+                    }}
                     accessibilityRole="button"
                     accessibilityLabel={popupText(p)}
                     accessibilityState={{ selected: on }}
@@ -222,8 +248,13 @@ function Editor({ setup }: { setup: SetupFull }) {
                 <Row label={`Effect for ${popupText(popup)}`} value={EFFECTS.find((e) => e.id === popup.effect)?.label ?? 'None'} onPress={() => setSheet('effect')} />
                 <Row label="Sound" value={soundLabel(popup.sound)} onPress={() => setSheet('sound')} />
                 <Row label="Hide after" value={AUTO_HIDES.find((a) => a.id === popup.auto_hide)?.label ?? 'Never'} onPress={() => setSheet('hide')} />
-                <Row label="Position" value={popup.x !== null && popup.y !== null ? 'Placed on the website' : POSITION_LABELS[popup.position]} onPress={() => setSheet('position')} />
-                <Row label="Size" value={SIZES.find((s) => s.id === popup.size)?.label ?? `${popup.size}%`} onPress={() => setSheet('size')} last={popup.kind === 'preset'} />
+                <Row
+                  label="Position"
+                  value={isFreelyPlaced(popup) ? 'Placed by hand' : POSITION_LABELS[popup.position]}
+                  onPress={() => setSheet('position')}
+                  last={popup.kind === 'preset' && popup.effect === 'none' && popup.entrance === 'none'}
+                />
+                {(popup.effect !== 'none' || popup.entrance !== 'none') && <Row label="Play it again" onPress={replay} last={popup.kind === 'preset'} />}
                 {popup.kind !== 'preset' && (
                   <Row
                     label="Remove this popup"
@@ -237,6 +268,22 @@ function Editor({ setup }: { setup: SetupFull }) {
                 )}
               </Card>
             )}
+
+            {popup && (
+              <View style={{ gap: space.xs }}>
+                <LookSlider
+                  label="Size"
+                  value={Math.min(SLIDER_MAX_SIZE, popup.size)}
+                  min={POPUP_SIZE.min}
+                  max={SLIDER_MAX_SIZE}
+                  onChange={(size) => changePopup({ size })}
+                  low="Smaller"
+                  high="Bigger"
+                  format={() => `${popup.size}%`}
+                />
+                <Text style={styles.help}>On the preview: drag to put the popup anywhere, pinch with two fingers to resize it.</Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -245,6 +292,7 @@ function Editor({ setup }: { setup: SetupFull }) {
             camera={doc.camera}
             orientation={doc.orientation}
             resolution={doc.resolution}
+            zoomLimit={zoomLimit}
             onCamera={changeCamera}
             onShape={(c) => change(c)}
           />
@@ -255,12 +303,23 @@ function Editor({ setup }: { setup: SetupFull }) {
             background={doc.background}
             media={mediaList}
             mediaLoading={media.isPending}
+            mediaError={mediaError}
+            onRetryMedia={retryMedia}
             segmentationMissing={segmentationMissing}
             onChange={changeBackground}
           />
         )}
 
-        {tab === 'foreground' && <ForegroundSection foreground={doc.foreground} media={mediaList} mediaLoading={media.isPending} onChange={changeForeground} />}
+        {tab === 'foreground' && (
+          <ForegroundSection
+            foreground={doc.foreground}
+            media={mediaList}
+            mediaLoading={media.isPending}
+            mediaError={mediaError}
+            onRetryMedia={retryMedia}
+            onChange={changeForeground}
+          />
+        )}
 
         {tab === 'sounds' && (
           <View style={{ padding: space.lg, gap: space.lg }}>
@@ -316,10 +375,23 @@ function Editor({ setup }: { setup: SetupFull }) {
           value={popup?.effect ?? 'none'}
           onPick={(effect) => {
             changePopup({ effect })
+            replay()
             setSheet(null)
           }}
         />
-        <Text style={styles.help}>Effects play on the website’s clean screen. In the phone’s live, the popup shows without the animation for now.</Text>
+        <Segmented<EffectRepeat>
+          label="How long it plays"
+          value={popup?.effect_repeat ?? 'once'}
+          onChange={(effect_repeat) => {
+            changePopup({ effect_repeat })
+            replay()
+          }}
+          options={[
+            { id: 'once', label: 'Play once' },
+            { id: 'loop', label: 'Keep playing' },
+          ]}
+        />
+        <Text style={styles.help}>Plays each time the popup shows, in your live and on the website’s clean screen. Turn on your camera in the preview to see it here.</Text>
       </Sheet>
       <Sheet visible={sheet === 'sound'} onClose={() => setSheet(null)} title="Sound when it shows">
         <ScrollView style={{ maxHeight: 420 }}>
@@ -365,16 +437,6 @@ function Editor({ setup }: { setup: SetupFull }) {
           })}
         </View>
         <Text style={styles.help}>Keep popups out of the bottom third: that’s where TikTok and Facebook show comments.</Text>
-      </Sheet>
-      <Sheet visible={sheet === 'size'} onClose={() => setSheet(null)} title="Size">
-        <Options<string>
-          options={SIZES.map((s) => ({ id: String(s.id), label: s.label }))}
-          value={String(popup?.size ?? 100)}
-          onPick={(v) => {
-            changePopup({ size: Number(v) })
-            setSheet(null)
-          }}
-        />
       </Sheet>
       <Sheet visible={sheet === 'text'} onClose={() => setSheet(null)} title="Make your own popup">
         <Field

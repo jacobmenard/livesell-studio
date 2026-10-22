@@ -24,7 +24,8 @@ export interface LiveStatsEvent {
 export interface LiveErrorEvent {
   /**
    * prepare / camera / sound as before; "microphone" = the mic couldn't start when going live;
-   * "segmentation" = this phone can't find the person, so Blur and Picture backgrounds aren't drawn.
+   * "segmentation" = this phone can't find the person, so Blur and Picture backgrounds aren't drawn;
+   * "zoom" = this camera can't zoom out as far as asked (the message says how far it goes).
    */
   code: 'prepare' | 'camera' | 'sound' | 'microphone' | 'segmentation' | string
   message: string

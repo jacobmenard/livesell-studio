@@ -5,20 +5,30 @@ import type { CameraSettings, Orientation, Resolution } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { Card, Notice, Segmented } from '@/components/ui'
 import { CAMERA_FILTERS, DEFAULT_FILTER_STRENGTH, LOOK_PRESETS, LOOK_SLIDERS, NEUTRAL_LOOK, sameLook, type CameraLook } from '@/stage/filters'
-import { cameraWithDefaults } from '@/stage/stageLook'
+import { cameraWithDefaults, MIN_PHONE_ZOOM } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 import { LookSlider, SectionTitle, styles, SwitchRow } from './parts'
+
+/** Quick zoom steps, like a phone's camera app. camera.zoom: -50 = 0.5×, 0 = 1×, 100 = 2×. */
+const ZOOM_STEPS = [
+  { zoom: MIN_PHONE_ZOOM, label: '0.5×', hint: 'Zoom out, 0.5 times' },
+  { zoom: 0, label: '1×', hint: 'No zoom' },
+  { zoom: 100, label: '2×', hint: 'Zoom in, 2 times' },
+]
 
 export function CameraSection({
   camera: saved,
   orientation,
   resolution,
+  zoomLimit,
   onCamera,
   onShape,
 }: {
   camera: CameraSettings
   orientation: Orientation
   resolution: Resolution
+  /** The preview's camera couldn't zoom out as far as asked (says how far it goes). */
+  zoomLimit: string | null
   onCamera: (change: Partial<CameraSettings>) => void
   onShape: (change: { orientation?: Orientation; resolution?: Resolution }) => void
 }) {
@@ -65,14 +75,34 @@ export function CameraSection({
 
       <View style={{ gap: space.md }}>
         <SectionTitle>Framing</SectionTitle>
+        <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup" accessibilityLabel="Zoom">
+          {ZOOM_STEPS.map((z) => {
+            const on = camera.zoom === z.zoom
+            return (
+              <Pressable
+                key={z.zoom}
+                onPress={() => onCamera({ zoom: z.zoom })}
+                accessibilityRole="radio"
+                accessibilityLabel={z.hint}
+                accessibilityState={{ selected: on }}
+                style={[styles.chip, { flex: 1 }, on && styles.chipOn]}
+              >
+                <Text style={styles.chipText}>{z.label}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
         <LookSlider
           label="Zoom"
-          value={Math.max(0, camera.zoom)}
+          value={Math.max(MIN_PHONE_ZOOM, Math.min(100, camera.zoom))}
+          min={MIN_PHONE_ZOOM}
           onChange={(zoom) => onCamera({ zoom })}
-          low="Whole picture"
-          high="Closer"
+          low="Wider · 0.5×"
+          high="Closer · 2×"
           format={(v) => `${(1 + v / 100).toFixed(1)}×`}
+          hint="Below 1× the camera uses its wide lens to show more of your room. Front cameras and some phones stop at 1×."
         />
+        {zoomLimit && camera.zoom < 0 && <Notice tone="warning">{zoomLimit} Viewers see its widest view.</Notice>}
         <Card>
           <SwitchRow label="Mirror" help="Flips the picture left to right, so writing on your products reads the right way." value={camera.mirror} onChange={(mirror) => onCamera({ mirror })} />
         </Card>

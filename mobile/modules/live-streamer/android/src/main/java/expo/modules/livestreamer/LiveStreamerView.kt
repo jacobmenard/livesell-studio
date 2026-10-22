@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -51,11 +52,17 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   private val surfaceView = SurfaceView(context)
   private val mixer = SoundMixer()
   private val sounds = SoundBank(context.assets)
-  private val popupImages = RemoteImages(context.assets, 1080) { main.post { renderOverlay() } }
+  private val popupImages = RemoteImages(context.assets, 1080) {
+    main.post {
+      renderOverlay()
+      ensureAnimating()
+    }
+  }
   private val pictures = RemoteImages(context.assets, 1920) {
     main.post {
       applyPicture()
       renderOverlay()
+      ensureAnimating()
     }
   }
   private val renderer = OverlayRenderer(loadTypeface(context))
@@ -77,7 +84,7 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   private var surfaceReady = false
   /** Our two filters are in RootEncoder's chain (it drops them whenever its GL pipeline stops). */
   private var filtersAttached = false
-  private var overlayJson = "[]"
+  private var overlaySpecs: List<OverlaySpec> = emptyList()
   private var look = LookSpec()
   private var shownPicture: String? = null
   private var lastUrl: String? = null
@@ -198,8 +205,10 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     previewAttempts = 0
     if (freshPipeline || !filtersAttached) attachFilters()
     applyFacing()
+    applyLensZoomSoon()
     applyPicture()
     renderOverlay()
+    ensureAnimating()
     emitStatus(if (stream.isStreaming) "live" else "previewing")
   }
 
@@ -223,7 +232,39 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     val camera = stream.videoSource as? Camera2Source ?: return
     if (!stream.isOnPreview && !stream.isStreaming) return
     val isFront = camera.getCameraFacing() == CameraHelper.Facing.FRONT
-    if (isFront != front) camera.switchCamera()
+    if (isFront != front) {
+      camera.switchCamera()
+      applyLensZoomSoon()
+    }
+  }
+
+  /**
+   * The camera's own zoom (0.5× = its wide lens). Android 11+ phones with several back lenses
+   * switch to the wide one by themselves for zoom ratios below 1; others stop at their widest
+   * (RootEncoder keeps the ratio inside what the camera allows), and the app is told so.
+   */
+  private fun applyLensZoom() {
+    val camera = stream.videoSource as? Camera2Source ?: return
+    if (!stream.isOnPreview && !stream.isStreaming) return
+    try {
+      camera.setZoom(look.lensZoom)
+      val widest = camera.getZoomRange().lower
+      if (look.lensZoom < 1f && widest > look.lensZoom + 0.01f && zoomLimitShown != widest) {
+        zoomLimitShown = widest
+        emitError("zoom", String.format(java.util.Locale.US, "This camera can only zoom out to %.1f×.", widest))
+      }
+    } catch (error: RuntimeException) {
+      Log.w(TAG, "zoom failed", error)
+    }
+  }
+
+  private var zoomLimitShown: Float? = null
+
+  /** A camera that is (re)opening ignores zoom until its session runs: ask again shortly. */
+  private fun applyLensZoomSoon() {
+    applyLensZoom()
+    main.postDelayed({ applyLensZoom() }, ZOOM_RETRY_MS)
+    main.postDelayed({ applyLensZoom() }, ZOOM_RETRY_MS * 3)
   }
 
   // ---- the look ---------------------------------------------------------------------------
@@ -232,10 +273,16 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   fun setLook(json: String) {
     val next = LookSpec.parse(json)
     val foregroundChanged = next.foreground != look.foreground
+    val lensChanged = next.lensZoom != look.lensZoom
     look = next
+    if (lensChanged) {
+      zoomLimitShown = null
+      applyLensZoom()
+    }
     stageFilter.look = next
     applyPicture()
     if (foregroundChanged) renderOverlay()
+    ensureAnimating()
   }
 
   /** The picture behind the person: shown once loaded (its tone until then). */
@@ -244,6 +291,13 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     if (source == null) {
       if (shownPicture != null) stageFilter.setPicture(null, null)
       shownPicture = null
+      return
+    }
+    // A moving picture: its current frame, every tick of the frame ticker.
+    val moving = movingFrame(pictures, source)
+    if (moving != null) {
+      stageFilter.setPicture(moving, source)
+      shownPicture = source
       return
     }
     val bitmap = pictures.get(source)
@@ -303,6 +357,8 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   fun switchCamera() {
     front = !front
     (stream.videoSource as? Camera2Source)?.switchCamera()
+    zoomLimitShown = null
+    applyLensZoomSoon()
   }
 
   fun setMicMuted(muted: Boolean) {
@@ -313,20 +369,87 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   // ---- popups and sounds ------------------------------------------------------------
 
   fun setOverlay(json: String) {
-    overlayJson = json
+    overlaySpecs = OverlaySpec.parseList(json)
     renderOverlay()
+    ensureAnimating()
   }
 
   private fun renderOverlay() {
     if (released || !filtersAttached) return
     val size = stream.getGlInterface().getEncoderSize()
     if (size.x <= 0 || size.y <= 0) return
-    val specs = OverlaySpec.parseList(overlayJson)
     val foreground = look.foreground
-    val banner = foreground?.let { pictures.get(it.url) }
-    val bitmap: Bitmap = renderer.render(specs, size.x, size.y, { url -> popupImages.get(url) }, banner, foreground?.dockTop == true)
+    val banner = foreground?.let { movingFrame(pictures, it.url) ?: pictures.get(it.url) }
+    val bitmap: Bitmap = renderer.render(
+      overlaySpecs,
+      size.x,
+      size.y,
+      { url -> movingFrame(popupImages, url) ?: popupImages.get(url) },
+      banner,
+      foreground?.dockTop == true,
+    )
     overlayFilter.setImage(bitmap)
   }
+
+  // ---- moving pictures (GIF / animated WebP) and popup animations ---------------------------
+  // Each loaded picture is one still frame; a moving one is redrawn on a ticker, only while
+  // something on screen moves, and only the part that moves (the background, or the overlay).
+  // Popup entrances and effects redraw the overlay too, at the stream's frame rate.
+
+  private var tick = 0L
+  private var animating = false
+  /** A popup animated on the last tick: once none does, the overlay is drawn still one last time. */
+  private var popupsWereAnimating = false
+
+  private val frameTicker = object : Runnable {
+    override fun run() {
+      val background = backgroundMoves()
+      val overlay = overlayMoves()
+      val popupsMove = popupsAnimate()
+      // An effect's last tick may have caught it mid-fade: draw its end state.
+      if (popupsWereAnimating && !popupsMove && !overlay) renderOverlay()
+      popupsWereAnimating = popupsMove
+      if (released || !filtersAttached || (!background && !overlay)) {
+        animating = false
+        return
+      }
+      tick++
+      if (background) applyPicture()
+      if (overlay) renderOverlay()
+      main.postDelayed(this, frameDelay())
+    }
+  }
+
+  /** Starts the frame ticker if a moving picture is on screen; it stops itself once none is. */
+  private fun ensureAnimating() {
+    if (animating || released || !filtersAttached || (!backgroundMoves() && !overlayMoves())) return
+    animating = true
+    main.postDelayed(frameTicker, frameDelay())
+  }
+
+  /** Effects are smooth motion, so they redraw every stream frame; GIFs need far fewer. */
+  private fun frameDelay(): Long = if (popupsAnimate()) EFFECT_FRAME_MS else FRAME_MS
+
+  private fun popupsAnimate(): Boolean {
+    val now = System.currentTimeMillis()
+    return overlaySpecs.any { PopupMotion.moves(it, now) }
+  }
+
+  private fun backgroundMoves(): Boolean {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+    val source = look.background.pictureSource ?: return false
+    return pictures.animation(source) != null
+  }
+
+  private fun overlayMoves(): Boolean {
+    if (popupsAnimate()) return true
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+    if (look.foreground?.let { pictures.animation(it.url) } != null) return true
+    return overlaySpecs.any { spec -> spec.kind == "image" && spec.imageUrl?.let { popupImages.animation(it) } != null }
+  }
+
+  private fun movingFrame(images: RemoteImages, source: String): Bitmap? =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) images.animation(source)?.frame(tick) else null
 
   fun playSound(id: String, volume: Float, toStream: Boolean, monitor: Boolean) {
     val samples = sounds.load(id) ?: run {
@@ -452,6 +575,11 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     private const val RETRY_DELAY_MS = 5_000L
     private const val MAX_PREVIEW_ATTEMPTS = 4
     private const val PREVIEW_RETRY_MS = 600L
+    /** Moving pictures redraw about 20 times a second (most GIFs run at 10–25 fps). */
+    private const val FRAME_MS = 50L
+    private const val ZOOM_RETRY_MS = 400L
+    /** Popup entrances and effects: one redraw per stream frame (30 fps). */
+    private const val EFFECT_FRAME_MS = 1000L / FPS
 
     private fun loadTypeface(context: Context): Typeface =
       try {

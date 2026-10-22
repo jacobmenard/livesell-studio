@@ -70,9 +70,9 @@ function visible(popups: PopupConfig[], active: ActivePopup[]): { popup: PopupCo
   return out
 }
 
-/** What the native streamer draws into the video, bottom to top (last shown on top). */
+/** What the native streamer draws into the video, bottom to top (last shown on top), each animated from when it was shown. */
 export function overlayFor(popups: PopupConfig[], active: ActivePopup[]): PopupDrawSpec[] {
-  return visible(popups, active).map(({ popup }) => resolveLook(popup))
+  return visible(popups, active).map(({ popup, shownAt }) => resolveLook(popup, shownAt))
 }
 
 /**

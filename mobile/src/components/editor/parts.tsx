@@ -1,10 +1,12 @@
 import Slider from '@react-native-community/slider'
 import { useState, type ReactNode } from 'react'
-import { ActivityIndicator, Alert, Image, Pressable, StyleSheet, Switch, Text, View, type ImageSourcePropType } from 'react-native'
+import { ActivityIndicator, Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native'
 
 import { errorMessage } from '@/api/client'
 import type { MediaItem, MediaKind } from '@/api/types'
 import { Icon } from '@/components/Icon'
+import { Picture, type PictureSource } from '@/components/Picture'
+import { Notice } from '@/components/ui'
 import { useRemoveMedia, useUploadMedia } from '@/hooks/queries'
 import { pickPicture, prepareUpload } from '@/media/pickImage'
 import { colors, radius, space } from '@/theme'
@@ -91,7 +93,7 @@ export function PictureTile({
   width = '31.6%',
   checker = false,
 }: {
-  source: ImageSourcePropType
+  source: PictureSource
   label: string
   selected: boolean
   onPress: () => void
@@ -112,13 +114,27 @@ export function PictureTile({
       style={[styles.tile, { aspectRatio: aspect, width }, selected && { borderColor: colors.link }]}
     >
       {checker && <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface2 }]} />}
-      <Image source={source} style={StyleSheet.absoluteFill} resizeMode={checker ? 'contain' : 'cover'} accessible={false} />
+      <Picture source={source} style={StyleSheet.absoluteFill} fit={checker ? 'contain' : 'cover'} accessible={false} />
       {selected && (
         <View style={styles.check}>
           <Icon name="check" size={12} color="#FFFFFF" strokeWidth={3.4} />
         </View>
       )}
     </Pressable>
+  )
+}
+
+/** The seller's pictures couldn't be fetched: says so (an empty list would look like "none uploaded"). */
+export function MediaError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <View style={{ gap: space.xs }}>
+      <Notice tone="danger" title="Couldn’t load your pictures">
+        {message}
+      </Notice>
+      <Pressable onPress={onRetry} accessibilityRole="button" hitSlop={8} style={{ minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }}>
+        <Text style={{ color: colors.link, fontSize: 14, fontWeight: '600' }}>Try again</Text>
+      </Pressable>
+    </View>
   )
 }
 
@@ -193,8 +209,10 @@ export const styles = StyleSheet.create({
   end: { color: colors.muted, fontSize: 12 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, padding: 14, minHeight: 64 },
   switchLabel: { color: colors.text, fontSize: 16, fontWeight: '500' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  tile: { width: '31.6%', borderRadius: radius.sm, borderWidth: 2, borderColor: 'transparent', backgroundColor: colors.surface, overflow: 'hidden' },
+  // Not stretched to the row's height: that overrides a tile's aspectRatio, and a row of
+  // pictures only (no text to give it height) collapses them to their 2 px borders.
+  grid: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start', gap: space.sm },
+  tile: { width: '31.6%', alignSelf: 'flex-start', borderRadius: radius.sm, borderWidth: 2, borderColor: 'transparent', backgroundColor: colors.surface, overflow: 'hidden' },
   upload: { alignItems: 'center', justifyContent: 'center', gap: 2, borderStyle: 'dashed', borderColor: colors.lineStrong },
   check: { position: 'absolute', top: 5, right: 5, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
   chip: { minHeight: 40, paddingHorizontal: 14, borderRadius: radius.pill, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },

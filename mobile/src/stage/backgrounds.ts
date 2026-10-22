@@ -1,9 +1,8 @@
-import type { ImageSourcePropType } from 'react-native'
-
 import type { BackgroundMode, BackgroundPresetId, BackgroundSettings, CameraSettings, ForegroundDock, ForegroundSettings, KeyColor } from '@/api/types'
 
 /** The six built-in backdrops (frontend/src/stage/catalog.ts BACKGROUND_PRESETS). */
-export const BACKGROUND_PRESETS: { id: BackgroundPresetId; label: string; tone: string; thumb: ImageSourcePropType }[] = [
+/** `thumb` is a bundled picture (require() gives its asset number). */
+export const BACKGROUND_PRESETS: { id: BackgroundPresetId; label: string; tone: string; thumb: number }[] = [
   { id: 'loft', label: 'Studio loft', tone: '#3A3424', thumb: require('../../assets/backgrounds/loft.jpg') },
   { id: 'rack', label: 'Boutique rack', tone: '#24324A', thumb: require('../../assets/backgrounds/rack.jpg') },
   { id: 'kitchen', label: 'Kitchen set', tone: '#4A2E24', thumb: require('../../assets/backgrounds/kitchen.jpg') },

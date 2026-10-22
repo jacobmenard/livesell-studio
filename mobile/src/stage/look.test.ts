@@ -1,5 +1,5 @@
 import type { PopupConfig } from '@/api/types'
-import { parseBorder, parseDeg, placement, popupText, resolveLook, sizeScale } from './look'
+import { nearTop, parseBorder, parseDeg, placement, popupText, resolveLook, sizeScale } from './look'
 
 function preset(key: PopupConfig['preset_key'], extra: Partial<PopupConfig> = {}): PopupConfig {
   return {
@@ -75,5 +75,18 @@ describe('look (same rules as the web stage)', () => {
     expect(popupText(preset('sold'))).toBe('SOLD OUT')
     expect(popupText(preset(null, { kind: 'text', text: 'HI' }))).toBe('HI')
     expect(popupText(preset(null, { kind: 'image', label: null }))).toBe('Image')
+  })
+
+  it('carries the entrance and effect for the native renderer, drawn still unless shown at a time', () => {
+    const still = resolveLook(preset('off10', { entrance: 'bounce', effect: 'confetti', effect_repeat: 'loop' }))
+    expect(still).toMatchObject({ entrance: 'bounce', effect: 'confetti', effectLoop: true, shownAt: 0 })
+    expect(resolveLook(preset('off10'), 1_700_000_000_000).shownAt).toBe(1_700_000_000_000)
+  })
+
+  it('knows when a popup is in the top part, where banderitas hang below it', () => {
+    expect(nearTop({ position: 'tr', x: null, y: null })).toBe(true)
+    expect(nearTop({ position: 'tr', x: 50, y: 70 })).toBe(false)
+    expect(nearTop({ position: 'bc', x: 20, y: 10 })).toBe(true)
+    expect(resolveLook(preset('off10', { position: 'bl' })).topRow).toBe(false)
   })
 })

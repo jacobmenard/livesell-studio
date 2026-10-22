@@ -29,10 +29,19 @@ data class OverlaySpec(
   val anchorY: Float,
   val alignX: Float,
   val alignY: Float,
+  /** Entrance ("pop", "slide", "bounce", "none") and effect, played from `shownAt` (ms since 1970). */
+  val entrance: String = "none",
+  val effect: String = "none",
+  val effectLoop: Boolean = false,
+  val topRow: Boolean = false,
+  /** 0 = drawn still (no entrance, no effect). */
+  val shownAt: Long = 0L,
 ) {
   companion object {
     private const val MAX_POPUPS = 12
     private const val MAX_TEXT = 40
+    private val ENTRANCES = setOf("pop", "slide", "bounce", "none")
+    private val EFFECTS = setOf("none", "fireworks", "confetti", "flags", "applause", "sparkle", "hearts")
 
     fun parseList(json: String): List<OverlaySpec> =
       try {
@@ -62,6 +71,11 @@ data class OverlaySpec(
         anchorY = o.optDouble("anchorY", 0.5).toFloat().coerceIn(0f, 1f),
         alignX = o.optDouble("alignX", -0.5).toFloat().coerceIn(-1f, 0f),
         alignY = o.optDouble("alignY", -0.5).toFloat().coerceIn(-1f, 0f),
+        entrance = o.optString("entrance", "none").takeIf { it in ENTRANCES } ?: "none",
+        effect = o.optString("effect", "none").takeIf { it in EFFECTS } ?: "none",
+        effectLoop = o.optBoolean("effectLoop", false),
+        topRow = o.optBoolean("topRow", false),
+        shownAt = o.optDouble("shownAt", 0.0).takeIf { it.isFinite() && it > 0 }?.toLong() ?: 0L,
       )
     }
 
@@ -75,7 +89,8 @@ data class OverlaySpec(
 }
 
 /**
- * Draws the popups onto a transparent picture the size of the stream. The box rules match
+ * Draws the popups onto a transparent picture the size of the stream, each with its effect
+ * underneath and its entrance animation (PopupMotion), as of `now`. The box rules match
  * the web stage (frontend/src/stage/Stage.tsx PopupView): padding 0.42em × 0.8em, circles
  * 3.2em wide, tag corners 0.28em, a 0.18em drop shadow, line height 1 and the tilt around
  * the box's centre. 1 unit = 1% of the stream's shorter side.
@@ -101,20 +116,38 @@ class OverlayRenderer(private val typeface: Typeface) {
     image: (String) -> Bitmap?,
     foreground: Bitmap? = null,
     foregroundTop: Boolean = false,
+    now: Long = System.currentTimeMillis(),
   ): Bitmap {
-    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val bitmap = nextBuffer(width, height)
     if (specs.isEmpty() && foreground == null) return bitmap
     val canvas = Canvas(bitmap)
     if (foreground != null) drawForeground(canvas, foreground, foregroundTop, width, height)
     val unit = min(width, height) / 100f
     for (spec in specs) {
       if (spec.kind == "image") {
-        spec.imageUrl?.let(image)?.let { drawImage(canvas, spec, it, unit, width, height) }
+        spec.imageUrl?.let(image)?.let { drawImage(canvas, spec, it, unit, width, height, now) }
       } else if (spec.text.isNotBlank()) {
-        drawText(canvas, spec, unit, width, height)
+        drawText(canvas, spec, unit, width, height, now)
       }
     }
     return bitmap
+  }
+
+  // Reused output pictures: a moving GIF redraws the overlay many times a second, and a new
+  // stream-sized bitmap each time would churn megabytes. Three, so the one the GPU may still be
+  // uploading is never drawn over (RootEncoder uploads the latest on its next frame).
+  private val buffers = arrayOfNulls<Bitmap>(3)
+  private var nextIndex = 0
+
+  private fun nextBuffer(width: Int, height: Int): Bitmap {
+    val index = nextIndex
+    nextIndex = (nextIndex + 1) % buffers.size
+    val reuse = buffers[index]?.takeIf { it.width == width && it.height == height }
+    if (reuse != null) {
+      reuse.eraseColor(Color.TRANSPARENT)
+      return reuse
+    }
+    return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { buffers[index] = it }
   }
 
   /** Full width at its own aspect ratio, docked to the top or bottom (Stage.tsx ForegroundLayer). */
@@ -125,7 +158,23 @@ class OverlayRenderer(private val typeface: Typeface) {
     canvas.drawBitmap(picture, null, RectF(0f, y, width.toFloat(), y + h), imagePaint)
   }
 
-  private fun drawText(canvas: Canvas, spec: OverlaySpec, unit: Float, width: Int, height: Int) {
+  /**
+   * The effect (under the popup, around its centre, sized in em of its font) and then the
+   * entrance: scale around the box's centre, a slide up, and a fade. Returns the save count
+   * to restore once the popup is drawn.
+   */
+  private fun beginPopup(canvas: Canvas, spec: OverlaySpec, box: RectF, unit: Float, now: Long): Int {
+    PopupMotion.drawEffect(canvas, spec, box.centerX(), box.centerY(), spec.fontU * unit, now)
+    val restoreTo = canvas.save()
+    if (spec.shownAt <= 0L) return restoreTo
+    val frame = PopupMotion.entrance(spec.entrance, now - spec.shownAt)
+    if (frame.alpha < 1f) canvas.saveLayerAlpha(null, (frame.alpha.coerceIn(0f, 1f) * 255).toInt())
+    canvas.translate(0f, frame.dropU * unit)
+    if (frame.scale != 1f) canvas.scale(frame.scale, frame.scale, box.centerX(), box.centerY())
+    return restoreTo
+  }
+
+  private fun drawText(canvas: Canvas, spec: OverlaySpec, unit: Float, width: Int, height: Int, now: Long) {
     val fontPx = spec.fontU * unit
     textPaint.textSize = fontPx
     textPaint.color = spec.fg
@@ -144,7 +193,7 @@ class OverlayRenderer(private val typeface: Typeface) {
       else -> 0.28f * fontPx
     }
 
-    canvas.save()
+    val restoreTo = beginPopup(canvas, spec, rect, unit, now)
     canvas.rotate(spec.rotDeg, rect.centerX(), rect.centerY())
 
     val shadow = RectF(rect).apply { offset(0f, 0.18f * fontPx) }
@@ -164,15 +213,18 @@ class OverlayRenderer(private val typeface: Typeface) {
     val metrics = textPaint.fontMetrics
     val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
     canvas.drawText(spec.text, rect.centerX() - textWidth / 2f, baseline, textPaint)
-    canvas.restore()
+    canvas.restoreToCount(restoreTo)
   }
 
-  private fun drawImage(canvas: Canvas, spec: OverlaySpec, picture: Bitmap, unit: Float, width: Int, height: Int) {
+  private fun drawImage(canvas: Canvas, spec: OverlaySpec, picture: Bitmap, unit: Float, width: Int, height: Int, now: Long) {
     if (picture.height <= 0) return
     val h = spec.imageU * unit
     val w = h * picture.width / picture.height
     val left = spec.anchorX * width + spec.alignX * w
     val top = spec.anchorY * height + spec.alignY * h
-    canvas.drawBitmap(picture, null, RectF(left, top, left + w, top + h), imagePaint)
+    val box = RectF(left, top, left + w, top + h)
+    val restoreTo = beginPopup(canvas, spec, box, unit, now)
+    canvas.drawBitmap(picture, null, box, imagePaint)
+    canvas.restoreToCount(restoreTo)
   }
 }
