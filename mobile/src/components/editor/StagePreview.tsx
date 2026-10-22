@@ -98,8 +98,8 @@ export function StagePreview({
 
       {showCamera && (
         <View style={styles.tools}>
-          <IconButton icon="flip" label="Flip camera" tone="overlay" size={40} onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))} />
-          <IconButton icon="eyeOff" label="Turn the camera preview off" tone="overlay" size={40} onPress={() => setCameraOn(false)} />
+          <IconButton icon="flip" label="Flip camera" tone="overlay" size={44} onPress={() => setFacing((f) => (f === 'front' ? 'back' : 'front'))} />
+          <IconButton icon="eyeOff" label="Turn the camera preview off" tone="overlay" size={44} onPress={() => setCameraOn(false)} />
         </View>
       )}
 
@@ -151,7 +151,8 @@ function StandIn({ look, overlay, width, height }: { look: NativeLook; overlay: 
 }
 
 const styles = StyleSheet.create({
-  tools: { position: 'absolute', top: 6, right: 6, gap: 6 },
+  // Bottom right: popups sit at the top right by default, and a top foreground at the top.
+  tools: { position: 'absolute', bottom: 6, right: 6, flexDirection: 'row', gap: 6 },
   cameraButton: {
     position: 'absolute',
     bottom: space.sm,
