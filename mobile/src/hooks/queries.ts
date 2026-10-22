@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-import { accountApi, mediaApi, setupsApi, type UploadFile } from '@/api/endpoints'
+import { accountApi, mediaApi, setupsApi, type PickedFile } from '@/api/endpoints'
 import type { MediaItem, MediaKind, SetupDocument, SetupFull } from '@/api/types'
 import { appVersionCode } from '@/config'
 
@@ -8,35 +8,8 @@ export const keys = {
   setups: ['setups'] as const,
   setup: (id: number) => ['setups', id] as const,
   subscription: ['subscription'] as const,
-  version: ['app-version'] as const,
   media: ['media'] as const,
-}
-
-/** The account's uploads (backgrounds, foregrounds, popup images, sounds). */
-export function useMedia() {
-  return useQuery({ queryKey: keys.media, queryFn: mediaApi.list })
-}
-
-export function useUploadMedia() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: ({ kind, file }: { kind: MediaKind; file: UploadFile }) => mediaApi.upload(kind, file),
-    onSuccess: (item: MediaItem) => {
-      client.setQueryData<MediaItem[]>(keys.media, (list) => (list ? [item, ...list] : [item]))
-    },
-  })
-}
-
-/** Deleting an upload also changes the setups that used it, so those are fetched again. */
-export function useRemoveMedia() {
-  const client = useQueryClient()
-  return useMutation({
-    mutationFn: (id: number) => mediaApi.remove(id),
-    onSuccess: (_: void, id: number) => {
-      client.setQueryData<MediaItem[]>(keys.media, (list) => list?.filter((m) => m.id !== id))
-      void client.invalidateQueries({ queryKey: keys.setups })
-    },
-  })
+  version: ['app-version'] as const,
 }
 
 export function useSetups() {
@@ -66,6 +39,31 @@ export function useCreateSetup() {
     onSuccess: (created: SetupFull) => {
       client.setQueryData(keys.setup(created.id), created)
       void client.invalidateQueries({ queryKey: keys.setups, exact: true })
+    },
+  })
+}
+
+/** The seller's uploaded pictures (backgrounds, foregrounds, popup images): URLs for the live picture. */
+export function useMedia() {
+  return useQuery({ queryKey: keys.media, queryFn: mediaApi.list, staleTime: 5 * 60 * 1000 })
+}
+
+export function useUploadMedia() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: ({ kind, file }: { kind: MediaKind; file: PickedFile }) => mediaApi.upload(kind, file),
+    onSuccess: (item: MediaItem) => client.setQueryData<MediaItem[]>(keys.media, (list) => [item, ...(list ?? [])]),
+  })
+}
+
+export function useRemoveMedia() {
+  const client = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => mediaApi.remove(id),
+    onSuccess: (_: unknown, id: number) => {
+      client.setQueryData<MediaItem[]>(keys.media, (list) => (list ?? []).filter((m) => m.id !== id))
+      // The server also resets the setups that used it, so those are fetched again.
+      void client.invalidateQueries({ queryKey: keys.setups })
     },
   })
 }

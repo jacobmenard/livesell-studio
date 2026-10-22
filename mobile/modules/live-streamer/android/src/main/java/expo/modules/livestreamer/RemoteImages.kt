@@ -1,7 +1,9 @@
 package expo.modules.livestreamer
 
+import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import android.util.Log
 import android.util.LruCache
 import java.io.IOException
@@ -11,60 +13,75 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
 /**
- * Pictures for image popups (the seller's uploads on the NegosyoWork server). Downloaded
- * once in the background and kept small; `onLoaded` redraws the overlay when one arrives.
+ * Pictures for the live: image popups, background photos and foreground banners (the
+ * seller's uploads on the NegosyoWork server), and the bundled backdrops ("asset:<path>").
+ * Loaded once in the background and kept within `maxSide`; `onLoaded` redraws when one
+ * arrives. A failed download is tried again after a while (the signal may come back).
+ * Bitmaps are never recycled here: the GPU upload may still be reading one.
  */
-class RemoteImages(private val onLoaded: () -> Unit) {
+class RemoteImages(private val assets: AssetManager, private val maxSide: Int, private val onLoaded: () -> Unit) {
 
   private val executor = Executors.newSingleThreadExecutor()
   private val pending = ConcurrentHashMap.newKeySet<String>()
-  private val failed = ConcurrentHashMap.newKeySet<String>()
+  private val failedAt = ConcurrentHashMap<String, Long>()
   private val cache = object : LruCache<String, Bitmap>(MAX_BYTES) {
     override fun sizeOf(key: String, value: Bitmap) = value.byteCount
   }
 
   @Volatile private var released = false
 
-  fun get(url: String): Bitmap? {
-    cache.get(url)?.let { return it }
-    if (!failed.contains(url) && pending.add(url)) executor.execute { download(url) }
+  fun get(source: String): Bitmap? {
+    cache.get(source)?.let { return it }
+    val failed = failedAt[source]
+    if (failed != null && SystemClock.elapsedRealtime() - failed < RETRY_AFTER_MS) return null
+    if (pending.add(source)) executor.execute { load(source) }
     return null
   }
 
-  private fun download(url: String) {
+  private fun load(source: String) {
     try {
-      val connection = URL(url).openConnection() as HttpURLConnection
-      connection.connectTimeout = 10_000
-      connection.readTimeout = 15_000
-      connection.instanceFollowRedirects = true
-      try {
-        if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
-        if (connection.contentLengthLong > MAX_DOWNLOAD) throw IOException("too large")
-        val bytes = connection.inputStream.use { it.readBytes() }
-        if (bytes.size > MAX_DOWNLOAD) throw IOException("too large")
-        val bitmap = decodeScaled(bytes) ?: throw IOException("not an image")
-        if (!released) {
-          cache.put(url, bitmap)
-          onLoaded()
-        }
-      } finally {
-        connection.disconnect()
+      val bytes = if (source.startsWith(ASSET)) {
+        assets.open(source.removePrefix(ASSET)).use { it.readBytes() }
+      } else {
+        download(source)
+      }
+      val bitmap = decodeScaled(bytes) ?: throw IOException("not an image")
+      if (!released) {
+        cache.put(source, bitmap)
+        failedAt.remove(source)
+        onLoaded()
       }
     } catch (error: Exception) {
-      Log.w("LiveStreamer", "image popup failed to load", error)
-      failed.add(url)
+      Log.w("LiveStreamer", "picture failed to load", error)
+      failedAt[source] = SystemClock.elapsedRealtime()
     } finally {
-      pending.remove(url)
+      pending.remove(source)
     }
   }
 
-  /** Uploads are capped at 5 MB; anything bigger than 1080 px on its long side is scaled down. */
+  private fun download(url: String): ByteArray {
+    val connection = URL(url).openConnection() as HttpURLConnection
+    connection.connectTimeout = 10_000
+    connection.readTimeout = 15_000
+    connection.instanceFollowRedirects = true
+    try {
+      if (connection.responseCode !in 200..299) throw IOException("HTTP ${connection.responseCode}")
+      if (connection.contentLengthLong > MAX_DOWNLOAD) throw IOException("too large")
+      val bytes = connection.inputStream.use { it.readBytes() }
+      if (bytes.size > MAX_DOWNLOAD) throw IOException("too large")
+      return bytes
+    } finally {
+      connection.disconnect()
+    }
+  }
+
+  /** Uploads are capped at 5 MB; anything bigger than `maxSide` on its long side is scaled down. */
   private fun decodeScaled(bytes: ByteArray): Bitmap? {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
     if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
     var sample = 1
-    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= MAX_SIDE) sample *= 2
+    while (maxOf(bounds.outWidth, bounds.outHeight) / (sample * 2) >= maxSide) sample *= 2
     return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, BitmapFactory.Options().apply { inSampleSize = sample })
   }
 
@@ -75,8 +92,9 @@ class RemoteImages(private val onLoaded: () -> Unit) {
   }
 
   companion object {
-    private const val MAX_BYTES = 24 * 1024 * 1024
+    const val ASSET = "asset:"
+    private const val MAX_BYTES = 40 * 1024 * 1024
     private const val MAX_DOWNLOAD = 6L * 1024 * 1024
-    private const val MAX_SIDE = 1080
+    private const val RETRY_AFTER_MS = 30_000L
   }
 }

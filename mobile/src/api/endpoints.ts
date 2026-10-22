@@ -49,21 +49,21 @@ export const liveApi = {
     request<unknown>(`/api/setups/${setupId}/sounds`, { method: 'POST', body: { sound, volume } }),
 }
 
-/** A picked file on the phone, as React Native's FormData takes it. */
-export interface UploadFile {
+/** A picture picked on the phone, ready to upload. */
+export interface PickedFile {
   uri: string
   name: string
   type: string
 }
 
 export const mediaApi = {
-  /** The account's uploads: popup images, backgrounds, foregrounds and sounds. */
   list: () => request<Wrapped<MediaItem[]>>('/api/media').then((r) => r.data),
-  upload: (kind: MediaKind, file: UploadFile) => {
+  upload: (kind: MediaKind, file: PickedFile) => {
     const body = new FormData()
     body.append('kind', kind)
-    // React Native sends { uri, name, type } as the file's contents.
+    // React Native's FormData takes { uri, name, type } for a file on the phone.
     body.append('file', file as unknown as Blob)
+    // Up to 5 MB on slow mobile data.
     return request<Wrapped<MediaItem>>('/api/media', { method: 'POST', body, timeoutMs: 120_000 }).then((r) => r.data)
   },
   /** Setups using a deleted background go back to their built-in one; a foreground turns off. */

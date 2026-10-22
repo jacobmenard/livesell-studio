@@ -1,7 +1,15 @@
-import type { MediaItem, PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
+import type { BackgroundSettings, CameraSettings, PopupConfig, Scene, ScenePopup, SetupDocument, SetupFull } from '@/api/types'
 import { MAX_POPUPS_ON_SCREEN } from '@/catalog'
-import { backgroundOf, foregroundOf, foregroundSpec, type ForegroundDrawSpec } from './background'
 import { resolveLook, type PopupDrawSpec } from './look'
+import { backgroundWithDefaults, cameraWithDefaults, foregroundWithDefaults } from './stageLook'
+
+/** Changes made on the live screen only (not saved to the setup). */
+export interface LiveOverrides {
+  camera?: Partial<CameraSettings>
+  background?: Partial<BackgroundSettings>
+}
+
+const CAMERA_KEYS = ['source', 'device_label', 'mirror', 'brightness', 'contrast', 'saturation', 'warmth', 'smoothing', 'effect', 'filter', 'filter_strength', 'zoom', 'audio'] as const
 
 /** A popup that is on screen, and when it was shown. */
 export interface ActivePopup {
@@ -16,8 +24,9 @@ export function documentFromSetup(setup: SetupFull): SetupDocument {
     orientation: setup.orientation,
     resolution: setup.resolution,
     camera: { ...setup.camera },
-    background: backgroundOf(setup.background),
-    foreground: foregroundOf(setup.foreground),
+    // Every field set, so a setup saved before a field existed still passes the API's checks.
+    background: backgroundWithDefaults(setup.background),
+    foreground: foregroundWithDefaults(setup.foreground),
     sound_settings: { ...setup.sound_settings },
     output_settings: { ...setup.output_settings },
     popups: setup.popups.map((p) => ({ ...p })),
@@ -61,22 +70,18 @@ function visible(popups: PopupConfig[], active: ActivePopup[]): { popup: PopupCo
   return out
 }
 
-/**
- * What the native streamer draws into the video, bottom to top: the foreground first (popups
- * show on top of it, as on the web), then the popups (last shown on top).
- */
-export function overlayFor(
-  popups: PopupConfig[],
-  active: ActivePopup[],
-  foreground?: { settings: unknown; media: MediaItem[] | undefined },
-): (ForegroundDrawSpec | PopupDrawSpec)[] {
-  const banner = foreground ? foregroundSpec(foregroundOf(foreground.settings), foreground.media) : null
-  const specs = visible(popups, active).map(({ popup }) => resolveLook(popup))
-  return banner ? [banner, ...specs] : specs
+/** What the native streamer draws into the video, bottom to top (last shown on top). */
+export function overlayFor(popups: PopupConfig[], active: ActivePopup[]): PopupDrawSpec[] {
+  return visible(popups, active).map(({ popup }) => resolveLook(popup))
 }
 
-/** The setup's "on screen now" for PUT /api/setups/{id}/scene, so the website can follow along. */
-export function sceneFor(setup: SetupFull, active: ActivePopup[]): Scene {
+/**
+ * The setup's "on screen now" for PUT /api/setups/{id}/scene, so the website can follow along.
+ * Built from the setup plus any live-only changes, with only the fields the API accepts
+ * (frontend/src/stage/scene.ts sceneForApi). `mediaIds` are the seller's pictures, when
+ * known: a deleted background photo falls back to the built-in picture, like the website.
+ */
+export function sceneFor(setup: SetupFull, active: ActivePopup[], overrides: LiveOverrides = {}, mediaIds?: ReadonlySet<number>): Scene {
   const popups: ScenePopup[] = visible(setup.popups, active).map(({ popup, shownAt }) => ({
     key: popup.key,
     kind: popup.kind,
@@ -94,14 +99,18 @@ export function sceneFor(setup: SetupFull, active: ActivePopup[]): Scene {
     effect_repeat: popup.effect_repeat,
     shown_at: shownAt,
   }))
-  // The setup's own background and foreground (what the seller chose, on the phone or the web),
-  // not the last live's: the website's clean screen follows what the phone shows now.
+  const exists = (id: number | null) => (id && (!mediaIds || mediaIds.has(id)) ? id : null)
+
+  const fullCamera = cameraWithDefaults({ ...setup.camera, ...overrides.camera })
+  const camera = Object.fromEntries(CAMERA_KEYS.filter((k) => fullCamera[k] !== undefined).map((k) => [k, fullCamera[k]])) as unknown as CameraSettings
+  const b = backgroundWithDefaults({ ...setup.background, ...overrides.background })
+  const f = foregroundWithDefaults(setup.foreground)
   return {
     orientation: setup.orientation,
     see_through: setup.scene.see_through,
-    camera: setup.scene.camera,
-    background: { ...backgroundOf(setup.background) },
-    foreground: { ...foregroundOf(setup.foreground) },
+    camera,
+    background: { mode: b.mode, preset: b.preset, media_id: exists(b.media_id), key_color: b.key_color, similarity: b.similarity, smoothness: b.smoothness },
+    foreground: { enabled: f.enabled, media_id: exists(f.media_id), dock: f.dock },
     popups,
   }
 }

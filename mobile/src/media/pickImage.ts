@@ -1,42 +1,52 @@
 import * as ImagePicker from 'expo-image-picker'
 
-import type { UploadFile } from '@/api/endpoints'
+import type { PickedFile } from '@/api/endpoints'
+import type { MediaKind } from '@/api/types'
 
-// Same rules as the server (backend MediaStorage) for "background" and "foreground" uploads;
-// the server checks the real file content again.
+/** Same limit as the API (MAX_UPLOAD_BYTES on the website). */
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024
-const TYPES: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
+
+const TYPES: Record<'background' | 'foreground' | 'image', { mimes: string[]; label: string }> = {
+  background: { mimes: ['image/png', 'image/jpeg', 'image/webp', 'image/gif'], label: 'PNG, JPG, WEBP or GIF' },
+  foreground: { mimes: ['image/png', 'image/webp', 'image/gif', 'image/jpeg'], label: 'PNG, WEBP, GIF or JPG' },
+  image: { mimes: ['image/png', 'image/webp', 'image/gif', 'image/jpeg'], label: 'PNG, WEBP, GIF or JPG' },
 }
 
-export type PickResult = { kind: 'picked'; file: UploadFile } | { kind: 'cancelled' } | { kind: 'invalid'; message: string }
+const EXTENSIONS: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' }
 
-interface PickedAsset {
+export interface PickerAsset {
   uri: string
-  mimeType?: string | null
   fileName?: string | null
+  mimeType?: string | null
   fileSize?: number | null
 }
 
-/** Checks a picked picture before uploading it, so the seller gets a clear message at once. */
-export function checkPicked(asset: PickedAsset): PickResult {
-  const type = (asset.mimeType ?? '').toLowerCase()
-  const ext = TYPES[type]
-  if (!ext) return { kind: 'invalid', message: 'Use a PNG, JPG, WEBP or GIF picture.' }
-  if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) return { kind: 'invalid', message: 'The picture must be 5 MB or smaller.' }
-  const name = asset.fileName?.trim() || `picture.${ext}`
-  return { kind: 'picked', file: { uri: asset.uri, name, type } }
+/**
+ * Checks a picked picture before uploading (the server checks the real content again), and
+ * gives it a file name with the right extension (the API checks extensions too).
+ */
+export function prepareUpload(kind: Exclude<MediaKind, 'sound'>, asset: PickerAsset): { file: PickedFile } | { error: string } {
+  const type = (asset.mimeType ?? guessMime(asset.fileName ?? asset.uri)).toLowerCase()
+  if (!TYPES[kind].mimes.includes(type)) return { error: `That file type is not supported. Use ${TYPES[kind].label}.` }
+  if (asset.fileSize && asset.fileSize > MAX_UPLOAD_BYTES) return { error: 'That picture is too big. Keep it at 5 MB or less.' }
+  const ext = EXTENSIONS[type] ?? 'jpg'
+  const fromPath = asset.uri.startsWith('file://') ? (asset.uri.split('/').pop() ?? '') : ''
+  const base = (asset.fileName ?? fromPath).replace(/\.[^.]*$/, '').replace(/[^\w\- ]+/g, '').trim().slice(0, 60) || `${kind}-${Date.now()}`
+  return { file: { uri: asset.uri, name: `${base}.${ext}`, type } }
 }
 
-/**
- * Opens the phone's gallery for one picture. The original file is sent as it is (no cropping
- * or re-compressing), so PNG transparency and moving GIFs survive.
- */
-export async function pickImage(): Promise<PickResult> {
-  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 1 })
-  if (result.canceled || !result.assets[0]) return { kind: 'cancelled' }
-  return checkPicked(result.assets[0])
+function guessMime(name: string): string {
+  const ext = /\.([a-z0-9]+)(?:\?.*)?$/i.exec(name)?.[1]?.toLowerCase()
+  if (ext === 'png') return 'image/png'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'gif') return 'image/gif'
+  return ''
+}
+
+/** Opens the phone's photo picker (no permission needed: Android's own picker). Null if cancelled. */
+export async function pickPicture(): Promise<PickerAsset | null> {
+  const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1, allowsEditing: false, exif: false })
+  if (result.canceled) return null
+  return result.assets[0] ?? null
 }

@@ -20,4 +20,7 @@ dependencies {
   // Apache-2.0, https://github.com/pedroSG94/RootEncoder (published on JitPack; the
   // repository is added by expo-build-properties in app.config.ts).
   implementation "com.github.pedroSG94.RootEncoder:library:2.8.1"
+  // Finds the person for the Blur and Picture backgrounds. The model is bundled (about 4.5 MB),
+  // so nothing is downloaded on the phone. Beta API: https://developers.google.com/ml-kit/vision/selfie-segmentation/android
+  implementation "com.google.mlkit:segmentation-selfie:16.0.0-beta6"
 }

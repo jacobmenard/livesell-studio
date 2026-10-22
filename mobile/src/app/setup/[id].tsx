@@ -1,26 +1,34 @@
 import { router, useLocalSearchParams, useNavigation, usePreventRemove } from 'expo-router'
 import { useMemo, useState } from 'react'
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import { errorMessage } from '@/api/client'
-import type { AutoHide, BackgroundSettings, EffectId, ForegroundSettings, MediaItem, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
-import { BackgroundSection, ForegroundSection } from '@/components/BackgroundEditor'
+import type { AutoHide, BackgroundSettings, CameraSettings, EffectId, ForegroundSettings, PopupConfig, Position, SetupDocument, SetupFull, SoundRef, TextColor } from '@/api/types'
 import { Icon } from '@/components/Icon'
-import { PopupArt, PopupLayer } from '@/components/PopupArt'
-import { StageBackdrop } from '@/components/StageBackdrop'
-import { Button, Card, ErrorState, Field, Loading, Notice, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
+import { PopupArt } from '@/components/PopupArt'
+import { BackgroundSection } from '@/components/editor/BackgroundSection'
+import { CameraSection } from '@/components/editor/CameraSection'
+import { ForegroundSection } from '@/components/editor/ForegroundSection'
+import { StagePreview } from '@/components/editor/StagePreview'
+import { Button, Card, ErrorState, Field, Loading, Row, ScreenHeader, Segmented, Sheet } from '@/components/ui'
 import { AUTO_HIDES, EFFECTS, isBuiltinSound, SOUND_BY_ID, SOUNDS, TEXT_COLORS } from '@/catalog'
-import { absoluteUrl } from '@/config'
-import { useMedia, useRemoveMedia, useSaveSetup, useSetup, useUploadMedia } from '@/hooks/queries'
-import { pickImage } from '@/media/pickImage'
-import { foregroundImage, previewBackground } from '@/stage/background'
+import { useMedia, useSaveSetup, useSetup } from '@/hooks/queries'
 import { popupText, resolveLook } from '@/stage/look'
 import { checkPopupText, MAX_TEXT_LENGTH, newTextPopup, removePopup, updatePopup } from '@/stage/popups'
 import { documentForApi, documentFromSetup } from '@/stage/scene'
+import { nativeLook } from '@/stage/stageLook'
 import { colors, radius, space } from '@/theme'
 
-type Tab = 'popups' | 'background' | 'camera' | 'sounds'
+type Tab = 'camera' | 'background' | 'popups' | 'foreground' | 'sounds'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'camera', label: 'Camera' },
+  { id: 'background', label: 'Background' },
+  { id: 'popups', label: 'Popups' },
+  { id: 'foreground', label: 'Foreground' },
+  { id: 'sounds', label: 'Sounds' },
+]
 type SheetKind = 'effect' | 'sound' | 'hide' | 'position' | 'size' | 'text' | null
 
 const SIZES: { id: number; label: string }[] = [
@@ -83,11 +91,8 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [newText, setNewText] = useState('')
   const [newColor, setNewColor] = useState<TextColor>('yellow')
   const [textError, setTextError] = useState<string | undefined>()
-
+  const [segmentationMissing, setSegmentationMissing] = useState(false)
   const media = useMedia()
-  const upload = useUploadMedia()
-  const removeMedia = useRemoveMedia()
-  const [uploading, setUploading] = useState<'background' | 'foreground' | null>(null)
 
   const dirty = stable(doc) !== base
 
@@ -101,43 +106,10 @@ function Editor({ setup }: { setup: SetupFull }) {
   const popup = useMemo(() => doc.popups.find((p) => p.key === selected) ?? null, [doc, selected])
 
   const change = (next: Partial<SetupDocument>) => setDoc((d) => ({ ...d, ...next }))
+  const changeCamera = (c: Partial<CameraSettings>) => setDoc((d) => ({ ...d, camera: { ...d.camera, ...c } }))
+  const changeBackground = (c: Partial<BackgroundSettings>) => setDoc((d) => ({ ...d, background: { ...d.background, ...c } }))
+  const changeForeground = (c: Partial<ForegroundSettings>) => setDoc((d) => ({ ...d, foreground: { ...d.foreground, ...c } }))
   const changePopup = (c: Partial<PopupConfig>) => selected && setDoc((d) => ({ ...d, popups: updatePopup(d.popups, selected, c) }))
-  const changeBackground = (patch: Partial<BackgroundSettings>) => setDoc((d) => ({ ...d, background: { ...d.background, ...patch } }))
-  const changeForeground = (patch: Partial<ForegroundSettings>) => setDoc((d) => ({ ...d, foreground: { ...d.foreground, ...patch } }))
-
-  /** Gallery → upload → picked straight away (as on the website). */
-  const uploadPicture = async (kind: 'background' | 'foreground') => {
-    const picked = await pickImage()
-    if (picked.kind === 'cancelled') return
-    if (picked.kind === 'invalid') {
-      Alert.alert('Can’t use that picture', picked.message)
-      return
-    }
-    setUploading(kind)
-    try {
-      const item = await upload.mutateAsync({ kind, file: picked.file })
-      if (kind === 'background') changeBackground({ media_id: item.id })
-      else changeForeground({ media_id: item.id, enabled: true })
-    } catch (error) {
-      Alert.alert('Not uploaded', errorMessage(error, 'The picture couldn’t be uploaded. Try again.'))
-    } finally {
-      setUploading(null)
-    }
-  }
-
-  /** The server also resets the setups using it; do the same to the unsaved copy so it still saves. */
-  const removePicture = async (item: MediaItem) => {
-    try {
-      await removeMedia.mutateAsync(item.id)
-      setDoc((d) => ({
-        ...d,
-        background: d.background.media_id === item.id ? { ...d.background, media_id: null } : d.background,
-        foreground: d.foreground.media_id === item.id ? { ...d.foreground, media_id: null, enabled: false } : d.foreground,
-      }))
-    } catch (error) {
-      Alert.alert('Not deleted', errorMessage(error))
-    }
-  }
 
   const persist = async (): Promise<boolean> => {
     try {
@@ -171,17 +143,10 @@ function Editor({ setup }: { setup: SetupFull }) {
   const portrait = doc.orientation === 'portrait'
   const stageW = portrait ? 168 : 320
   const stageH = portrait ? 300 : 180
-  const backdrop = previewBackground(doc.background, media.data)
-  const banner = foregroundImage(doc.foreground, media.data)
-  const bannerUrl = banner ? absoluteUrl(banner.url) : null
-  const bannerH = banner?.width && banner.height ? (stageW * banner.height) / banner.width : stageH * 0.22
-  const library = {
-    media: media.data,
-    mediaError: media.isError ? errorMessage(media.error, 'Your pictures couldn’t be loaded.') : null,
-    uploading,
-    onUpload: (kind: 'background' | 'foreground') => void uploadPicture(kind),
-    onRemove: removePicture,
-  }
+  const mediaList = useMemo(() => media.data ?? [], [media.data])
+  const look = useMemo(() => nativeLook(doc, mediaList), [doc, mediaList])
+  // The popup only shows on the Popups step, so the look is easy to judge on the others.
+  const overlay = useMemo(() => (tab === 'popups' && popup ? [resolveLook(popup)] : []), [tab, popup])
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
@@ -194,39 +159,32 @@ function Editor({ setup }: { setup: SetupFull }) {
 
       <ScrollView contentContainerStyle={{ paddingBottom: space.lg }}>
         <View style={styles.previewBox} accessibilityLabel={popup ? `Preview of ${popupText(popup)}` : 'Preview'}>
-          <View style={{ width: stageW, height: stageH, borderRadius: 4, overflow: 'hidden' }}>
-            {backdrop.imageUrl ? (
-              <View style={[StyleSheet.absoluteFill, { backgroundColor: backdrop.tone }]}>
-                <Image source={{ uri: backdrop.imageUrl }} style={StyleSheet.absoluteFill} resizeMode="cover" accessible={false} />
-              </View>
-            ) : (
-              <StageBackdrop tone={backdrop.tone} />
-            )}
-            {bannerUrl && (
-              <Image
-                source={{ uri: bannerUrl }}
-                style={{ position: 'absolute', left: 0, width: stageW, height: bannerH, [doc.foreground.dock]: 0 }}
-                resizeMode="stretch"
-                accessible={false}
-              />
-            )}
-            {popup && <PopupLayer specs={[resolveLook(popup)]} width={stageW} height={stageH} />}
-          </View>
-        </View>
-
-        <View style={{ paddingHorizontal: space.lg, paddingTop: space.md }}>
-          <Segmented
-            label="Setup steps"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { id: 'popups', label: 'Popups' },
-              { id: 'background', label: 'Background' },
-              { id: 'camera', label: 'Camera' },
-              { id: 'sounds', label: 'Sounds' },
-            ]}
+          <StagePreview
+            width={stageW}
+            height={stageH}
+            orientation={doc.orientation}
+            resolution={doc.resolution}
+            look={look}
+            overlay={overlay}
+            onSegmentationMissing={() => setSegmentationMissing(true)}
           />
         </View>
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ gap: space.sm, paddingHorizontal: space.lg, paddingTop: space.md }}
+          accessibilityRole="tablist"
+        >
+          {TABS.map((t) => {
+            const on = t.id === tab
+            return (
+              <Pressable key={t.id} onPress={() => setTab(t.id)} accessibilityRole="tab" accessibilityState={{ selected: on }} style={[styles.tabChip, on && styles.tabChipOn]}>
+                <Text style={{ color: on ? colors.ink : colors.text, fontSize: 14, fontWeight: on ? '700' : '500' }}>{t.label}</Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
 
         {tab === 'popups' && (
           <View style={{ padding: space.lg, gap: space.md }}>
@@ -282,45 +240,27 @@ function Editor({ setup }: { setup: SetupFull }) {
           </View>
         )}
 
-        {tab === 'background' && (
-          <View style={{ padding: space.lg, gap: space.xl }}>
-            <BackgroundSection background={doc.background} onChange={changeBackground} {...library} />
-            <ForegroundSection foreground={doc.foreground} onChange={changeForeground} {...library} />
-          </View>
+        {tab === 'camera' && (
+          <CameraSection
+            camera={doc.camera}
+            orientation={doc.orientation}
+            resolution={doc.resolution}
+            onCamera={changeCamera}
+            onShape={(c) => change(c)}
+          />
         )}
 
-        {tab === 'camera' && (
-          <View style={{ padding: space.lg, gap: space.lg }}>
-            <View style={{ gap: space.sm }}>
-              <Text style={styles.h2}>Shape</Text>
-              <Segmented
-                label="Shape"
-                value={doc.orientation}
-                onChange={(orientation) => change({ orientation })}
-                options={[
-                  { id: 'portrait', label: 'Portrait 9:16' },
-                  { id: 'landscape', label: 'Landscape 16:9' },
-                ]}
-              />
-              <Text style={styles.help}>Portrait fits TikTok and Facebook on phones. Landscape fits YouTube.</Text>
-            </View>
-            <View style={{ gap: space.sm }}>
-              <Text style={styles.h2}>Quality</Text>
-              <Segmented
-                label="Quality"
-                value={doc.resolution}
-                onChange={(resolution) => change({ resolution })}
-                options={[
-                  { id: '720p', label: '720p · best for data' },
-                  { id: '1080p', label: '1080p · sharper' },
-                ]}
-              />
-            </View>
-            <Notice title="Camera looks">
-              Camera filters and face effects are set on the website. Backgrounds and the foreground are in the Background tab; the phone’s own live shows the foreground but keeps your real room behind you for now.
-            </Notice>
-          </View>
+        {tab === 'background' && (
+          <BackgroundSection
+            background={doc.background}
+            media={mediaList}
+            mediaLoading={media.isPending}
+            segmentationMissing={segmentationMissing}
+            onChange={changeBackground}
+          />
         )}
+
+        {tab === 'foreground' && <ForegroundSection foreground={doc.foreground} media={mediaList} mediaLoading={media.isPending} onChange={changeForeground} />}
 
         {tab === 'sounds' && (
           <View style={{ padding: space.lg, gap: space.lg }}>
@@ -492,6 +432,8 @@ function Options<T extends string>({ options, value, onPick }: { options: { id: 
 const styles = StyleSheet.create({
   previewBox: { height: 316, marginHorizontal: space.lg, marginTop: space.sm, borderRadius: 18, backgroundColor: colors.field, alignItems: 'center', justifyContent: 'center' },
   h2: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  tabChip: { minHeight: 40, paddingHorizontal: 16, borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  tabChipOn: { backgroundColor: colors.text },
   help: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
   tile: {

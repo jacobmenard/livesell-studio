@@ -64,13 +64,12 @@ export function messageFor(status: number, body: Record<string, unknown>): strin
 
 export interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
-  /** Sent as JSON, or as multipart form data when it's a FormData (uploads). */
   body?: unknown
-  /** Overrides REQUEST_TIMEOUT_MS (uploads on slow mobile data take longer). */
-  timeoutMs?: number
   /** Skip the bearer token (login, register, version check). */
   anonymous?: boolean
   signal?: AbortSignal
+  /** Longer for uploads; the default suits ordinary requests. */
+  timeoutMs?: number
 }
 
 export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
@@ -79,8 +78,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const abort = () => controller.abort()
   options.signal?.addEventListener('abort', abort)
 
-  // fetch sets the multipart Content-Type (with its boundary) itself for FormData.
-  const multipart = typeof FormData !== 'undefined' && options.body instanceof FormData
+  // A FormData body (an upload) sets its own multipart Content-Type with the boundary.
+  const multipart = options.body instanceof FormData
   const headers: Record<string, string> = { Accept: 'application/json' }
   if (options.body !== undefined && !multipart) headers['Content-Type'] = 'application/json'
   const token = options.anonymous ? null : getToken()

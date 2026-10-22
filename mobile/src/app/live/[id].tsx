@@ -6,7 +6,7 @@ import { Alert, AppState, Pressable, ScrollView, StyleSheet, Switch, Text, useWi
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { liveApi } from '@/api/endpoints'
-import type { BuiltinSoundId, Platform, PopupConfig, Resolution } from '@/api/types'
+import type { BackgroundMode, BuiltinSoundId, CameraFilterId, Platform, PopupConfig, Resolution } from '@/api/types'
 import { Icon } from '@/components/Icon'
 import { PopupArt } from '@/components/PopupArt'
 import { Button, ErrorState, IconButton, Loading, Notice, Segmented, Sheet } from '@/components/ui'
@@ -15,7 +15,10 @@ import { useMedia, useSetup } from '@/hooks/queries'
 import { clock, failureMessage, signal } from '@/live/format'
 import { useLiveSession } from '@/live/useLiveSession'
 import { popupText, resolveLook } from '@/stage/look'
-import { overlayFor, sceneFor, togglePopup, hidePopup, type ActivePopup } from '@/stage/scene'
+import { BACKGROUND_MODES } from '@/stage/backgrounds'
+import { CAMERA_FILTERS } from '@/stage/filters'
+import { overlayFor, sceneFor, togglePopup, hidePopup, type ActivePopup, type LiveOverrides } from '@/stage/scene'
+import { backgroundWithDefaults, cameraWithDefaults, nativeLook } from '@/stage/stageLook'
 import { loadDestination, streamUrl, type StreamDestination } from '@/stream/streamKeys'
 import { colors, radius, space } from '@/theme'
 import { LiveStreamerView, type LiveStatsEvent, type LiveStatusEvent, type LiveStreamerHandle } from '../../../modules/live-streamer'
@@ -32,8 +35,6 @@ export default function LiveScreen() {
   const platform: Platform = params.platform in PLATFORM_BY_ID ? params.platform : 'facebook'
   const platformLabel = PLATFORM_BY_ID[platform].label
   const setup = useSetup(setupId)
-  // The foreground's picture comes from the account's uploads (the live goes on without it if this fails).
-  const media = useMedia()
   const session = useLiveSession(setupId)
   const insets = useSafeAreaInsets()
   const window = useWindowDimensions()
@@ -45,6 +46,12 @@ export default function LiveScreen() {
   const [status, setStatus] = useState<LiveStatusEvent | null>(null)
   const [stats, setStats] = useState<LiveStatsEvent | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [micError, setMicError] = useState<string | null>(null)
+  const [segmentationMissing, setSegmentationMissing] = useState(false)
+  const [lookOpen, setLookOpen] = useState(false)
+  /** Background and filter changed during this live (not saved to the setup). */
+  const [overrides, setOverrides] = useState<LiveOverrides>({})
+  const media = useMedia()
   const [active, setActive] = useState<ActivePopup[]>([])
   const [micMuted, setMicMuted] = useState(false)
   const [soundsOpen, setSoundsOpen] = useState(false)
@@ -80,19 +87,32 @@ export default function LiveScreen() {
     void streamer.current?.startStream(streamUrl(destination))
   }, [destination, session.state.kind, status?.status])
 
-  // The foreground and the popups showing, drawn into the video by the native streamer.
-  const foregroundSettings = setup.data?.foreground
+  // The popups showing, drawn into the video by the native streamer.
   useEffect(() => {
-    void streamer.current?.setOverlay(JSON.stringify(overlayFor(popups, active, { settings: foregroundSettings, media: media.data })))
-  }, [popups, active, status?.status, foregroundSettings, media.data])
+    void streamer.current?.setOverlay(JSON.stringify(overlayFor(popups, active)))
+  }, [popups, active, status?.status])
+
+  // The camera look, background and foreground, drawn into the video by the native streamer.
+  const lookJson = useMemo(() => {
+    if (!setup.data) return null
+    const d = setup.data
+    return JSON.stringify(
+      nativeLook({ camera: { ...d.camera, ...overrides.camera }, background: { ...d.background, ...overrides.background }, foreground: d.foreground }, media.data ?? []),
+    )
+  }, [setup.data, overrides, media.data])
+
+  useEffect(() => {
+    if (lookJson) void streamer.current?.setLook(lookJson).catch(() => {})
+  }, [lookJson, status?.status])
 
   // Keep the website's copy of "on screen now" in step (best effort, never blocks the live).
+  const mediaIds = useMemo(() => (media.data ? new Set(media.data.map((m) => m.id)) : undefined), [media.data])
   useEffect(() => {
     if (!setup.data) return
     const data = setup.data
-    const timer = setTimeout(() => void liveApi.pushScene(setupId, sceneFor(data, active)).catch(() => {}), 500)
+    const timer = setTimeout(() => void liveApi.pushScene(setupId, sceneFor(data, active, overrides, mediaIds)).catch(() => {}), 500)
     return () => clearTimeout(timer)
-  }, [active, setup.data, setupId])
+  }, [active, setup.data, setupId, overrides, mediaIds])
 
   // The live timer.
   useEffect(() => {
@@ -206,6 +226,8 @@ export default function LiveScreen() {
   const reconnecting = status?.status === 'reconnecting'
   const failed = status?.status === 'failed'
   const battery = batteryLevel >= 0 ? Math.round(batteryLevel * 100) : null
+  const currentMode = backgroundWithDefaults({ ...setup.data.background, ...overrides.background }).mode
+  const currentFilter = cameraWithDefaults({ ...setup.data.camera, ...overrides.camera }).filter ?? 'none'
 
   return (
     <View style={{ flex: 1, backgroundColor: '#000' }}>
@@ -218,7 +240,13 @@ export default function LiveScreen() {
           facing={params.facing === 'back' ? 'back' : 'front'}
           onStatus={(e) => onStatus(e.nativeEvent)}
           onStats={(e) => setStats(e.nativeEvent)}
-          onError={(e) => setCameraError(e.nativeEvent.message)}
+          onError={(e) => {
+            const { code, message } = e.nativeEvent
+            // Blur and Picture need to find the person; without it the live goes on with the real room.
+            if (code === 'segmentation') setSegmentationMissing(true)
+            else if (code === 'microphone') setMicError(message)
+            else setCameraError(message)
+          }}
         />
       </View>
 
@@ -253,6 +281,7 @@ export default function LiveScreen() {
       {/* ---- right rail ---- */}
       <View style={[styles.rail, { top: window.height * 0.38 }]}>
         <IconButton icon="flip" label="Flip camera" tone="overlay" size={52} onPress={() => void streamer.current?.switchCamera()} />
+        <IconButton icon="sparkle" label="Background and filter" tone="overlay" size={52} onPress={() => setLookOpen(true)} />
         <IconButton
           icon={micMuted ? 'micOff' : 'mic'}
           label={micMuted ? 'Turn microphone on' : 'Mute microphone'}
@@ -271,6 +300,15 @@ export default function LiveScreen() {
           <Icon name="micOff" size={18} color={colors.warning} />
           <Text style={{ color: colors.warning, fontSize: 14, fontWeight: '600' }}>Microphone muted — viewers can’t hear you</Text>
         </View>
+      )}
+
+      {segmentationMissing && !micMuted && (currentMode === 'blur' || currentMode === 'image') && (
+        <Pressable onPress={() => setSegmentationMissing(false)} style={[styles.banner, { top: insets.top + 88 }]} accessibilityRole="button" accessibilityHint="Dismiss">
+          <Icon name="alert" size={18} color={colors.warning} />
+          <Text style={{ flex: 1, color: colors.warning, fontSize: 14, fontWeight: '600' }}>
+            This phone can’t pick you out from the room, so viewers see your real background. Green screen still works.
+          </Text>
+        </Pressable>
       )}
 
       {/* ---- popup tray ---- */}
@@ -339,6 +377,60 @@ export default function LiveScreen() {
           ))}
         </View>
       </Sheet>
+
+      {/* ---- background and filter, for this live only ---- */}
+      <Sheet visible={lookOpen} onClose={() => setLookOpen(false)} title="Background and filter">
+        <Text style={{ color: colors.muted, fontSize: 13 }}>Changes here are for this live only. Your setup stays as saved.</Text>
+        <Text style={styles.sheetHeading}>Behind you</Text>
+        <View style={styles.choiceRow} accessibilityRole="radiogroup" accessibilityLabel="Background">
+          {BACKGROUND_MODES.map((m) => {
+            const on = m.id === currentMode
+            return (
+              <Pressable
+                key={m.id}
+                onPress={() => setOverrides((o) => ({ ...o, background: { ...o.background, mode: m.id as BackgroundMode } }))}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: on }}
+                style={[styles.choice, on && styles.choiceOn]}
+              >
+                <Text style={{ color: on ? colors.ink : colors.text, fontSize: 14, fontWeight: on ? '700' : '500' }}>{m.label}</Text>
+              </Pressable>
+            )
+          })}
+        </View>
+        <Text style={styles.sheetHeading}>Colour filter</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+          {CAMERA_FILTERS.map((f) => {
+            const on = f.id === currentFilter
+            return (
+              <Pressable
+                key={f.id}
+                onPress={() => setOverrides((o) => ({ ...o, camera: { ...o.camera, filter: f.id as CameraFilterId } }))}
+                accessibilityRole="radio"
+                accessibilityLabel={`${f.label} filter`}
+                accessibilityState={{ selected: on }}
+                style={{ alignItems: 'center', gap: 4, width: 60 }}
+              >
+                <View style={[styles.filterSwatch, { backgroundColor: f.swatch[1], borderColor: on ? colors.link : 'transparent' }]}>
+                  <View style={{ flex: 1, backgroundColor: f.swatch[0], opacity: 0.85, borderBottomRightRadius: 40 }} />
+                </View>
+                <Text style={{ color: on ? colors.text : colors.text2, fontSize: 11, fontWeight: on ? '700' : '500' }} numberOfLines={1}>
+                  {f.label}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </ScrollView>
+        {(overrides.camera || overrides.background) && <Button label="Back to my setup’s look" variant="secondary" size="md" onPress={() => setOverrides({})} />}
+      </Sheet>
+
+      {micError && !refusedMessage && !cameraError && (
+        <Cover title="Microphone problem" icon="alert">
+          <Text style={styles.coverText}>{micError}</Text>
+          <Text style={styles.coverText}>Close other apps that use the microphone (calls, voice recorders), then try again.</Text>
+          <Button label="Back" variant="secondary" onPress={() => void leave()} style={{ alignSelf: 'stretch' }} />
+        </Cover>
+      )}
 
       {/* ---- states that cover the controls ---- */}
       {refusedMessage && (
@@ -422,6 +514,11 @@ const styles = StyleSheet.create({
   cover: { borderRadius: radius.sheet, backgroundColor: colors.surface, padding: space.xl, paddingTop: space.xxl, alignItems: 'center', gap: 14 },
   coverIcon: { width: 60, height: 60, borderRadius: 30, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
   coverText: { color: colors.text2, fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  sheetHeading: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  choice: { minHeight: 44, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  choiceOn: { backgroundColor: colors.text },
+  filterSwatch: { width: 52, height: 52, borderRadius: radius.md, borderWidth: 2, overflow: 'hidden' },
   progress: { height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: 'hidden' },
   progressFill: { height: '100%', borderRadius: 3, backgroundColor: colors.link },
 })

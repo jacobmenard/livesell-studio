@@ -29,42 +29,6 @@ export type BuiltinSoundId =
 /** A built-in sound, or "media:<id>" for a seller's own upload. */
 export type SoundRef = BuiltinSoundId | `media:${number}`
 export type Platform = 'facebook' | 'youtube' | 'tiktok' | 'custom'
-export type BackgroundMode = 'none' | 'blur' | 'image' | 'green'
-export type BackgroundPresetId = 'loft' | 'rack' | 'kitchen' | 'vanity' | 'brand' | 'white'
-export type KeyColor = 'green' | 'blue'
-export type ForegroundDock = 'top' | 'bottom'
-/** "foreground" uploads are kept apart from popup "image" uploads. */
-export type MediaKind = 'image' | 'background' | 'foreground' | 'sound'
-
-export interface BackgroundSettings {
-  mode: BackgroundMode
-  preset: BackgroundPresetId
-  /** One of the seller's "background" uploads, shown instead of the preset. */
-  media_id: number | null
-  key_color: KeyColor
-  similarity: number
-  smoothness: number
-}
-
-/** A full-width image (banner, lower third) docked to the top or bottom of the stage. */
-export interface ForegroundSettings {
-  enabled: boolean
-  media_id: number | null
-  dock: ForegroundDock
-}
-
-/** One of the seller's uploads (GET /api/media). `url` may be relative: see absoluteUrl(). */
-export interface MediaItem {
-  id: number
-  kind: MediaKind
-  label: string
-  url: string
-  mime: string
-  size: number
-  width: number | null
-  height: number | null
-  created_at: string | null
-}
 
 export interface User {
   id: number
@@ -120,15 +84,93 @@ export interface ScenePopup extends PopupLook {
   shown_at: number
 }
 
-/** Settings the app passes through unchanged when it saves (it doesn't edit them yet). */
+/** Settings the app passes through unchanged when it saves (it doesn't edit them). */
 export type Opaque = Record<string, unknown>
+
+/** Colour filters (frontend/src/stage/filters.ts; the API's Catalog::CAMERA_FILTERS). */
+export type CameraFilterId =
+  | 'none'
+  | 'fair'
+  | 'soft'
+  | 'glow'
+  | 'clear'
+  | 'warm'
+  | 'cool'
+  | 'vivid'
+  | 'pastel'
+  | 'dreamy'
+  | 'neon'
+  | 'vintage'
+  | 'film'
+  | 'retro'
+  | 'cinematic'
+  | 'bw'
+  | 'noir'
+
+export type BackgroundMode = 'none' | 'blur' | 'image' | 'green'
+export type BackgroundPresetId = 'loft' | 'rack' | 'kitchen' | 'vanity' | 'brand' | 'white'
+export type KeyColor = 'green' | 'blue'
+export type ForegroundDock = 'top' | 'bottom'
+export type MediaKind = 'image' | 'background' | 'foreground' | 'sound'
+
+/**
+ * The camera part of a setup. Fields the website added over time are optional here, as in
+ * the API, so setups saved before they existed still load (the defaults then apply).
+ */
+export interface CameraSettings {
+  source: 'camera' | 'phone'
+  device_label: string | null
+  mirror: boolean
+  /** 0–100; 50 = unchanged. */
+  brightness: number
+  contrast?: number
+  saturation?: number
+  warmth?: number
+  /** Face enhance, 0 = off. */
+  smoothing?: number
+  /** A face-tracked effect (set on the website; not drawn on the phone yet). */
+  effect?: string
+  filter?: CameraFilterId
+  filter_strength?: number
+  /** −100–100; the phone uses 0–100 (its camera already fits the shape). */
+  zoom: number
+  audio?: boolean
+}
+
+export interface BackgroundSettings {
+  mode: BackgroundMode
+  preset: BackgroundPresetId
+  media_id: number | null
+  key_color: KeyColor
+  similarity: number
+  smoothness: number
+}
+
+export interface ForegroundSettings {
+  enabled: boolean
+  media_id: number | null
+  dock: ForegroundDock
+}
+
+/** One of the seller's uploads (GET /api/media). `url` may be "/storage/…": see absoluteUrl(). */
+export interface MediaItem {
+  id: number
+  kind: MediaKind
+  label: string
+  url: string
+  mime: string
+  size: number
+  width: number | null
+  height: number | null
+  created_at: string | null
+}
 
 export interface Scene {
   orientation: Orientation
   see_through: boolean
-  camera: Opaque
-  background: Opaque
-  foreground: Opaque
+  camera: CameraSettings
+  background: BackgroundSettings & { media_url?: string | null }
+  foreground: Partial<ForegroundSettings> & { media_url?: string | null }
   popups: ScenePopup[]
 }
 
@@ -152,7 +194,7 @@ export interface SetupSummary {
 }
 
 export interface SetupFull extends SetupSummary {
-  camera: Opaque
+  camera: CameraSettings
   background: BackgroundSettings
   foreground: ForegroundSettings
   sound_settings: SoundSettings
@@ -165,7 +207,7 @@ export interface SetupDocument {
   name: string
   orientation: Orientation
   resolution: Resolution
-  camera: Opaque
+  camera: CameraSettings
   background: BackgroundSettings
   foreground: ForegroundSettings
   sound_settings: SoundSettings

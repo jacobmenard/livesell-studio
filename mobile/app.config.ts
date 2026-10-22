@@ -43,6 +43,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-secure-store',
     // Release APKs are signed with your own upload key, never the public debug key (see README).
     './plugins/withReleaseSigning',
+    // Photo picker for background and foreground uploads (Android's own picker: no storage permission).
+    // No options: its cameraPermission/microphonePermission "false" switches would block the camera and mic the live needs.
+    'expo-image-picker',
     [
       'expo-font',
       { fonts: ['./assets/fonts/BricolageGrotesque-ExtraBold.ttf'] },

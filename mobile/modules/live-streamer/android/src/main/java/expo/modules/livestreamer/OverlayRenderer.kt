@@ -12,10 +12,7 @@ import org.json.JSONException
 import org.json.JSONObject
 import kotlin.math.min
 
-/**
- * One thing drawn over the camera: a popup as src/stage/look.ts (PopupDrawSpec) describes it,
- * or the foreground banner (src/stage/background.ts ForegroundDrawSpec).
- */
+/** One popup, as src/stage/look.ts (PopupDrawSpec) describes it. */
 data class OverlaySpec(
   val kind: String,
   val text: String,
@@ -32,12 +29,9 @@ data class OverlaySpec(
   val anchorY: Float,
   val alignX: Float,
   val alignY: Float,
-  /** The foreground's side of the picture: "top" or "bottom". */
-  val dock: String = "bottom",
 ) {
   companion object {
-    // Twelve popups plus the foreground.
-    private const val MAX_POPUPS = 13
+    private const val MAX_POPUPS = 12
     private const val MAX_TEXT = 40
 
     fun parseList(json: String): List<OverlaySpec> =
@@ -51,7 +45,6 @@ data class OverlaySpec(
 
     private fun parse(o: JSONObject): OverlaySpec? {
       val kind = o.optString("kind", "text")
-      if (kind == "foreground") return parseForeground(o)
       if (kind != "text" && kind != "image") return null
       return OverlaySpec(
         kind = kind,
@@ -69,16 +62,6 @@ data class OverlaySpec(
         anchorY = o.optDouble("anchorY", 0.5).toFloat().coerceIn(0f, 1f),
         alignX = o.optDouble("alignX", -0.5).toFloat().coerceIn(-1f, 0f),
         alignY = o.optDouble("alignY", -0.5).toFloat().coerceIn(-1f, 0f),
-      )
-    }
-
-    private fun parseForeground(o: JSONObject): OverlaySpec? {
-      val url = o.optString("imageUrl", "").takeIf { it.startsWith("https://") || it.startsWith("http://") } ?: return null
-      return OverlaySpec(
-        kind = "foreground", text = "", imageUrl = url, bg = Color.TRANSPARENT, fg = Color.TRANSPARENT,
-        borderColor = null, borderEm = 0f, shape = "tag", rotDeg = 0f, fontU = 1f, imageU = 1f,
-        anchorX = 0f, anchorY = 0f, alignX = 0f, alignY = 0f,
-        dock = if (o.optString("dock") == "top") "top" else "bottom",
       )
     }
 
@@ -107,21 +90,39 @@ class OverlayRenderer(private val typeface: Typeface) {
   private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
   private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
 
-  fun render(specs: List<OverlaySpec>, width: Int, height: Int, image: (String) -> Bitmap?): Bitmap {
+  /**
+   * The foreground banner (if any) and then the popups, bottom to top, like the website:
+   * the foreground sits above the camera and below every popup.
+   */
+  fun render(
+    specs: List<OverlaySpec>,
+    width: Int,
+    height: Int,
+    image: (String) -> Bitmap?,
+    foreground: Bitmap? = null,
+    foregroundTop: Boolean = false,
+  ): Bitmap {
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-    if (specs.isEmpty()) return bitmap
+    if (specs.isEmpty() && foreground == null) return bitmap
     val canvas = Canvas(bitmap)
+    if (foreground != null) drawForeground(canvas, foreground, foregroundTop, width, height)
     val unit = min(width, height) / 100f
     for (spec in specs) {
-      if (spec.kind == "foreground") {
-        spec.imageUrl?.let(image)?.let { drawForeground(canvas, spec, it, width, height) }
-      } else if (spec.kind == "image") {
+      if (spec.kind == "image") {
         spec.imageUrl?.let(image)?.let { drawImage(canvas, spec, it, unit, width, height) }
       } else if (spec.text.isNotBlank()) {
         drawText(canvas, spec, unit, width, height)
       }
     }
     return bitmap
+  }
+
+  /** Full width at its own aspect ratio, docked to the top or bottom (Stage.tsx ForegroundLayer). */
+  private fun drawForeground(canvas: Canvas, picture: Bitmap, top: Boolean, width: Int, height: Int) {
+    if (picture.width <= 0 || picture.height <= 0) return
+    val h = width.toFloat() * picture.height / picture.width
+    val y = if (top) 0f else height - h
+    canvas.drawBitmap(picture, null, RectF(0f, y, width.toFloat(), y + h), imagePaint)
   }
 
   private fun drawText(canvas: Canvas, spec: OverlaySpec, unit: Float, width: Int, height: Int) {
@@ -164,17 +165,6 @@ class OverlayRenderer(private val typeface: Typeface) {
     val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
     canvas.drawText(spec.text, rect.centerX() - textWidth / 2f, baseline, textPaint)
     canvas.restore()
-  }
-
-  /**
-   * The foreground: as wide as the picture, its height from its own shape (never stretched),
-   * against the top or bottom edge. Same as the web stage's ForegroundLayer.
-   */
-  private fun drawForeground(canvas: Canvas, spec: OverlaySpec, picture: Bitmap, width: Int, height: Int) {
-    if (picture.width <= 0 || picture.height <= 0) return
-    val h = width.toFloat() * picture.height / picture.width
-    val top = if (spec.dock == "top") 0f else height - h
-    canvas.drawBitmap(picture, null, RectF(0f, top, width.toFloat(), top + h), imagePaint)
   }
 
   private fun drawImage(canvas: Canvas, spec: OverlaySpec, picture: Bitmap, unit: Float, width: Int, height: Int) {
