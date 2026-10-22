@@ -25,7 +25,11 @@ class LiveSessionController extends Controller
     {
         Gate::authorize('goLive', $setup);
 
-        return $this->respond($this->sessions->start($setup, $request->user(), 'screen'), 201);
+        // "screen": the website's own clean-screen window (a free account gets a preview).
+        // "app": the Android app streaming straight to a platform (no preview: it is a real live).
+        $source = $request->validate(['source' => ['sometimes', 'string', 'in:screen,app']])['source'] ?? 'screen';
+
+        return $this->respond($this->sessions->start($setup, $request->user(), $source), 201);
     }
 
     public function update(Request $request, LiveSession $session): JsonResponse

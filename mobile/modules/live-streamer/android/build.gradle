@@ -1,0 +1,23 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'ph.negosyowork.livestreamer'
+version = '1.0.0'
+
+android {
+  namespace "expo.modules.livestreamer"
+  defaultConfig {
+    versionCode 1
+    versionName "1.0.0"
+    consumerProguardFiles 'proguard-rules.pro'
+  }
+}
+
+dependencies {
+  // RTMP/RTMPS streaming with a camera source, OpenGL filters and microphone hooks.
+  // Apache-2.0, https://github.com/pedroSG94/RootEncoder (published on JitPack; the
+  // repository is added by expo-build-properties in app.config.ts).
+  implementation "com.github.pedroSG94.RootEncoder:library:2.8.1"
+}

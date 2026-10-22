@@ -212,6 +212,24 @@ cd ~/htdocs/DOMAIN && bash deploy/deploy.sh
 
 Then as root: `supervisorctl restart negosyowork-reverb negosyowork-relay`.
 
+## Android app (APK)
+
+The phone app (`mobile/`) uses this same server. On the server:
+
+1. Run `php artisan migrate` after updating (it adds the `personal_access_tokens` table the
+   app signs in with). Nothing else changes for the website.
+2. Build and sign the APK on your computer as described in
+   [mobile/README.md](mobile/README.md#build-the-apk-you-publish), with
+   `EXPO_PUBLIC_API_URL=https://DOMAIN`.
+3. Upload it to the site over HTTPS (for example `~/htdocs/DOMAIN/frontend/dist/app/negosyowork-studio.apk`,
+   served as `https://DOMAIN/app/negosyowork-studio.apk`; copy it again after each frontend
+   deploy, or keep it in a folder the deploy doesn't replace).
+4. Fill in the `ANDROID_APP_*` lines in `backend/.env`, then `php artisan config:cache`.
+   Installed apps check `GET /api/mobile/version` and offer the download.
+
+The video from the app goes straight from the phone to the platform, so the app adds no
+streaming load to this server.
+
 ## If something goes wrong
 
 | What you see | Where to look / what to do |

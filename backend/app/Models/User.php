@@ -10,11 +10,13 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    // HasApiTokens: the Android app signs in with a token (the website keeps its cookie session).
+    use HasApiTokens, HasFactory, Notifiable;
 
     // "role", "owner_id" and "deactivated_at" are deliberately not fillable, so sign-up can
     // never grant admin rights or attach itself to someone else's account.

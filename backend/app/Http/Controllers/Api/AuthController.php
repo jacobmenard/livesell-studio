@@ -7,8 +7,8 @@ use App\Http\Middleware\EnsureAccountIsActive;
 use App\Http\Resources\UserResource;
 use App\Models\User;
 use App\Services\Impersonation;
+use App\Services\Registration;
 use Illuminate\Auth\Events\PasswordReset;
-use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -24,26 +24,17 @@ use Illuminate\Validation\ValidationException;
  */
 class AuthController extends Controller
 {
-    public function __construct(private readonly Impersonation $impersonation) {}
+    public function __construct(
+        private readonly Impersonation $impersonation,
+        private readonly Registration $registration,
+    ) {}
 
     public function register(Request $request): JsonResponse
     {
-        $data = $request->validate([
-            'name' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
-            'email' => ['required', 'string', 'email:rfc', 'max:254', 'unique:users,email'],
-            'password' => ['required', 'string', 'max:128', 'confirmed', PasswordRule::min(8)],
-        ]);
+        $data = $request->validate(Registration::rules());
 
-        $trialDays = (int) config('livesell.trial_days');
-        $user = new User([
-            'name' => trim($data['name']),
-            'email' => Str::lower($data['email']),
-            'password' => $data['password'],
-        ]);
-        // The free week (not fillable, so sign-up input can never set it).
-        $user->forceFill(['trial_ends_at' => $trialDays > 0 ? now()->addDays($trialDays) : null])->save();
-
-        event(new Registered($user));
+        // Also starts the free week (not fillable, so sign-up input can never set it).
+        $user = $this->registration->register($data);
 
         Auth::guard('web')->login($user);
         $request->session()->regenerate();
@@ -138,6 +129,8 @@ class AuthController extends Controller
                     'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
+                // A new password signs the account out of the Android app on every phone too.
+                $user->tokens()->delete();
 
                 event(new PasswordReset($user));
             },
