@@ -24,7 +24,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'ph.negosyowork.studio',
     // Bump on every APK you publish; the app compares it with GET /api/mobile/version.
-    versionCode: 1,
+    versionCode: 1.0,
     adaptiveIcon: {
       backgroundColor: '#062B63',
       foregroundImage: './assets/android-icon-foreground.png',
