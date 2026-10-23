@@ -4,3 +4,6 @@ dist/
 .env
 frontend/public/mediapipe/
 .DS_Store
+
+# The Android app uploaded to the website on the server (website/README.md)
+website/app/*.apk

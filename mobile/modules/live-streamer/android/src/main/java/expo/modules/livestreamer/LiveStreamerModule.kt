@@ -26,6 +26,10 @@ class LiveStreamerModule : Module() {
         view.setResolution(if (value == "1080p") Resolution.P1080 else Resolution.P720)
       }
 
+      Prop("followRotation") { view: LiveStreamerView, value: Boolean ->
+        view.setFollowRotation(value)
+      }
+
       Prop("facing") { view: LiveStreamerView, value: String ->
         view.setFacing(front = value != "back")
       }

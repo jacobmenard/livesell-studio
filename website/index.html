@@ -1,0 +1,475 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>NegosyoWorks Studio</title>
+<meta name="description" content="NegosyoWorks Studio is the Android app for live sellers: set up your popups, sounds and background once, then go live on Facebook, YouTube or TikTok from your phone or tablet.">
+<meta name="theme-color" content="#0D0C10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#FAF9FB" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="NegosyoWorks Studio">
+<meta property="og:title" content="NegosyoWorks Studio: your live-selling studio on your phone">
+<meta property="og:description" content="NegosyoWorks Studio is the Android app for live sellers: set up your popups, sounds and background once, then go live on Facebook, YouTube or TikTok from your phone or tablet.">
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Instrument+Sans:wght@400..700&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<!-- Shared drawings: the logo tag and the boutique live-stage scene (rack, dress form, display table) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#43293D"/><stop offset="1" stop-color="#24191F"/></linearGradient>
+    <radialGradient id="lamp" cx="0.82" cy="0.08" r="0.75"><stop offset="0" stop-color="#FF9B6E" stop-opacity=".42"/><stop offset="1" stop-color="#FF9B6E" stop-opacity="0"/></radialGradient>
+    <radialGradient id="spot" cx="0.5" cy="0.55" r="0.5"><stop offset="0" stop-color="#FFE3CF" stop-opacity=".22"/><stop offset="1" stop-color="#FFE3CF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="dress" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#E2704F"/><stop offset=".55" stop-color="#FF8A66"/><stop offset="1" stop-color="#C95A3D"/></linearGradient>
+    <linearGradient id="table" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3A2833"/><stop offset="1" stop-color="#1B1318"/></linearGradient>
+  </defs>
+  <symbol id="tag" viewBox="0 0 48 48">
+    <path d="M20 6h18a4 4 0 0 1 4 4v18a4 4 0 0 1-1.2 2.8L26.8 44.8a4 4 0 0 1-5.6 0L3.2 26.8a4 4 0 0 1 0-5.6L17.2 7.2A4 4 0 0 1 20 6z" fill="#0B63CE"/>
+    <circle cx="33" cy="15" r="4.2" fill="#27D978"/>
+    <path d="M17 21.5v11l9-5.5z" fill="#FFFFFF"/>
+  </symbol>
+  <symbol id="boutique" viewBox="0 0 90 160">
+    <rect width="90" height="160" fill="url(#wall)"/>
+    <rect width="90" height="160" fill="url(#lamp)"/>
+    <path d="M26 128V78a19 19 0 0 1 38 0v50z" fill="#523349" opacity=".7"/>
+    <rect width="90" height="160" fill="url(#spot)"/>
+    <path d="M7 22h76" stroke="#D8C4AE" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M9 22v106M81 22v106" stroke="#8E7B6C" stroke-width="1"/>
+    <path d="M15 22v3M25 22v3M35 22v3M55 22v3M65 22v3M75 22v3" stroke="#D8C4AE" stroke-width=".6"/>
+    <path d="M11 25h8l1.5 24h-11z" fill="#E98B6D"/>
+    <path d="M21 25h8l2 28h-12z" fill="#F1D18A"/>
+    <path d="M31 25h8l1.5 22h-11z" fill="#8FB0E8"/>
+    <path d="M51 25h8l1.5 23h-11z" fill="#E8E2D6"/>
+    <path d="M61 25h8l2 27h-12z" fill="#B9718F"/>
+    <path d="M71 25h8l1.5 24h-11z" fill="#6FA58C"/>
+    <rect x="43.6" y="62" width="2.8" height="6" rx="1" fill="#9C8676"/>
+    <ellipse cx="45" cy="62" rx="3" ry="1.8" fill="#B49E8C"/>
+    <path d="M33 72q12-6 24 0l-1.6 13q-3.4 8-1.6 15H36.2q1.8-7-1.6-15z" fill="url(#dress)"/>
+    <path d="M36.2 100h17.6l4.6 24H31.6z" fill="url(#dress)"/>
+    <path d="M36.2 100h17.6" stroke="#F5C542" stroke-width="1.6"/>
+    <path d="M38 75q7 4 14 0" stroke="#FFC2AD" stroke-width=".7" fill="none" opacity=".8"/>
+    <rect x="44.4" y="124" width="1.2" height="5" fill="#8E7B6C"/>
+    <rect x="0" y="128" width="90" height="32" fill="url(#table)"/>
+    <rect x="0" y="128" width="90" height="1.2" fill="#5A4250"/>
+    <rect x="8" y="123" width="20" height="5" rx="1.2" fill="#F1D18A"/>
+    <rect x="9" y="118.4" width="18" height="4.8" rx="1.2" fill="#8FB0E8"/>
+    <rect x="10" y="114" width="16" height="4.6" rx="1.2" fill="#E8E2D6"/>
+    <path d="M65 114h14l1.4 14H63.6z" fill="#0B63CE"/>
+    <path d="M68.5 114q3.5-7 7 0" stroke="#0B63CE" stroke-width="1.1" fill="none"/>
+    <path d="M65 114h14l.3 3H64.7z" fill="#0D0C10" opacity=".18"/>
+  </symbol>
+</svg>
+
+<header class="site-header">
+  <div class="wrap header-row">
+    <a class="brand" href="#home" aria-label="NegosyoWorks Studio home">
+      <svg aria-hidden="true"><use href="#tag"/></svg>
+      <span class="word"><b>NegosyoWorks</b> <span>Studio</span></span>
+    </a>
+    <nav class="nav" aria-label="Main">
+      <span class="nav-pill" aria-hidden="true"></span>
+      <a href="#home" data-route="home">Home</a>
+      <a href="#plans" data-route="plans">Plans</a>
+      <a href="#app" data-route="app"><span class="nav-long">Get the app</span><span class="nav-short">App</span></a>
+      <a href="#contact" data-route="contact">Contact</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main" tabindex="-1">
+  <!-- ================= HOME ================= -->
+  <div class="page" data-page="home">
+    <section class="hero">
+      <div class="wrap hero-grid">
+        <div class="hero-copy">
+          <span class="label on-air" data-rise style="--i:0"><span class="dot"></span>Android app for live sellers</span>
+          <h1 tabindex="-1" data-rise style="--i:1">Your live-selling studio, right on your <em>phone.</em></h1>
+          <p class="hero-sub" data-rise style="--i:2">Set up your camera look, background, sale popups and sounds once. Then tap 10% OFF while you sell, and it pops up on your Facebook, YouTube or TikTok Live with fireworks and a ka-ching. No computer, no OBS.</p>
+          <div class="hero-ctas" data-rise style="--i:3">
+            <a class="btn btn-primary" href="#app">Get the Android app <span class="arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost" href="#plans">See plans</a>
+          </div>
+          <div class="hero-facts" data-rise style="--i:4">
+            <span><b>Android</b> 8.0 and newer</span><span><b>Phones</b> and tablets</span><span><b>7 days</b> of going live free</span>
+          </div>
+        </div>
+
+        <div class="hero-phone" data-rise style="--i:2">
+          <div class="handset" id="deck">
+            <div class="screen">
+              <div class="stage" id="stage" aria-label="Sample live picture from the app">
+                <svg viewBox="0 0 90 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><use href="#boutique"/></svg>
+                <canvas id="fx" aria-hidden="true"></canvas>
+                <div class="layer" id="popups"></div>
+              </div>
+              <div class="app-top app-ui" aria-hidden="true">
+                <span class="chip-ui live"><span class="led"></span><span id="live-clock">LIVE 12:48</span></span>
+                <span class="chip-ui">TikTok</span>
+                <span class="chip-ui signal"><span class="led"></span>Good</span>
+              </div>
+              <div class="rail-ui app-ui" aria-hidden="true"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h12l-3-3M20 16H8l3 3"/></svg></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 17l.6 1.4L21 19l-1.4.6L19 21l-.6-1.4L17 19l1.4-.6z"/></svg></span><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg></span></div>
+              <div class="tray app-ui">
+                <div class="tray-head"><b>Popups</b><span>Tap to show · tap again to hide</span></div>
+                <div class="tchips" id="tiles" role="group" aria-label="Popups"></div>
+                <div class="tray-btns">
+                  <button class="tbtn" type="button" id="open-sounds" aria-expanded="false" aria-controls="sound-sheet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg>Sounds</button>
+                  <button class="tbtn" type="button" id="hide-all"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18M10.6 6.1A9.8 9.8 0 0 1 12 6c5 0 9 6 9 6a16 16 0 0 1-3 3.4M6.6 7.6C4.3 9.1 3 12 3 12s4 6 9 6a8.8 8.8 0 0 0 3.4-.7"/><path d="M9.9 10a3 3 0 0 0 4.1 4.1"/></svg>Hide all</button>
+                  <span class="tbtn end" aria-hidden="true">End</span>
+                </div>
+              </div>
+              <div class="sheet app-ui" id="sound-sheet" role="group" aria-label="Sound effects" hidden>
+                <div class="sheet-head"><b>Sound effects</b><button class="sheet-close" type="button" id="close-sounds" aria-label="Close sound effects">×</button></div>
+                <div class="pads" id="pads"></div>
+                <p class="sheet-note">7 more sounds in the app. Viewers hear them mixed into your voice.</p>
+              </div>
+            </div>
+          </div>
+          <div class="phone-ctrls">
+            <div class="seg" role="group" aria-label="Show the phone as">
+              <button type="button" id="view-seller" aria-pressed="true">Your screen</button>
+              <button type="button" id="view-buyer" aria-pressed="false">What buyers see</button>
+            </div>
+            <button class="switch" id="sound-switch" role="switch" aria-checked="false"><span class="track" aria-hidden="true"></span>Sound</button>
+          </div>
+          <p class="deck-hint" id="deck-hint">Tap a popup on the phone to show or hide it. Your buttons never go out on the live.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="strip">
+      <div class="wrap strip-row">
+        <span class="label">Goes live from your phone to</span>
+        <div class="marquee">
+          <p class="sr-only">Facebook Live, YouTube Live, TikTok LIVE and any RTMP server</p>
+          <div class="marquee-track" aria-hidden="true">
+            <ul class="names"><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li></ul><ul class="names"><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li><li>Facebook Live</li><li>YouTube Live</li><li>TikTok LIVE</li><li>Any RTMP server</li></ul>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">How it works</span>
+          <h2>Set it up before you go live. Then just sell.</h2>
+        </div>
+        <div class="steps">
+          <div class="step"><span class="num">STEP 1</span><h3>Save your setup once</h3><p>In the app, pick your camera, shape, look and background. Add the popups and sounds you use every live, and save it as a setup. Or start from a template like 11.11 Mega sale.</p></div>
+          <div class="step"><span class="num">STEP 2</span><h3>Go live from your phone</h3><p>Add your stream key for Facebook, YouTube or TikTok once. Then open a setup and tap Go live. The phone sends the live itself.</p></div>
+          <div class="step"><span class="num">STEP 3</span><h3>Tap while you sell</h3><p>A buyer says "mine"? Tap SOLD OUT. Price drop? Tap 10% OFF. Each popup brings its own effect and sound, and your buttons stay on your screen.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">Phones and tablets</span>
+          <h2>One app for your phone and your tablet.</h2>
+          <p>Install the same app on both. A tablet gives you bigger buttons, with every popup on screen while you sell.</p>
+        </div>
+        <div class="tab-wrap">
+          <div class="tablet" role="img" aria-label="The app on a tablet held sideways: the live picture on the left, popups and sound pads on the right">
+            <div class="tscreen" aria-hidden="true">
+              <div class="tstage">
+                <svg viewBox="0 0 90 160" preserveAspectRatio="xMidYMid slice"><use href="#boutique"/></svg>
+                <div class="slot" data-pos="top"><div class="popup pp-b1t1">BUY 1<br>TAKE 1</div></div>
+                <div class="slot" data-pos="right"><div class="popup pp-free">FREE</div></div>
+                <span class="chip-ui live"><span class="led"></span>LIVE 24:05</span>
+              </div>
+              <div class="tpanel">
+                <div class="t-cams"><span>Flip</span><span>Background</span><span>Mute mic</span></div>
+                <div class="t-label">Popups <span>Tap to show · tap again to hide</span></div>
+                <div class="t-grid">
+                  <span class="on"><i class="chip-pop w">BUY 1 TAKE 1</i></span><span class="on"><i class="chip-pop c">FREE</i></span><span><i class="chip-pop y">10% OFF</i></span>
+                  <span><i class="chip-pop k">LAST 5 PCS</i></span><span><i class="chip-pop w">SOLD OUT</i></span><span><i class="chip-pop s">NEW</i></span>
+                </div>
+                <div class="t-label">Sounds</div>
+                <div class="t-pads"><span>Ka-ching</span><span>Applause</span><span>Drumroll</span><span>Ding</span><span>Wow</span><span>Bang</span></div>
+                <div class="t-end"><span>Hide all popups</span><span class="end">End live</span></div>
+              </div>
+            </div>
+          </div>
+          <ul class="tab-points">
+            <li><b>Turn it any way</b><span>Tablets work upright or sideways. Turning the tablet doesn't stop your camera or your live.</span></li>
+            <li><b>Everything on one screen</b><span>Sideways, the picture sits on the left, with your popups and six sounds on the right.</span></li>
+            <li><b>Room to edit</b><span>The editor shows the steps, the preview and the settings side by side.</span></li>
+            <li><b>Phones stay simple</b><span>On a phone, the camera fills the screen and your popups sit in a tray at the bottom.</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">Everything in the studio</span>
+          <h2>Made for "mine"-style selling, not for video editors.</h2>
+        </div>
+        <div class="bento">
+          <div class="card span-4">
+            <span class="label">Popups</span>
+            <h3>Nine sale popups, ready to tap</h3>
+            <div class="chips" aria-label="Built-in popups">
+              <span class="chip-pop y">10% OFF</span><span class="chip-pop c">LIVE TODAY</span><span class="chip-pop c">FREE</span>
+              <span class="chip-pop w">BUY 1 TAKE 1</span><span class="chip-pop s">FREE SHIPPING</span><span class="chip-pop c">FLASH SALE</span>
+              <span class="chip-pop k">LAST 5 PCS</span><span class="chip-pop w">SOLD OUT</span><span class="chip-pop s">NEW</span>
+            </div>
+            <div class="typed"><span>Or type your own, up to 24 characters:</span><span class="chip-pop y">₱99 ONLY<span class="caret" aria-hidden="true"></span></span></div>
+            <p>Each popup has its own spot, size, entrance, auto-hide timer and linked sound. Drag it on the preview to place it, and pinch to resize. Add your own picture popups too.</p>
+          </div>
+          <div class="card span-2">
+            <svg class="bunting" viewBox="0 0 300 46" preserveAspectRatio="none" aria-hidden="true">
+              <path d="M0 6 Q150 34 300 6" stroke="var(--line-strong)" stroke-width="1.5" fill="none"/>
+              <g id="flags"></g>
+            </svg>
+            <span class="label">Effects</span>
+            <h3>Fireworks to banderitas</h3>
+            <div class="fx-list"><span>Fireworks</span><span>Confetti</span><span>Banderitas</span><span>Applause</span><span>Sparkles</span><span>Hearts</span></div>
+            <p>Play once or keep playing. Effects grow with the popup's size.</p>
+          </div>
+          <div class="card span-3">
+            <span class="label">Soundboard</span>
+            <h3>Thirteen sound pads, one tap each</h3>
+            <div class="keys" id="keycaps"></div>
+            <p>Sounds are mixed into your microphone, so viewers hear a clean ka-ching. Set the volume, or turn off "Viewers hear it" to test a sound quietly.</p>
+          </div>
+          <div class="card span-3">
+            <span class="label">Your look</span>
+            <h3>Hide the messy room, no green cloth needed</h3>
+            <p>The phone finds you in the picture and swaps what's behind you. Add a foreground picture, like your shop's banner, and pick one of 17 colour filters.</p>
+            <div class="modes">
+              <div class="mode"><b>None</b><span>Viewers see your real room.</span></div>
+              <div class="mode"><b>Blur</b><span>Keeps the focus on you.</span></div>
+              <div class="mode"><b>Picture</b><span>Swaps the room for a backdrop.</span></div>
+              <div class="mode"><b>Green screen</b><span>Cleanest edges with a cloth.</span></div>
+            </div>
+            <div class="swatches">
+              <div><i style="background:linear-gradient(160deg,#5D6C80,#2D3440)"></i><span>Studio loft</span></div>
+              <div><i style="background:linear-gradient(160deg,#5B3A52,#2A1D28)"></i><span>Boutique rack</span></div>
+              <div><i style="background:linear-gradient(160deg,#C08A58,#6B4528)"></i><span>Kitchen set</span></div>
+              <div><i style="background:linear-gradient(160deg,#F2B8C6,#B5708A)"></i><span>Vanity corner</span></div>
+              <div><i style="background:repeating-linear-gradient(135deg,#0B63CE 0 8px,#0952AD 8px 16px)"></i><span>Brand wall</span></div>
+              <div><i style="background:linear-gradient(160deg,#FFFFFF,#E7E5EA)"></i><span>Clean white</span></div>
+            </div>
+          </div>
+          <div class="card span-6">
+            <span class="label">Going live</span>
+            <h3>Straight from your phone to your buyers</h3>
+            <div class="routes">
+              <div class="route"><b>Facebook and YouTube</b><p>Paste your stream key once. It's locked in your phone's secure storage and never sent to our server.</p><code>Key saved on this phone</code></div>
+              <div class="route"><b>TikTok LIVE</b><p>Works with a TikTok stream key. TikTok only gives keys to some accounts, so check yours first.</p><code>Needs key access</code></div>
+              <div class="route"><b>If the signal drops</b><p>The app keeps trying for about 2 minutes and shows Reconnecting. Tap Try now to reconnect at once.</p><code>Your live picks up again</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-alt">
+      <div class="wrap">
+        <div class="slider-top">
+          <div class="section-head">
+            <span class="label">Starter templates</span>
+            <h2>Start from a sale that already works.</h2>
+            <p>The app comes with six ready setups. Open one, change the popups, and you're live.</p>
+          </div>
+          <div class="slider-ctrl">
+            <button class="ctrl" type="button" id="tpl-prev" aria-label="Previous template"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button>
+            <button class="ctrl" type="button" id="tpl-pause" aria-label="Pause slideshow"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="7" y="5" width="3.5" height="14" rx="1"/><rect x="13.5" y="5" width="3.5" height="14" rx="1"/></svg></button>
+            <button class="ctrl" type="button" id="tpl-next" aria-label="Next template"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button>
+          </div>
+        </div>
+        <div class="slider" id="tpl-slider" role="region" aria-roledescription="carousel" aria-label="Starter templates">
+          <div class="rail" id="templates" tabindex="0"></div>
+          <div class="slider-dots" id="tpl-dots"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">What you need</span>
+          <h2>All you need is the phone in your hand.</h2>
+        </div>
+        <div class="devices">
+          <div class="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg><b>An Android phone</b><span>Android 8.0 or newer. Use the front or back camera, and flip any time.</span></div>
+          <div class="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2.5"/><path d="M11 17h2"/></svg><b>Or an Android tablet</b><span>Bigger buttons, and it turns any way while you're live.</span></div>
+          <div class="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M2 9a15 15 0 0 1 20 0M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0"/><circle cx="12" cy="19.5" r="1.2" fill="currentColor"/></svg><b>Good internet</b><span>Wi-Fi or strong mobile data. 720p uses less data than 1080p.</span></div>
+          <div class="device"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M16 7l3 3M14 9l2 2"/></svg><b>A stream key</b><span>From Facebook, YouTube or TikTok. It stays on your phone.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-alt">
+      <div class="wrap ladder-wrap">
+        <div class="section-head" style="margin:0">
+          <span class="label">Plans</span>
+          <h2>Pay for the way you sell.</h2>
+          <p>Go live free for your first 7 days. After that, plans start at ₱299 a month, and you add seats when your assistant or team joins you.</p>
+          <div><a class="btn btn-ghost" href="#plans">Compare all plans <span class="arrow" aria-hidden="true">→</span></a></div>
+        </div>
+        <div class="ladder" id="ladder"></div>
+      </div>
+    </section>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="cta-band">
+          <svg class="big-tag" aria-hidden="true"><use href="#tag"/></svg>
+          <span class="label" style="color:rgba(255,255,255,.72)">Ready when you are</span>
+          <h2>Your next live starts on your phone.</h2>
+          <p>Download the app, create your account, and go live free for 7 days.</p>
+          <div class="hero-ctas">
+            <a class="btn btn-dark" href="#app">Get the app <span class="arrow" aria-hidden="true">→</span></a>
+            <a class="btn btn-ghost btn-line" href="#contact">Ask a question</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= PLANS ================= -->
+  <div class="page" data-page="plans" hidden>
+    <div class="wrap page-hero">
+      <span class="label" data-rise style="--i:0">Plans · billed monthly in pesos</span>
+      <h1 tabindex="-1" data-rise style="--i:1">Pick the plan that fits how you sell.</h1>
+      <p data-rise style="--i:2">Every plan has the full app: popups, effects, the soundboard, backgrounds, filters and starter templates. New accounts go live free for 7 days. After that, a paid plan lets you go live, and bigger plans add lives and team seats.</p>
+    </div>
+    <div class="wrap">
+      <div class="plans" id="plan-cards"></div>
+      <div class="pay-note">
+        <span><b>Pay from the app:</b> Account → Plan opens our payment page. Use GCash, Maya or a bank transfer.</span>
+        <span><b>Your plan starts</b> the day your payment is approved and runs for a month.</span>
+      </div>
+    </div>
+
+    <section class="band">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">Compare plans</span>
+          <h2>Everything side by side.</h2>
+          <p>Every plan gets the whole app. What changes is whether you can go live, how many lives run at once, and who you share setups with.</p>
+        </div>
+        <div class="table-wrap" tabindex="0" aria-label="Plan comparison table">
+          <table class="compare" id="compare"></table>
+        </div>
+      </div>
+    </section>
+
+    <section class="band band-alt">
+      <div class="wrap">
+        <div class="section-head">
+          <span class="label">Questions</span>
+          <h2>Before you pick a plan</h2>
+        </div>
+        <div class="faq">
+          <details><summary>Can I try it before I pay?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>Yes. New accounts can go live free for 7 days, with the same limits as Solo. After that you can still open the app, edit your setups and try every popup and sound, but going live needs a paid plan.</p></div></details>
+          <details><summary>What does "lives at once" mean?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>It's how many lives your account can run at the same time. Solo runs one. Duo runs two, so you and your assistant can each go live from your own phone, one on TikTok and one on Facebook. Team runs up to four.</p></div></details>
+          <details><summary>How do I pay?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>In the app, open Account and tap your plan. It opens our payment page, where you pick GCash, Maya or a bank transfer, send the plan's price, and add the reference number and a screenshot of your receipt. Your plan starts the day we approve the payment and runs for a month.</p></div></details>
+          <details><summary>Can I switch plans later?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>Yes. You can renew in the last month of your plan. Switching to another plan starts a fresh month from the day it's approved, and days left on the old plan aren't carried over.</p></div></details>
+          <details><summary>Can I go live on TikTok from the app?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>Yes, if your TikTok account has a stream key. TikTok decides who gets one: you usually need to be 18 or older with around 1,000 followers. Facebook and YouTube give stream keys to more accounts.</p></div></details>
+          <details><summary>What do I need to start?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>An Android phone or tablet with Android 8.0 or newer, a good internet connection, and a stream key from where you sell. A phone stand or tripod helps.</p></div></details>
+          <details><summary>Is there an iPhone or iPad app?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>Not yet. NegosyoWorks Studio is for Android phones and tablets for now.</p></div></details>
+          <details><summary>Why isn't the app on Google Play?<span class="plus" aria-hidden="true">+</span></summary>
+            <div class="ans"><p>For now we share it from our website as an APK file. The first time you install it, Android asks you to allow installs from your browser. After that, new versions show up inside the app.</p></div></details>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ================= GET THE APP ================= -->
+  <div class="page" data-page="app" hidden>
+    <div class="wrap page-hero">
+      <span class="label" data-rise style="--i:0">Get the app</span>
+      <h1 tabindex="-1" data-rise style="--i:1">NegosyoWorks Studio for Android.</h1>
+      <p data-rise style="--i:2">One app for phones and tablets. Download it, create your account in the app, and go live free for 7 days.</p>
+    </div>
+    <div class="wrap contact-grid">
+      <div class="get-card" data-rise style="--i:3">
+        <div class="get-top">
+          <span class="app-icon"><svg aria-hidden="true"><use href="#tag"/></svg></span>
+          <div><h2>NegosyoWorks Studio</h2><p id="app-meta">Android app</p></div>
+        </div>
+        <p class="picked" id="picked" hidden></p>
+        <div id="download"></div>
+        <div class="req">
+          <div><b>Works on</b><span>Android phones and tablets, Android 8.0 or newer</span></div>
+          <div><b>Not yet on</b><span>iPhone or iPad</span></div>
+        </div>
+        <p class="safe-note"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span>You create your account and choose your password inside the app. We never ask for your password by message.</span></p>
+      </div>
+
+      <div data-rise style="--i:4">
+        <span class="label">How to start</span>
+        <ol class="next-steps" style="margin-top:14px">
+          <li><span class="n">1</span><div><b>Download the app</b><span>Tap Download on your Android phone or tablet.</span></div></li>
+          <li><span class="n">2</span><div><b>Allow the install</b><span>Open the downloaded file. If Android asks, tap Settings, allow installs from your browser, then tap Install.</span></div></li>
+          <li><span class="n">3</span><div><b>Create your account</b><span>Open the app and tap Create an account. Your 7 free days of going live start now.</span></div></li>
+          <li><span class="n">4</span><div><b>Add your stream key</b><span>In Platforms, paste the key from Facebook, YouTube or TikTok. It stays on your phone.</span></div></li>
+          <li><span class="n">5</span><div><b>Go live</b><span>Open a setup and tap Go live. When your free week ends, pay for a plan from Account → Plan.</span></div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= CONTACT ================= -->
+  <div class="page" data-page="contact" hidden>
+    <div class="wrap page-hero">
+      <span class="label" data-rise style="--i:0">Contact</span>
+      <h1 tabindex="-1" data-rise style="--i:1">Talk to the NegosyoWorks team.</h1>
+      <p data-rise style="--i:2">Questions about plans, installing the app, or getting your stream key? Message us on Facebook, WhatsApp or Gmail.</p>
+    </div>
+    <div class="wrap contact-grid">
+      <div data-rise style="--i:3">
+        <ul class="help-list">
+          <li><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M20 12V7a2 2 0 0 0-2-2h-6L3 14l7 7 6.5-6.5"/><circle cx="15.5" cy="8.5" r="1.3" fill="currentColor"/></svg></span><div><b>Choosing a plan</b><span>Not sure if you need Solo, Duo or Team? Tell us how many people sell with you.</span></div></li>
+          <li><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="M16 10l5-3v10l-5-3"/></svg></span><div><b>Installing and going live</b><span>Downloading the app, allowing the install, and stream keys for Facebook, YouTube and TikTok.</span></div></li>
+          <li><span class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span><div><b>Payments</b><span>GCash, Maya or bank transfers, receipts and plan approval.</span></div></li>
+        </ul>
+      </div>
+
+      <div class="reach" data-rise style="--i:4" id="reach" aria-labelledby="reach-title">
+        <h2 id="reach-title">Message us directly</h2>
+        <p>Have a question before you sign up? Pick the app you already use and we'll answer you there.</p>
+        <ul class="reach-list" id="reach-list"></ul>
+        <p class="reach-note">Gmail opens a new email in your browser. Using another email app? Copy the address instead.</p>
+      </div>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap">
+    <div class="foot-row">
+      <div>
+        <a class="brand" href="#home" aria-label="NegosyoWorks Studio home"><svg aria-hidden="true"><use href="#tag"/></svg><span class="word"><b>NegosyoWorks</b> <span>Studio</span></span></a>
+        <p>Your live-selling studio on your phone. The Android app for sellers on Facebook, YouTube and TikTok Live.</p>
+      </div>
+      <nav class="foot-links" aria-label="Footer">
+        <a href="#home">Home</a><a href="#plans">Plans</a><a href="#app">Get the app</a><a href="#contact">Contact</a>
+      </nav>
+    </div>
+    <p class="foot-small">© 2026 NegosyoWorks Studio · Prices in Philippine pesos</p>
+  </div>
+</footer>
+
+<script src="assets/js/config.js"></script>
+<script src="assets/js/lib/qrcode.min.js" defer></script>
+<script src="assets/js/main.js" defer></script>
+</body>
+</html>

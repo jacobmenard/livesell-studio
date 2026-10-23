@@ -11,6 +11,7 @@ This repository turns the NegosyoWork Studio design prototype into a working web
 | `frontend/` | React 19 + TypeScript, Vite 8, Tailwind CSS 4, React Router 7, Laravel Echo + Pusher JS, MediaPipe (background removal) — **Node 22.13.1** |
 | `backend/` | Laravel 12 (PHP 8.2+), Sanctum (cookie sessions + CSRF for the website, bearer tokens for the Android app), Reverb (WebSockets) |
 | `mobile/` | Android app: React Native 0.88 + Expo SDK 58, Expo Router, a Kotlin streaming module (RootEncoder) — see **[mobile/README.md](mobile/README.md)** |
+| `website/` | Public landing page for the Android app (Home, Plans, Get the app, Contact): static HTML, CSS and JS, no build step — see **[website/README.md](website/README.md)** |
 | Database | MySQL 8 |
 
 ## What works

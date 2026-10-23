@@ -9,6 +9,7 @@ import { Button, Card, Row } from '@/components/ui'
 import { API_URL, appVersionName } from '@/config'
 import { useAppUpdate, useSubscription } from '@/hooks/queries'
 import { colors, radius, space } from '@/theme'
+import { readable } from '@/layout/readable'
 
 function initials(name: string): string {
   return (
@@ -47,7 +48,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ padding: space.xl, gap: space.lg, paddingBottom: 40 }}>
+      <ScrollView contentContainerStyle={[{ padding: space.xl, gap: space.lg, paddingBottom: 40 }, readable]}>
         <Text style={{ color: colors.text, fontSize: 28, fontWeight: '700', letterSpacing: -0.5 }} accessibilityRole="header">
           Account
         </Text>
