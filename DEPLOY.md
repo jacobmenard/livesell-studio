@@ -11,6 +11,7 @@ Everything you paste lives in [`deploy/`](deploy/). Throughout, replace:
 |---|---|
 | `DOMAIN` | The API's address, e.g. `api.yourdomain.com` (no `https://`). The code lives in its folder. |
 | `APP_DOMAIN` | The app's address sellers open, e.g. `app.yourdomain.com` |
+| `WEBSITE_DOMAIN` | The public website's address, e.g. `yourdomain.com` (only for the website section) |
 | `PARENT_DOMAIN` | What both share, e.g. `yourdomain.com` |
 | `SITE_USER` | The API site's user you create in CloudPanel (step 2), e.g. `negosyowork` |
 | `VPS_IP` | Your VPS's IP address (Hostinger → VPS → Overview) |
@@ -212,6 +213,20 @@ cd ~/htdocs/DOMAIN && bash deploy/deploy.sh
 
 Then as root: `supervisorctl restart negosyowork-reverb negosyowork-relay`.
 
+## Website (landing page)
+
+The public website in [`website/`](website/) (Home, Plans, Get the app, Contact) is served
+straight from this same code folder, so `bash deploy/deploy.sh` updates it too.
+
+1. Add an **A record** for the website's address (e.g. the main domain, `@`) → `VPS_IP`.
+2. CloudPanel → **Add Site** → **Create a Static HTML Site**: domain `WEBSITE_DOMAIN`, any site
+   user. Then **SSL/TLS** → **New Let's Encrypt Certificate** → Create.
+3. Its **Vhost**: replace everything with [`deploy/nginx-website.conf`](deploy/nginx-website.conf),
+   replace `WEBSITE_DOMAIN`, `SITE_USER` and `DOMAIN`, then **Save**.
+
+The download link and contact details are in `website/assets/js/config.js`
+([website/README.md](website/README.md)).
+
 ## Android app (APK)
 
 The phone app (`mobile/`) uses this same server. On the server:
@@ -221,9 +236,10 @@ The phone app (`mobile/`) uses this same server. On the server:
 2. Build and sign the APK on your computer as described in
    [mobile/README.md](mobile/README.md#build-the-apk-you-publish), with
    `EXPO_PUBLIC_API_URL=https://DOMAIN`.
-3. Upload it to the site over HTTPS (for example `~/htdocs/DOMAIN/frontend/dist/app/negosyowork-studio.apk`,
-   served as `https://DOMAIN/app/negosyowork-studio.apk`; copy it again after each frontend
-   deploy, or keep it in a folder the deploy doesn't replace).
+3. Upload it to the server as `~/htdocs/DOMAIN/website/app/negosyowork-studio.apk`. The website
+   serves it as `https://WEBSITE_DOMAIN/app/negosyowork-studio.apk`, and git ignores it, so
+   deploys leave it in place. Then set `apkUrl` in `website/assets/js/config.js`
+   ([website/README.md](website/README.md#when-the-apk-is-ready)).
 4. Fill in the `ANDROID_APP_*` lines in `backend/.env`, then `php artisan config:cache`.
    Installed apps check `GET /api/mobile/version` and offer the download.
 
