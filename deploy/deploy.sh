@@ -14,6 +14,10 @@ COMPOSER=("$PHP" "$(command -v composer)")
 echo "==> Getting the latest code"
 git pull --ff-only
 
+echo "==> Settings"
+# Only lists settings that are new in deploy/; adding them is a separate, deliberate step.
+bash deploy/sync-env.sh --check
+
 echo "==> Backend"
 cd "$ROOT/backend"
 "$PHP" artisan down --retry=15 || true

@@ -45,6 +45,7 @@
     "android": "expo run:android",
     "android:release": "expo run:android --variant release",
     "prebuild": "expo prebuild --platform android --clean",
+    "build:apk": "node scripts/build-apk.mjs",
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest",

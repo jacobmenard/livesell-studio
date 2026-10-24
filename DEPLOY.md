@@ -213,6 +213,17 @@ cd ~/htdocs/DOMAIN && bash deploy/deploy.sh
 
 Then as root: `supervisorctl restart negosyowork-reverb negosyowork-relay`.
 
+If the update lists settings under **Settings** (new lines in the `deploy/*.env.production.example`
+files), add them to your `.env` files with:
+
+```bash
+cd ~/htdocs/DOMAIN && bash deploy/sync-env.sh
+```
+
+It only adds what's missing, with the template's value and comment; every value you already have
+stays as it is. Fill in any it marks **FILL IN**, then `php8.4 artisan config:cache` in `backend`
+(and `npm run build` in `frontend` if it added frontend settings).
+
 ## Website (landing page)
 
 The public website in [`website/`](website/) (Home, Plans, Get the app, Contact) is served
@@ -234,8 +245,9 @@ The phone app (`mobile/`) uses this same server. On the server:
 1. Run `php artisan migrate` after updating (it adds the `personal_access_tokens` table the
    app signs in with). Nothing else changes for the website.
 2. Build and sign the APK on your computer as described in
-   [mobile/README.md](mobile/README.md#build-the-apk-you-publish), with
-   `EXPO_PUBLIC_API_URL=https://DOMAIN`.
+   [mobile/README.md](mobile/README.md#build-the-apk-you-publish):
+   `npm run build:apk -- https://DOMAIN` in `mobile/` (it refuses to finish if the app
+   wouldn't talk to that server).
 3. Upload it to the server as `~/htdocs/DOMAIN/website/app/negosyowork-studio.apk`. The website
    serves it as `https://WEBSITE_DOMAIN/app/negosyowork-studio.apk`, and git ignores it, so
    deploys leave it in place. Then set `apkUrl` in `website/assets/js/config.js`

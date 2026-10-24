@@ -163,10 +163,16 @@ debug-signed APK can never be published by accident.
 ```bash
 cd mobile
 # Bump android.versionCode in app.config.ts first (and version for people to read).
-APP_ENV=production EXPO_PUBLIC_API_URL=https://<your NegosyoWork domain> npx expo prebuild --platform android --clean
-cd android && ./gradlew assembleRelease
+npm run build:apk -- https://<your API domain>
 # → android/app/build/outputs/apk/release/app-release.apk
 ```
+
+Use this command rather than running `expo prebuild` and `gradlew` yourself. The API address
+is baked in while Gradle bundles the JavaScript, and an address in `.env` / `.env.local` (such
+as a LAN IP for testing) wins over one typed before `npx expo prebuild` only, so the APK would
+show "We couldn't reach the server" to every seller. `scripts/build-apk.mjs` sets the address
+for both steps, stops early if the server doesn't answer `/api/mobile/version`, and checks the
+built app contains the address.
 
 Install it on a test phone (`adb install -r app-release.apk`) and go live once on each
 platform you support before publishing.
