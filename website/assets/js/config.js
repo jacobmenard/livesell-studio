@@ -10,9 +10,9 @@
  */
 window.NEGOSYOWORKS_CONFIG = {
   app: {
-    apkUrl: "",
-    appVersion: "",
-    apkSizeMb: ""
+    apkUrl: "/app/negosyowork-studio.apk",
+    appVersion: "1.0.0",
+    apkSizeMb: "142"
   },
   contact: {
     facebook: "https://www.facebook.com/menardjemely/",
