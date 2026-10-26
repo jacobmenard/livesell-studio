@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   name: 'NegosyoWork Studio',
   slug: 'negosyowork-studio',
   scheme: 'negosyowork',
-  version: '1.0.1',
+  version: '1.0.2',
   // Phones are held upright (locked at start-up, src/layout/orientation.ts); tablets turn freely
   // (Android 16 ignores orientation locks on tablets anyway).
   orientation: 'default',
@@ -26,7 +26,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'ph.negosyowork.studio',
     // Bump on every APK you publish; the app compares it with GET /api/mobile/version.
-    versionCode: 2,
+    versionCode: 3,
     adaptiveIcon: {
       backgroundColor: '#062B63',
       foregroundImage: './assets/android-icon-foreground.png',
