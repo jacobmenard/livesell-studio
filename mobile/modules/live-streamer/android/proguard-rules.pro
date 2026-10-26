@@ -4,7 +4,10 @@
 -dontwarn com.pedro.**
 
 # ML Kit's selfie segmentation (PersonSegmenter) runs MediaPipe in native code (libxeno_native.so),
-# which finds these Java classes by name. Shrinking renamed or removed them, so in release builds
-# every frame failed and the Blur and Picture backgrounds never showed ("can't pick you out").
--keep class com.google.mlkit.vision.mediapipe.** { *; }
--keep class com.google.android.gms.internal.mlkit_vision_mediapipe.** { *; }
+# which finds Java classes by name; shrinking renamed or removed them, so in release builds every
+# frame failed and the Blur and Picture backgrounds never showed ("can't pick you out"). ML Kit is
+# kept whole: it is small, its beta packages ship no keep rules of their own, and its exception
+# names then stay readable in the warning's details.
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_** { *; }
+-keep class com.google.research.xeno.** { *; }

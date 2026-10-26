@@ -29,6 +29,8 @@ export interface LiveErrorEvent {
    */
   code: 'prepare' | 'camera' | 'sound' | 'microphone' | 'segmentation' | string
   message: string
+  /** The technical reason, for support (segmentation: the exception ML Kit gave). */
+  detail?: string
 }
 
 export interface LiveStreamerProps extends ViewProps {

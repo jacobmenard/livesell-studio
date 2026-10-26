@@ -85,7 +85,8 @@ function Editor({ setup }: { setup: SetupFull }) {
   const [newText, setNewText] = useState('')
   const [newColor, setNewColor] = useState<TextColor>('yellow')
   const [textError, setTextError] = useState<string | undefined>()
-  const [segmentationMissing, setSegmentationMissing] = useState(false)
+  /** Set once the phone can't find the person; `detail` is the technical reason. */
+  const [segmentationMissing, setSegmentationMissing] = useState<{ detail?: string } | null>(null)
   const [zoomLimit, setZoomLimit] = useState<string | null>(null)
   /** When the selected popup's entrance and effect last started playing in the preview. */
   const [playedAt, setPlayedAt] = useState(() => Date.now())
@@ -266,7 +267,8 @@ function Editor({ setup }: { setup: SetupFull }) {
           mediaLoading={media.isPending}
           mediaError={mediaError}
           onRetryMedia={retryMedia}
-          segmentationMissing={segmentationMissing}
+          segmentationMissing={segmentationMissing !== null}
+          segmentationDetail={segmentationMissing?.detail}
           onChange={changeBackground}
         />
       )}
@@ -334,7 +336,7 @@ function Editor({ setup }: { setup: SetupFull }) {
       resolution={doc.resolution}
       look={look}
       overlay={overlay}
-      onSegmentationMissing={() => setSegmentationMissing(true)}
+      onSegmentationMissing={(detail) => setSegmentationMissing({ detail })}
       onZoomLimit={setZoomLimit}
       popupGestures={popupGestures}
     />

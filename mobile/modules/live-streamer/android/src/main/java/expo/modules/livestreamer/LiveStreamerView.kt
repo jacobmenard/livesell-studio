@@ -69,8 +69,8 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
   }
   private val renderer = OverlayRenderer(loadTypeface(context))
   private val overlayFilter = ImageFilterRender()
-  private val segmenter = PersonSegmenter {
-    main.post { emitError("segmentation", "Background removal isn't working on this phone right now, so viewers see your real room.") }
+  private val segmenter = PersonSegmenter { reason ->
+    main.post { emitError("segmentation", "Background removal isn't working on this phone right now, so viewers see your real room.", reason) }
   }
   private val stageFilter = StageFilterRender(context.assets, segmenter)
 
@@ -577,8 +577,9 @@ class LiveStreamerView(context: Context, appContext: AppContext) : ExpoView(cont
     )
   }
 
-  private fun emitError(code: String, message: String) {
-    onError(mapOf("code" to code, "message" to message))
+  /** `detail`: the technical reason, for support (shown small under the seller's message). */
+  private fun emitError(code: String, message: String, detail: String? = null) {
+    onError(if (detail == null) mapOf("code" to code, "message" to message) else mapOf("code" to code, "message" to message, "detail" to detail))
   }
 
   fun release() {

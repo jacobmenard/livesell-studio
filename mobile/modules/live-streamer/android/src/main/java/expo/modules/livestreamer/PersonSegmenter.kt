@@ -16,7 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  * arrive while it's busy are skipped, so it never slows the live down. Each mask says which
  * frame it was found in, so the stage can draw it over that same frame (StageFilterRender).
  */
-class PersonSegmenter(private val onUnavailable: () -> Unit) {
+class PersonSegmenter(private val onUnavailable: (reason: String) -> Unit) {
 
   /** How sure the model is that each pixel is the person, 0–255, rows top first, in frame `frameId`. */
   class Mask(val bytes: ByteArray, val width: Int, val height: Int, val frameId: Long)
@@ -31,6 +31,9 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
   @Volatile var latest: Mask? = null
     private set
 
+  /** Why ML Kit couldn't be set up, if it couldn't (reported with the first frame). */
+  private var setupError: Throwable? = null
+
   private val client: Segmenter? =
     try {
       Segmentation.getClient(
@@ -43,6 +46,7 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
       )
     } catch (error: Throwable) {
       Log.w(TAG, "selfie segmentation unavailable", error)
+      setupError = error
       null
     }
 
@@ -61,7 +65,7 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
   fun offer(frame: Bitmap, frameId: Long) {
     val segmenter = client
     if (segmenter == null) {
-      reportUnavailable()
+      reportUnavailable(setupError)
       return
     }
     if (closed || !busy.compareAndSet(false, true)) return
@@ -85,20 +89,31 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
         }
         .addOnFailureListener(executor) { error ->
           Log.w(TAG, "segmentation failed", error)
-          if (++failures >= MAX_FAILURES) reportUnavailable()
+          if (++failures >= MAX_FAILURES) reportUnavailable(error)
           busy.set(false)
         }
     } catch (error: Throwable) {
       Log.w(TAG, "segmentation could not start", error)
       busy.set(false)
-      if (++failures >= MAX_FAILURES) reportUnavailable()
+      if (++failures >= MAX_FAILURES) reportUnavailable(error)
     }
   }
 
-  private fun reportUnavailable() {
+  private fun reportUnavailable(error: Throwable?) {
     if (reportedUnavailable) return
     reportedUnavailable = true
-    onUnavailable()
+    onUnavailable(describe(error))
+  }
+
+  /**
+   * What went wrong in one line, shown under the warning so a seller's screenshot says why
+   * (the phone's log is out of reach for them). The deepest cause is usually the telling one.
+   */
+  private fun describe(error: Throwable?): String {
+    if (error == null) return "ML Kit isn't available"
+    val root = generateSequence(error) { it.cause }.last()
+    val name = { e: Throwable -> "${e.javaClass.simpleName}: ${e.message.orEmpty()}".trim() }
+    return (if (root === error) name(error) else "${name(error)} ← ${name(root)}").take(MAX_REASON)
   }
 
   fun close() {
@@ -111,5 +126,6 @@ class PersonSegmenter(private val onUnavailable: () -> Unit) {
   companion object {
     private const val TAG = "LiveStreamer"
     private const val MAX_FAILURES = 5
+    private const val MAX_REASON = 300
   }
 }

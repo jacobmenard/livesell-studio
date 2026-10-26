@@ -15,6 +15,7 @@ export function BackgroundSection({
   mediaError,
   onRetryMedia,
   segmentationMissing,
+  segmentationDetail,
   onChange,
 }: {
   background: BackgroundSettings
@@ -26,6 +27,8 @@ export function BackgroundSection({
   onRetryMedia: () => void
   /** This phone can't find the person (Blur and Picture need it). */
   segmentationMissing: boolean
+  /** Why, technically: shown small, so a screenshot tells support what happened. */
+  segmentationDetail?: string
   onChange: (change: Partial<BackgroundSettings>) => void
 }) {
   const background = backgroundWithDefaults(saved)
@@ -72,6 +75,7 @@ export function BackgroundSection({
         {segmentationMissing && (background.mode === 'blur' || background.mode === 'image') && (
           <Notice tone="warning" title="This phone can’t do it">
             This phone can’t pick you out from the room, so {background.mode === 'blur' ? 'the blur' : 'the picture'} won’t show in your live. Green screen still works.
+            {segmentationDetail ? <Text style={{ fontSize: 12, lineHeight: 17 }} selectable>{`\nDetails: ${segmentationDetail}`}</Text> : null}
           </Notice>
         )}
       </View>

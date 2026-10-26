@@ -43,7 +43,8 @@ export function StagePreview({
   resolution: Resolution
   look: NativeLook
   overlay: PopupDrawSpec[]
-  onSegmentationMissing: () => void
+  /** `detail`: why, technically (shown small, for support). */
+  onSegmentationMissing: (detail?: string) => void
   /** The camera can't zoom out as far as the setup asks (the message says how far it goes). */
   onZoomLimit: (message: string) => void
   /** Moving and resizing the selected popup by touch (the Popups step). */
@@ -101,7 +102,7 @@ export function StagePreview({
           onStatus={(e) => e.nativeEvent.status === 'previewing' && setPreviews((n) => n + 1)}
           onError={(e) => {
             const { code, message } = e.nativeEvent
-            if (code === 'segmentation') onSegmentationMissing()
+            if (code === 'segmentation') onSegmentationMissing(e.nativeEvent.detail)
             else if (code === 'zoom') onZoomLimit(message)
             else if (code === 'camera' || code === 'prepare') setCameraError(message)
           }}
