@@ -95,6 +95,8 @@ class MobileAuthController extends Controller
                 'apk_url' => $url,
                 'size_mb' => $app['size_mb'],
                 'notes' => $app['notes'],
+                // The web app (its own subdomain in production): the app opens plans and the guide there.
+                'web_url' => rtrim((string) config('livesell.frontend_url'), '/') ?: null,
             ],
         ]);
     }

@@ -233,4 +233,6 @@ export interface AppVersion {
   apk_url: string | null
   size_mb: number | null
   notes: string[]
+  /** The web app, where plans are paid and the guide is (missing on older servers). */
+  web_url?: string | null
 }

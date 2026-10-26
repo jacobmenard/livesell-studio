@@ -155,13 +155,15 @@ class MobileAuthTest extends TestCase
             'version_code' => 3, 'version_name' => '1.2.0', 'min_version_code' => 2,
             'apk_url' => 'https://negosyowork.example/app.apk', 'size_mb' => 42.5, 'notes' => ['Smoother reconnect'],
         ]]);
+        config(['livesell.frontend_url' => 'https://app.negosyowork.example/']);
 
         $this->getJson('/api/mobile/version')
             ->assertOk()
             ->assertJsonPath('data.version_code', 3)
             ->assertJsonPath('data.min_version_code', 2)
             ->assertJsonPath('data.apk_url', 'https://negosyowork.example/app.apk')
-            ->assertJsonPath('data.notes.0', 'Smoother reconnect');
+            ->assertJsonPath('data.notes.0', 'Smoother reconnect')
+            ->assertJsonPath('data.web_url', 'https://app.negosyowork.example');
 
         config(['livesell.android_app.apk_url' => 'http://negosyowork.example/app.apk']);
         $this->getJson('/api/mobile/version')->assertOk()->assertJsonPath('data.apk_url', null);

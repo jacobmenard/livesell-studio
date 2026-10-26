@@ -26,14 +26,20 @@ function day(iso: string | null): string | null {
   return iso ? new Date(iso).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }) : null
 }
 
-/** Plans are paid on the website (GCash, Maya or bank, checked by the NegosyoWork team). */
-const openPlans = () => void Linking.openURL(`${API_URL}/plans`)
+/**
+ * Opens a page of the web app. The server names its address (in production its own subdomain,
+ * not the API's); until it has answered, the API's address is used, as when both share a domain.
+ */
+const openWeb = (webUrl: string | null | undefined, path: string) => void Linking.openURL(`${webUrl || API_URL}${path}`)
 
 export default function AccountScreen() {
   const { user, logout } = useAuth()
   const subscription = useSubscription()
   const update = useAppUpdate()
   const [updateOpen, setUpdateOpen] = useState(false)
+
+  // Plans are paid on the website (GCash, Maya or bank, checked by the NegosyoWork team).
+  const openPlans = () => openWeb(update.latest?.web_url, '/plans')
 
   const plan = subscription.data?.plan
   const until = day(subscription.data?.ends_at ?? null)
@@ -89,7 +95,7 @@ export default function AccountScreen() {
 
         <Card>
           <Row label="Platforms and stream keys" onPress={() => router.push('/platforms')} />
-          <Row label="Help and guide" onPress={() => void Linking.openURL(`${API_URL}/setups`)} />
+          <Row label="Help and guide" onPress={() => openWeb(update.latest?.web_url, '/setups')} />
           <Row
             label={`App version ${appVersionName()}`}
             value={update.available ? 'Update ready' : 'Up to date'}

@@ -1,3 +1,5 @@
+import { File } from 'expo-file-system'
+
 import { request } from './client'
 import type {
   AppVersion,
@@ -56,13 +58,28 @@ export interface PickedFile {
   type: string
 }
 
+/** A FormData file part that Expo's fetch can send. */
+export interface UploadPart {
+  name: string
+  type: string
+  bytes: () => Promise<Uint8Array>
+}
+
+/**
+ * Expo replaces the global fetch with expo/fetch, which builds the multipart body itself and
+ * reads each file part through bytes(). React Native's { uri, name, type } part makes it throw
+ * before anything is sent, which surfaced as "We couldn't reach the server".
+ */
+export function uploadPart(file: PickedFile): UploadPart {
+  return { name: file.name, type: file.type, bytes: () => new File(file.uri).bytes() }
+}
+
 export const mediaApi = {
   list: () => request<Wrapped<MediaItem[]>>('/api/media').then((r) => r.data),
   upload: (kind: MediaKind, file: PickedFile) => {
     const body = new FormData()
     body.append('kind', kind)
-    // React Native's FormData takes { uri, name, type } for a file on the phone.
-    body.append('file', file as unknown as Blob)
+    body.append('file', uploadPart(file) as unknown as Blob)
     // Up to 5 MB on slow mobile data.
     return request<Wrapped<MediaItem>>('/api/media', { method: 'POST', body, timeoutMs: 120_000 }).then((r) => r.data)
   },
