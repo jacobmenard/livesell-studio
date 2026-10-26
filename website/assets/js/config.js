@@ -11,8 +11,8 @@
 window.NEGOSYOWORKS_CONFIG = {
   app: {
     apkUrl: "/app/negosyowork-studio.apk",
-    appVersion: "1.0.0",
-    apkSizeMb: "142"
+    appVersion: "1.0.2",
+    apkSizeMb: "149"
   },
   contact: {
     facebook: "https://www.facebook.com/menardjemely/",
