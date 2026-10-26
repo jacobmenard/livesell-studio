@@ -11,7 +11,7 @@
 window.NEGOSYOWORKS_CONFIG = {
   app: {
     apkUrl: "/app/negosyowork-studio.apk",
-    appVersion: "1.0.2",
+    appVersion: "1.0.3",
     apkSizeMb: "149"
   },
   contact: {
