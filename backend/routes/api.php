@@ -19,6 +19,7 @@ use App\Http\Controllers\Api\SceneController;
 use App\Http\Controllers\Api\SetupController;
 use App\Http\Controllers\Api\SubscriptionController;
 use App\Http\Controllers\Api\TeamController;
+use App\Http\Controllers\Api\WebHandoffController;
 use App\Http\Resources\PlanResource;
 use App\Models\Plan;
 use App\Models\User;
@@ -35,6 +36,8 @@ Route::prefix('auth')->group(function () {
     Route::post('login', [AuthController::class, 'login'])->middleware('throttle:login');
     Route::post('forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:password-reset');
     Route::post('reset-password', [AuthController::class, 'resetPassword'])->middleware('throttle:password-reset');
+    // Opened from the Android app's one-time link (WebHandoffController).
+    Route::post('handoff', [WebHandoffController::class, 'claim'])->middleware('throttle:login');
 
     Route::middleware('auth:sanctum')->group(function () {
         Route::get('me', [AuthController::class, 'me'])->middleware('account.active');
@@ -50,6 +53,8 @@ Route::prefix('mobile')->group(function () {
     Route::post('login', [MobileAuthController::class, 'login'])->middleware('throttle:login');
     Route::post('register', [MobileAuthController::class, 'register'])->middleware('throttle:register');
     Route::post('logout', [MobileAuthController::class, 'logout'])->middleware('auth:sanctum');
+    // A link that opens the website already signed in (plans are paid there).
+    Route::post('web-link', [WebHandoffController::class, 'create'])->middleware(['auth:sanctum', 'account.active', 'throttle:api']);
     // The newest APK on the website (no login: the app checks before and after sign-in).
     Route::get('version', [MobileAuthController::class, 'version'])->middleware('throttle:60,1');
 });

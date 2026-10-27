@@ -90,4 +90,6 @@ export const mediaApi = {
 export const accountApi = {
   subscription: () => request<Wrapped<SubscriptionSummary>>('/api/subscription').then((r) => r.data),
   version: () => request<Wrapped<AppVersion>>('/api/mobile/version', { anonymous: true }).then((r) => r.data),
+  /** A link that opens `path` on the website already signed in; it works once, for a minute. */
+  webLink: (path: string) => request<Wrapped<{ url: string }>>('/api/mobile/web-link', { method: 'POST', body: { path } }).then((r) => r.data),
 }

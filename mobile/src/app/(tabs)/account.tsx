@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Alert, Linking, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
+import { accountApi } from '@/api/endpoints'
 import { useAuth } from '@/auth/AuthProvider'
 import { UpdateSheet } from '@/components/UpdateSheet'
 import { Button, Card, Row } from '@/components/ui'
@@ -37,9 +38,25 @@ export default function AccountScreen() {
   const subscription = useSubscription()
   const update = useAppUpdate()
   const [updateOpen, setUpdateOpen] = useState(false)
+  /** The page whose sign-in link is being fetched. */
+  const [opening, setOpening] = useState<string | null>(null)
+
+  /** Opens a page of the website signed in as this account (no second login); the plain page if that fails. */
+  const openSignedIn = async (path: string) => {
+    if (opening) return
+    setOpening(path)
+    try {
+      const { url } = await accountApi.webLink(path)
+      await Linking.openURL(url)
+    } catch {
+      openWeb(update.latest?.web_url, path)
+    } finally {
+      setOpening(null)
+    }
+  }
 
   // Plans are paid on the website (GCash, Maya or bank, checked by the NegosyoWork team).
-  const openPlans = () => openWeb(update.latest?.web_url, '/plans')
+  const openPlans = () => void openSignedIn('/plans')
 
   const plan = subscription.data?.plan
   const until = day(subscription.data?.ends_at ?? null)
@@ -87,15 +104,15 @@ export default function AccountScreen() {
           </Text>
           {!user?.is_subuser && (
             <View style={{ flexDirection: 'row', gap: space.sm, marginTop: 4 }}>
-              <Button label="Change plan" variant="onBrand" size="md" onPress={openPlans} style={{ flex: 1 }} />
-              <Button label="Pay or renew" size="md" onPress={openPlans} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.14)' }} />
+              <Button label="Change plan" variant="onBrand" size="md" busy={opening === '/plans'} onPress={openPlans} style={{ flex: 1 }} />
+              <Button label="Pay or renew" size="md" busy={opening === '/plans'} onPress={openPlans} style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.14)' }} />
             </View>
           )}
         </View>
 
         <Card>
           <Row label="Platforms and stream keys" onPress={() => router.push('/platforms')} />
-          <Row label="Help and guide" onPress={() => openWeb(update.latest?.web_url, '/setups')} />
+          <Row label="Help and guide" onPress={() => void openSignedIn('/setups')} />
           <Row
             label={`App version ${appVersionName()}`}
             value={update.available ? 'Update ready' : 'Up to date'}

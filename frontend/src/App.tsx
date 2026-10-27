@@ -5,6 +5,7 @@ import { RouteError } from './components/RouteError'
 import { Spinner } from './components/ui'
 import { DashboardPage } from './pages/DashboardPage'
 import { LoginPage } from './pages/auth/LoginPage'
+import { HandoffPage } from './pages/auth/HandoffPage'
 import { ForgotPasswordPage, ResetPasswordPage } from './pages/auth/PasswordPages'
 import { RegisterPage } from './pages/auth/RegisterPage'
 import { PricingPage } from './pages/PricingPage'
@@ -90,6 +91,8 @@ export const router = createBrowserRouter([
           { path: '/admin/payments', lazy: adminPayments },
         ],
       },
+      // Opened from the Android app, signed in or not (it signs in as the app's account).
+      { path: '/handoff', element: <HandoffPage /> },
       // Public pricing (signed in or not).
       { path: '/pricing', element: <PricingPage /> },
       // Public, token-protected clean screen for OBS / TikTok LIVE Studio.

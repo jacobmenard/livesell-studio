@@ -48,6 +48,9 @@ return [
 
     'broadcast_ticket_ttl' => (int) env('LIVESELL_BROADCAST_TICKET_TTL', 60),
 
+    // Seconds the Android app's "open the website signed in" link works (once).
+    'web_handoff_ttl' => (int) env('LIVESELL_WEB_HANDOFF_TTL', 60),
+
     /*
     | The business inbox (e.g. support@yourdomain): it gets an email for every payment to
     | check, and sellers' replies to payment emails go there (they are sent from the

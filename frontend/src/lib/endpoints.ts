@@ -35,6 +35,8 @@ export const authApi = {
   register: (body: { name: string; email: string; password: string; password_confirmation: string }) =>
     http.post<Wrapped<User>>('/api/auth/register', body).then((r) => r.data.data),
   logout: () => http.post('/api/auth/logout'),
+  /** Swaps the Android app's one-time code (lib/handoff.ts) for a signed-in session. */
+  handoff: (code: string) => http.post<Wrapped<User>>('/api/auth/handoff', { code }).then((r) => r.data.data),
   forgotPassword: (email: string) =>
     http.post<{ message: string }>('/api/auth/forgot-password', { email }).then((r) => r.data.message),
   resetPassword: (body: { token: string; email: string; password: string; password_confirmation: string }) =>

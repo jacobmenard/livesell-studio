@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { editedLabel, formatDate, formatPrice, initials, plural } from './format'
 import { checkEmail, checkPassword, checkRtmpServer, checkStreamKey, compact, withoutKey } from './validation'
+import { readHandoff } from './handoff'
 
 describe('validation', () => {
   it('checks email and password like the API', () => {
@@ -52,5 +53,24 @@ describe('plan prices', () => {
     expect(formatDate(null)).toBe('')
     expect(formatDate('not a date')).toBe('')
     expect(formatDate('2026-10-31T12:00:00+08:00')).toContain('2026')
+  })
+})
+
+describe('app hand-off links', () => {
+  const code = 'a'.repeat(24) + 'B7'.repeat(12)
+
+  it('reads the one-time code and the page to open', () => {
+    expect(readHandoff(`#code=${code}&next=%2Fplans`)).toEqual({ code, next: '/plans' })
+  })
+
+  it('opens only pages of this website', () => {
+    for (const next of ['https://evil.example', '//evil.example', '/\\evil.example', 'plans', '']) {
+      expect(readHandoff(`#code=${code}&next=${encodeURIComponent(next)}`)?.next).toBe('/setups')
+    }
+  })
+
+  it('ignores links without a proper code', () => {
+    expect(readHandoff('')).toBeNull()
+    expect(readHandoff('#code=short&next=/plans')).toBeNull()
   })
 })
