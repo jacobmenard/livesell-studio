@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { useAuth } from '../../auth/AuthProvider'
 import { AppPage } from '../../components/AppPage'
+import { DataTable, type Column } from '../../components/DataTable'
 import { MoreMenu } from '../../components/Menu'
 import { Alert, Button, Spinner, TextField } from '../../components/ui'
 import { errorMessage } from '../../lib/api'
@@ -42,6 +43,8 @@ function UserList() {
   const [rows, setRows] = useState<AdminAccount[] | null>(null)
   const [meta, setMeta] = useState({ current_page: 1, last_page: 1, total: 0 })
   const [error, setError] = useState('')
+  // A failed "Log in as" (e.g. deactivated meanwhile), shown above the table with whose it was.
+  const [actionError, setActionError] = useState('')
   const { page } = request
   const setPage = (next: number) => setRequest((r) => ({ ...r, page: next }))
 
@@ -81,16 +84,11 @@ function UserList() {
       </form>
 
       {error && <Alert>{error}</Alert>}
+      {actionError && <Alert>{actionError}</Alert>}
       {rows === null && !error && <Spinner label="Loading users…" />}
       {rows?.length === 0 && <p className="m-0 text-sm text-muted">No users match.</p>}
 
-      {rows && rows.length > 0 && (
-        <ul className="m-0 flex list-none flex-col divide-y divide-line p-0">
-          {rows.map((a) => (
-            <UserRow key={a.id} account={a} onChanged={replace} />
-          ))}
-        </ul>
-      )}
+      {rows && rows.length > 0 && <DataTable caption="Seller account owners" columns={userColumns(replace, setActionError)} rows={rows} rowKey={(a) => a.id} />}
 
       {meta.last_page > 1 && (
         <div className="flex items-center justify-between gap-2 text-sm">
@@ -109,42 +107,51 @@ function UserList() {
   )
 }
 
-function UserRow({ account: a, onChanged }: { account: AdminAccount; onChanged: (account: AdminAccount) => void }) {
+/** The Users table; a failed action is reported with whose account it was. */
+function userColumns(onChanged: (account: AdminAccount) => void, onError: (message: string) => void): Column<AdminAccount>[] {
+  return [
+    {
+      header: 'User',
+      cell: (a) => (
+        <span className="flex flex-col">
+          <Link to={`/admin/users/${a.id}`} className="font-semibold text-text no-underline hover:underline">
+            {a.name}
+          </Link>
+          <span className="text-[13px] break-all text-muted">{a.email}</span>
+        </span>
+      ),
+    },
+    { header: 'Plan', cell: (a) => <span className="text-text-2">{planSummary(a)}</span> },
+    { header: 'Sub-users', align: 'right', cell: (a) => a.members },
+    { header: 'Joined', cell: (a) => <span className="whitespace-nowrap text-text-2">{formatDate(a.joined_at) || '—'}</span> },
+    { header: 'Status', cell: (a) => (a.disabled_at ? <DeactivatedBadge /> : <span className="text-text-2">Active</span>) },
+    {
+      header: 'Actions',
+      hideHeader: true,
+      align: 'right',
+      cell: (a) => <UserActions account={a} onChanged={onChanged} onError={(message) => onError(message && `${a.name}: ${message}`)} />,
+    },
+  ]
+}
+
+/** "Log in as" and the ⋯ menu (View, Deactivate or Reactivate) for one row. */
+function UserActions({ account: a, onChanged, onError }: { account: AdminAccount; onChanged: (account: AdminAccount) => void; onError: (message: string) => void }) {
   const navigate = useNavigate()
   const [changingStatus, setChangingStatus] = useState(false)
-  const [error, setError] = useState('')
 
   return (
-    <li className="flex flex-col gap-2 py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex min-w-60 flex-1 flex-col">
-          <span className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
-            <Link to={`/admin/users/${a.id}`} className="text-text no-underline hover:underline">
-              {a.name}
-            </Link>
-            <span className="font-normal text-[13px] text-muted">{a.email}</span>
-            {a.disabled_at && <DeactivatedBadge />}
-          </span>
-          <span className="text-[13px] text-text-2">
-            {planSummary(a)} · {plural(a.members, 'sub-user')}
-            {a.joined_at && ` · joined ${formatDate(a.joined_at)}`}
-          </span>
-        </div>
-        <div className="flex items-center gap-1">
-          <LogInAs account={a} onError={setError} />
-          <MoreMenu
-            label={`More for ${a.name}`}
-            items={[
-              { label: 'View', onSelect: () => navigate(`/admin/users/${a.id}`) },
-              a.disabled_at
-                ? { label: 'Reactivate', onSelect: () => setChangingStatus(true) }
-                : { label: 'Deactivate', danger: true, onSelect: () => setChangingStatus(true) },
-            ]}
-          />
-        </div>
-      </div>
-      {error && <Alert>{error}</Alert>}
+    <div className="inline-flex items-center gap-1">
+      <LogInAs account={a} onError={onError} compact />
+      <MoreMenu
+        label={`More for ${a.name}`}
+        items={[
+          { label: 'View', onSelect: () => navigate(`/admin/users/${a.id}`) },
+          a.disabled_at
+            ? { label: 'Reactivate', onSelect: () => setChangingStatus(true) }
+            : { label: 'Deactivate', danger: true, onSelect: () => setChangingStatus(true) },
+        ]}
+      />
       {changingStatus && <AccountStatusDialog account={a} onClose={() => setChangingStatus(false)} onChanged={onChanged} />}
-    </li>
+    </div>
   )
 }

@@ -23,7 +23,7 @@ export function AppHeader() {
     }
   }
 
-  // Owners manage their team; only the superadmin sees Payments (with a pending badge), Users and Admin.
+  // Owners manage their team; only the superadmin sees Payments (with a pending badge), Users, Reports and Admin.
   // "tour" marks links the first-visit walkthrough points at.
   const links: { to: string; label: string; badge?: number; tour?: string }[] = [
     { to: '/setups', label: 'My setups' },
@@ -33,6 +33,7 @@ export function AppHeader() {
       ? [
           { to: '/admin/payments', label: 'Payments', badge: pendingPayments },
           { to: '/admin/users', label: 'Users' },
+          { to: '/admin/reports', label: 'Reports' },
           { to: '/admin', label: 'Admin' },
         ]
       : []),

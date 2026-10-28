@@ -16,8 +16,11 @@ export function DeactivatedBadge() {
   return <span className="inline-flex shrink-0 items-center rounded-full bg-danger-bg px-2.5 py-0.5 text-xs font-semibold text-danger-text">Deactivated</span>
 }
 
-/** "Log in as", confirmed in place (a deactivated account has to be reactivated first). */
-export function LogInAs({ account: a, onError }: { account: AdminAccount; onError: (message: string) => void }) {
+/**
+ * "Log in as", confirmed in place (a deactivated account has to be reactivated first).
+ * Compact leaves out the question, for a table cell.
+ */
+export function LogInAs({ account: a, onError, compact = false }: { account: AdminAccount; onError: (message: string) => void; compact?: boolean }) {
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
 
@@ -38,9 +41,9 @@ export function LogInAs({ account: a, onError }: { account: AdminAccount; onErro
   if (confirming) {
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[13px] text-text-2">Open the app as {a.name}?</span>
-        <Button size="sm" variant="primary" loading={busy} onClick={logInAs}>
-          Yes, log in as them
+        {!compact && <span className="text-[13px] text-text-2">Open the app as {a.name}?</span>}
+        <Button size="sm" variant="primary" loading={busy} aria-label={`Yes, log in as ${a.name}`} onClick={logInAs}>
+          {compact ? 'Yes, log in' : 'Yes, log in as them'}
         </Button>
         <Button size="sm" variant="ghost" disabled={busy} onClick={() => setConfirming(false)}>
           Cancel

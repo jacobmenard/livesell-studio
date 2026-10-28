@@ -441,3 +441,20 @@ export interface SoundEvent {
   url: string | null
   volume: number
 }
+
+export type SalesPeriod = 'daily' | 'weekly' | 'monthly'
+
+/** Sales from approved payments (counted on the day each was approved), in whole units of `currency`. */
+export interface SalesReport {
+  period: SalesPeriod
+  /** First and last day covered ("YYYY-MM-DD"), snapped to whole weeks or months. */
+  from: string
+  to: string
+  currency: string
+  total: number
+  count: number
+  /** Every day, week (Monday to Sunday) or month in the range, oldest first, empty ones included. */
+  rows: { start: string; end: string; total: number; count: number }[]
+  /** Biggest first. */
+  by_plan: { plan_id: number; name: string; total: number; count: number }[]
+}

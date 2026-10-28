@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { editedLabel, formatDate, formatPrice, initials, plural } from './format'
 import { checkEmail, checkPassword, checkRtmpServer, checkStreamKey, compact, withoutKey } from './validation'
 import { readHandoff } from './handoff'
+import { periodLabel } from './reports'
 
 describe('validation', () => {
   it('checks email and password like the API', () => {
@@ -72,5 +73,14 @@ describe('app hand-off links', () => {
   it('ignores links without a proper code', () => {
     expect(readHandoff('')).toBeNull()
     expect(readHandoff('#code=short&next=/plans')).toBeNull()
+  })
+})
+
+describe('sales report periods', () => {
+  it('names a day, a week and a month', () => {
+    expect(periodLabel('daily', '2026-10-29', '2026-10-29')).toBe('Thu, Oct 29, 2026')
+    expect(periodLabel('weekly', '2026-10-26', '2026-11-01')).toBe('Oct 26 – Nov 1, 2026')
+    expect(periodLabel('weekly', '2026-12-28', '2027-01-03')).toBe('Dec 28, 2026 – Jan 3, 2027')
+    expect(periodLabel('monthly', '2026-10-01', '2026-10-31')).toBe('October 2026')
   })
 })

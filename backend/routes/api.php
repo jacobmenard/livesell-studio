@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\Admin\AccountController as AdminAccountController;
 use App\Http\Controllers\Api\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\Admin\PlanController as AdminPlanController;
+use App\Http\Controllers\Api\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BroadcastController;
 use App\Http\Controllers\Api\DestinationController;
@@ -98,7 +99,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::delete('team/{member}', [TeamController::class, 'destroy']);
     });
 
-    // Superadmin: check payments, change plans, edit plan prices and limits, manage accounts.
+    // Superadmin: check payments, change plans, edit plan prices and limits, manage accounts, sales reports.
     Route::middleware('can:admin')->prefix('admin')->group(function () {
         Route::get('payments', [AdminPaymentController::class, 'index']);
         Route::get('payments/pending-count', [AdminPaymentController::class, 'pendingCount']);
@@ -112,6 +113,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::post('accounts/{account}/reactivate', [AdminAccountController::class, 'reactivate']);
         Route::get('plans', [AdminPlanController::class, 'index']);
         Route::put('plans/{plan}', [AdminPlanController::class, 'update']);
+        Route::get('reports/sales', [AdminReportController::class, 'sales']);
     });
 });
 

@@ -15,6 +15,8 @@ import type {
   Plan,
   Platform,
   Resolution,
+  SalesPeriod,
+  SalesReport,
   Scene,
   SetupDocument,
   SetupFull,
@@ -145,6 +147,9 @@ export const adminApi = {
   deactivateAccount: (accountId: number) => http.post<Wrapped<AdminAccount>>(`/api/admin/accounts/${accountId}/deactivate`).then((r) => r.data.data),
   reactivateAccount: (accountId: number) => http.post<Wrapped<AdminAccount>>(`/api/admin/accounts/${accountId}/reactivate`).then((r) => r.data.data),
   plans: () => http.get<Wrapped<Plan[]>>('/api/admin/plans').then((r) => r.data.data),
+  /** Without dates: the last 30 days, 12 weeks or 12 months. */
+  salesReport: (params: { period: SalesPeriod; from?: string; to?: string }) =>
+    http.get<Wrapped<SalesReport>>('/api/admin/reports/sales', { params }).then((r) => r.data.data),
   updatePlan: (planId: number, body: Pick<Plan, 'name' | 'price_monthly' | 'max_subusers' | 'max_live_setups'>) =>
     http.put<Wrapped<Plan>>(`/api/admin/plans/${planId}`, body).then((r) => r.data.data),
   payments: (params: { status: PaymentStatus | 'all'; search: string; page: number }) =>
