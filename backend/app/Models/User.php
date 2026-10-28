@@ -18,7 +18,7 @@ class User extends Authenticatable
     // HasApiTokens: the Android app signs in with a token (the website keeps its cookie session).
     use HasApiTokens, HasFactory, Notifiable;
 
-    // "role", "owner_id" and "deactivated_at" are deliberately not fillable, so sign-up can
+    // "role", "owner_id", "deactivated_at" and "disabled_at" are deliberately not fillable, so sign-up can
     // never grant admin rights or attach itself to someone else's account.
     protected $fillable = [
         'name',
@@ -41,6 +41,7 @@ class User extends Authenticatable
         'role' => 'seller',
         'owner_id' => null,
         'deactivated_at' => null,
+        'disabled_at' => null,
         'trial_ends_at' => null,
         'trial_reminded_at' => null,
         'completed_tours' => null,
@@ -54,6 +55,7 @@ class User extends Authenticatable
             'role' => UserRole::class,
             'owner_id' => 'integer',
             'deactivated_at' => 'datetime',
+            'disabled_at' => 'datetime',
             'trial_ends_at' => 'datetime',
             'trial_reminded_at' => 'datetime',
             'completed_tours' => 'array',
@@ -84,6 +86,12 @@ class User extends Authenticatable
     public function isDeactivated(): bool
     {
         return $this->deactivated_at !== null;
+    }
+
+    /** Deactivated by the superadmin (an account owner): nobody in the account can sign in. */
+    public function isDisabled(): bool
+    {
+        return $this->disabled_at !== null;
     }
 
     /** In the free week after signing up (see Plan::forAccount); a plan put in place ends it. */

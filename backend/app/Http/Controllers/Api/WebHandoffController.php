@@ -55,9 +55,9 @@ class WebHandoffController extends Controller
             throw ValidationException::withMessages(['code' => 'This link has expired. Open it again from the app, or log in.']);
         }
 
-        // A paused sub-user (owner's plan has no seat for them) can't come in.
-        if ($user->isDeactivated()) {
-            throw ValidationException::withMessages(['code' => EnsureAccountIsActive::PAUSED_MESSAGE]);
+        // A paused sub-user (owner's plan has no seat for them) or a deactivated account can't come in.
+        if (($refusal = EnsureAccountIsActive::refusal($user)) !== null) {
+            throw ValidationException::withMessages(['code' => $refusal]);
         }
 
         Auth::guard('web')->login($user);

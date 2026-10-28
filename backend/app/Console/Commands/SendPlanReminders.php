@@ -36,6 +36,7 @@ class SendPlanReminders extends Command
         Subscription::query()
             ->with(['plan', 'user'])
             ->whereHas('plan', fn (Builder $plan) => $plan->where('purchasable', true))
+            ->whereHas('user', fn (Builder $owner) => $owner->whereNull('disabled_at'))
             ->where('ends_at', '>', now())
             ->where('ends_at', '<=', now()->addDays((int) config('livesell.plan_reminder_days')))
             // Not yet reminded about this end date (a renewal moves it, so it's reminded again).
@@ -60,6 +61,7 @@ class SendPlanReminders extends Command
         $sent = 0;
         User::query()
             ->whereNull('owner_id')
+            ->whereNull('disabled_at')
             ->whereNull('trial_reminded_at')
             ->where('trial_ends_at', '>', now())
             ->where('trial_ends_at', '<=', now()->addDays((int) config('livesell.trial_reminder_days')))

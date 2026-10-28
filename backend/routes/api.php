@@ -98,7 +98,7 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::delete('team/{member}', [TeamController::class, 'destroy']);
     });
 
-    // Superadmin: check payments, change plans, edit plan prices and limits.
+    // Superadmin: check payments, change plans, edit plan prices and limits, manage accounts.
     Route::middleware('can:admin')->prefix('admin')->group(function () {
         Route::get('payments', [AdminPaymentController::class, 'index']);
         Route::get('payments/pending-count', [AdminPaymentController::class, 'pendingCount']);
@@ -106,7 +106,10 @@ Route::middleware(['auth:sanctum', 'account.active', 'throttle:api'])->group(fun
         Route::post('payments/{payment}/reject', [AdminPaymentController::class, 'reject']);
         Route::apiResource('payment-methods', AdminPaymentMethodController::class)->except('show');
         Route::get('accounts', [AdminAccountController::class, 'index']);
+        Route::get('accounts/{account}', [AdminAccountController::class, 'show']);
         Route::post('accounts/{account}/impersonate', [AdminAccountController::class, 'impersonate']);
+        Route::post('accounts/{account}/deactivate', [AdminAccountController::class, 'deactivate']);
+        Route::post('accounts/{account}/reactivate', [AdminAccountController::class, 'reactivate']);
         Route::get('plans', [AdminPlanController::class, 'index']);
         Route::put('plans/{plan}', [AdminPlanController::class, 'update']);
     });

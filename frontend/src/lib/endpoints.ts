@@ -1,6 +1,7 @@
 import { http } from './api'
 import type {
   AdminAccount,
+  AdminAccountDetail,
   AdminPayment,
   Destination,
   MediaItem,
@@ -137,8 +138,12 @@ export const adminApi = {
     http
       .get<{ data: AdminAccount[]; meta: { current_page: number; last_page: number; total: number } }>('/api/admin/accounts', { params })
       .then((r) => r.data),
+  account: (accountId: number) => http.get<Wrapped<AdminAccountDetail>>(`/api/admin/accounts/${accountId}`).then((r) => r.data.data),
   /** Signs the superadmin in as this account owner. */
   impersonate: (accountId: number) => http.post<Wrapped<User>>(`/api/admin/accounts/${accountId}/impersonate`).then((r) => r.data.data),
+  /** Nobody in the account can sign in until it's reactivated; nothing is deleted. */
+  deactivateAccount: (accountId: number) => http.post<Wrapped<AdminAccount>>(`/api/admin/accounts/${accountId}/deactivate`).then((r) => r.data.data),
+  reactivateAccount: (accountId: number) => http.post<Wrapped<AdminAccount>>(`/api/admin/accounts/${accountId}/reactivate`).then((r) => r.data.data),
   plans: () => http.get<Wrapped<Plan[]>>('/api/admin/plans').then((r) => r.data.data),
   updatePlan: (planId: number, body: Pick<Plan, 'name' | 'price_monthly' | 'max_subusers' | 'max_live_setups'>) =>
     http.put<Wrapped<Plan>>(`/api/admin/plans/${planId}`, body).then((r) => r.data.data),

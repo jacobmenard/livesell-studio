@@ -18,6 +18,8 @@ const plans = () => import('./pages/account/PlansPage').then((m) => ({ Component
 const team = () => import('./pages/account/TeamPage').then((m) => ({ Component: m.TeamPage }))
 const admin = () => import('./pages/admin/AdminPage').then((m) => ({ Component: m.AdminPage }))
 const adminPayments = () => import('./pages/admin/AdminPaymentsPage').then((m) => ({ Component: m.AdminPaymentsPage }))
+const adminUsers = () => import('./pages/admin/AdminUsersPage').then((m) => ({ Component: m.AdminUsersPage }))
+const adminUser = () => import('./pages/admin/AdminUserPage').then((m) => ({ Component: m.AdminUserPage }))
 
 /** Pages that need a signed-in seller. */
 function RequireAuth() {
@@ -89,6 +91,8 @@ export const router = createBrowserRouter([
           { path: '/team', lazy: team },
           { path: '/admin', lazy: admin },
           { path: '/admin/payments', lazy: adminPayments },
+          { path: '/admin/users', lazy: adminUsers },
+          { path: '/admin/users/:id', lazy: adminUser },
         ],
       },
       // Opened from the Android app, signed in or not (it signs in as the app's account).

@@ -6,11 +6,10 @@ import { Alert, Button, TextField } from '../../components/ui'
 import { errorMessage, fieldErrors } from '../../lib/api'
 import { adminApi } from '../../lib/endpoints'
 import type { Plan } from '../../lib/types'
-import { AccountsAdmin } from './AccountsAdmin'
 
 /**
- * Superadmin: seller accounts (and logging in as one), and what each plan costs and allows
- * (payments, which switch plans on, are on /admin/payments).
+ * Superadmin: what each plan costs and allows (payments, which switch plans on, are on
+ * /admin/payments; seller accounts on /admin/users).
  */
 export function AdminPage() {
   const { user } = useAuth()
@@ -42,14 +41,18 @@ function AdminScreens() {
   return (
     <AppPage
       title="Admin"
-      subtitle="Seller accounts (log in as one to help them), and what each plan costs and allows. Plans switch on when you approve a payment."
+      subtitle="What each plan costs and allows. Plans switch on when you approve a payment."
       actions={
-        <Link to="/admin/payments" className="text-sm font-semibold">
-          Review payments
-        </Link>
+        <span className="flex flex-wrap gap-4">
+          <Link to="/admin/users" className="text-sm font-semibold">
+            Users
+          </Link>
+          <Link to="/admin/payments" className="text-sm font-semibold">
+            Review payments
+          </Link>
+        </span>
       }
     >
-      <AccountsAdmin />
       <section aria-labelledby="plans-h" className="flex flex-col gap-3 rounded-[20px] border border-line bg-surface p-[18px]">
         <h2 id="plans-h" className="m-0 font-display text-xl font-semibold">
           Plans

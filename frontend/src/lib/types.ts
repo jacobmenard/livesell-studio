@@ -157,6 +157,18 @@ export interface AdminAccount {
   trial_ends_at: string | null
   members: number
   joined_at: string | null
+  /** Set while the superadmin has deactivated the account (nobody in it can sign in). */
+  disabled_at: string | null
+}
+
+/** One account on the superadmin's Users page (View). */
+export interface AdminAccountDetail extends AdminAccount {
+  setups: number
+  /** Platforms with a saved stream key (never the keys). */
+  platforms: Platform[]
+  team: TeamMember[]
+  /** The latest few, newest first. */
+  payments: Payment[]
 }
 
 export type TourName = 'dashboard' | 'editor'

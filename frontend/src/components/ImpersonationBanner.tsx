@@ -15,7 +15,8 @@ export function ImpersonationBanner() {
     setError('')
     try {
       await authApi.stopImpersonating()
-      window.location.assign('/admin')
+      // Back to the Users page, where "Log in as" started it.
+      window.location.assign('/admin/users')
     } catch (e) {
       // The admin session may be gone (e.g. their role changed): sign in again.
       setError(errorMessage(e, "We couldn't switch back."))

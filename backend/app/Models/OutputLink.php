@@ -68,6 +68,8 @@ class OutputLink extends Model
             ->with('setup')
             ->where('token_hash', self::hashToken($token))
             ->whereNull('revoked_at')
+            // A deactivated account's clean screens go dark too.
+            ->whereDoesntHave('setup.user', fn (Builder $user) => $user->whereNotNull('disabled_at'))
             ->first();
     }
 

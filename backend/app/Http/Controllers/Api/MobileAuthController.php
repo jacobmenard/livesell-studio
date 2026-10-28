@@ -51,8 +51,8 @@ class MobileAuthController extends Controller
             ]);
         }
 
-        if ($user->isDeactivated()) {
-            throw ValidationException::withMessages(['email' => EnsureAccountIsActive::PAUSED_MESSAGE]);
+        if (($refusal = EnsureAccountIsActive::refusal($user)) !== null) {
+            throw ValidationException::withMessages(['email' => $refusal]);
         }
 
         return $this->issue($user, $data['device_name']);

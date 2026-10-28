@@ -67,10 +67,10 @@ class AuthController extends Controller
         /** @var User $user */
         $user = Auth::guard('web')->user();
 
-        // A paused sub-user (owner's plan has no seat for them) can't come in.
-        if ($user->isDeactivated()) {
+        // A paused sub-user (owner's plan has no seat for them) or a deactivated account can't come in.
+        if (($refusal = EnsureAccountIsActive::refusal($user)) !== null) {
             Auth::guard('web')->logout();
-            throw ValidationException::withMessages(['email' => EnsureAccountIsActive::PAUSED_MESSAGE]);
+            throw ValidationException::withMessages(['email' => $refusal]);
         }
 
         $request->session()->regenerate();

@@ -28,6 +28,9 @@ final class Impersonation
         if ($owner->isSubUser() || $owner->role !== UserRole::Seller || $owner->is($admin)) {
             throw ValidationException::withMessages(['account' => 'Only a seller’s own account can be opened this way.']);
         }
+        if ($owner->isDisabled()) {
+            throw ValidationException::withMessages(['account' => 'This account is deactivated. Reactivate it first.']);
+        }
 
         // Not "remember me": impersonation ends with this browser session at the latest.
         Auth::guard('web')->login($owner);
