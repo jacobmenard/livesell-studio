@@ -57,7 +57,18 @@ export function checkKey(key: string): string | undefined {
   const k = key.trim()
   if (!k) return 'Paste your stream key.'
   if (/\s/.test(k)) return 'Stream keys have no spaces. Check you copied all of it.'
+  if (/^rtmps?:\/\//i.test(k)) return 'That’s the whole stream URL. Paste only the stream key.'
   return undefined
+}
+
+/**
+ * What was pasted into the stream key field. Live Producer also offers the whole stream URL
+ * (server + key) to copy; that is split so only the key goes in the key field.
+ */
+export function readPastedKey(text: string): { key: string; server?: string } {
+  const t = text.trim()
+  const [, server, key] = /^(rtmps?:\/\/\S+)\/([^/\s]+)$/i.exec(t) ?? []
+  return server && key ? { server, key } : { key: t }
 }
 
 /** The full address the phone streams to: server + "/" + key. */

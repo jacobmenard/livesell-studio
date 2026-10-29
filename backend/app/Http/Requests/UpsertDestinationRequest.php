@@ -15,7 +15,8 @@ class UpsertDestinationRequest extends FormRequest
     {
         return [
             'server_url' => ['required', 'string', 'max:300', 'regex:/^rtmps?:\/\/[^\s\/]+\.[^\s]+$/i'],
-            'stream_key' => ['required', 'string', 'max:300', 'regex:/^\S+$/'],
+            // Not the whole stream URL (server + key), which Live Producer also offers to copy.
+            'stream_key' => ['required', 'string', 'max:300', 'regex:/^\S+$/', 'not_regex:/^rtmps?:\/\//i'],
         ];
     }
 
@@ -24,6 +25,7 @@ class UpsertDestinationRequest extends FormRequest
         return [
             'server_url.regex' => 'The server URL should start with rtmp:// or rtmps://',
             'stream_key.regex' => 'Stream keys have no spaces. Check you copied all of it.',
+            'stream_key.not_regex' => 'That’s the whole stream URL. Paste only the stream key.',
         ];
     }
 

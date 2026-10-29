@@ -179,6 +179,11 @@ class MediaAndDestinationTest extends TestCase
             'stream_key' => 'has spaces in it',
         ])->assertUnprocessable()->assertJsonValidationErrors(['server_url', 'stream_key']);
 
+        $this->putJson('/api/destinations/facebook', [
+            'server_url' => 'rtmps://live-api-s.facebook.com:443/rtmp/',
+            'stream_key' => 'rtmps://live-api-s.facebook.com:443/rtmp/FB-123',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['stream_key' => 'only the stream key']);
+
         $this->putJson('/api/destinations/myspace', [
             'server_url' => 'rtmp://a.rtmp.youtube.com/live2',
             'stream_key' => 'abc',

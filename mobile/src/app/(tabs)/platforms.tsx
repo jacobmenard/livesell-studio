@@ -1,17 +1,20 @@
+import * as Clipboard from 'expo-clipboard'
 import { useFocusEffect } from 'expo-router'
+import * as WebBrowser from 'expo-web-browser'
 import { useCallback, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, KeyboardAvoidingView, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 
 import type { Platform } from '@/api/types'
-import { Button, Field, Notice } from '@/components/ui'
-import { PLATFORM_BY_ID, PLATFORMS } from '@/catalog'
+import { Button, Card, Field, Notice } from '@/components/ui'
+import { PLATFORM_BY_ID, PLATFORMS, type PlatformInfo } from '@/catalog'
 import {
   checkKey,
   checkServer,
   defaultServer,
   keyHint,
   loadAllDestinations,
+  readPastedKey,
   removeDestination,
   saveDestination,
   type StreamDestination,
@@ -50,6 +53,28 @@ export default function PlatformsScreen() {
 
   const fixed = FIXED_SERVER.includes(platform)
   const existing = saved[platform]
+
+  const paste = async (field: 'server' | 'key') => {
+    let text = ''
+    try {
+      text = (await Clipboard.getStringAsync()).trim()
+    } catch {
+      // Treated like an empty clipboard below.
+    }
+    if (!text) {
+      setErrors((e) => ({ ...e, [field]: 'Nothing copied yet. Copy it on your platform’s page first.' }))
+      return
+    }
+    if (field === 'server') {
+      setServer(text)
+      setErrors((e) => ({ ...e, server: undefined }))
+      return
+    }
+    const pasted = readPastedKey(text)
+    setKey(pasted.key)
+    if (pasted.server && !fixed) setServer(pasted.server)
+    setErrors((e) => ({ ...e, key: undefined, ...(pasted.server && !fixed ? { server: undefined } : null) }))
+  }
 
   const save = async () => {
     const next = { server: checkServer(server), key: checkKey(key) }
@@ -118,11 +143,14 @@ export default function PlatformsScreen() {
             })}
           </View>
 
+          {PLATFORM_BY_ID[platform].keyPage && <KeyGuide page={PLATFORM_BY_ID[platform].keyPage} />}
+
           <Field
             label="Server URL"
             value={server}
             onChangeText={setServer}
             editable={!fixed}
+            action={fixed ? undefined : { label: 'Paste', onPress: () => void paste('server') }}
             error={errors.server}
             help={fixed ? 'Filled in for you.' : 'Paste the server URL your platform shows.'}
             autoCapitalize="none"
@@ -133,6 +161,7 @@ export default function PlatformsScreen() {
             label={existing ? 'New stream key' : 'Stream key'}
             value={key}
             onChangeText={setKey}
+            action={{ label: 'Paste', onPress: () => void paste('key') }}
             error={errors.key}
             help={PLATFORM_BY_ID[platform].note}
             secret
@@ -155,7 +184,44 @@ export default function PlatformsScreen() {
   )
 }
 
+/** How to copy the key on this phone, with a button to the platform's page. */
+function KeyGuide({ page }: { page: NonNullable<PlatformInfo['keyPage']> }) {
+  // A Chrome Custom Tab, not Linking: a facebook.com or youtube.com link would open the
+  // platform's app, which never shows the stream key.
+  const open = () => void WebBrowser.openBrowserAsync(page.url, { toolbarColor: colors.bg, showTitle: true }).catch(() => Linking.openURL(page.url))
+  return (
+    <Card style={{ padding: space.lg, gap: space.md }}>
+      <Text style={{ color: colors.text, fontSize: 17, fontWeight: '700' }} accessibilityRole="header">
+        Get your key on this phone
+      </Text>
+      {page.steps.map((step, i) => (
+        <View key={step} style={{ flexDirection: 'row', gap: 10 }}>
+          <Text style={styles.stepNumber} accessibilityElementsHidden importantForAccessibility="no">
+            {i + 1}
+          </Text>
+          <Text style={{ flex: 1, color: colors.text2, fontSize: 15, lineHeight: 21 }} accessibilityLabel={`Step ${i + 1}. ${step}`}>
+            {step}
+          </Text>
+        </View>
+      ))}
+      <Button label={page.label} onPress={open} variant="secondary" size="md" />
+    </Card>
+  )
+}
+
 const styles = StyleSheet.create({
+  stepNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    overflow: 'hidden',
+    textAlign: 'center',
+    lineHeight: 24,
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+    backgroundColor: colors.surface2,
+  },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   platform: {
     flexBasis: '47%',

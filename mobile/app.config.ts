@@ -43,6 +43,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   plugins: [
     'expo-router',
     'expo-secure-store',
+    // Opens Facebook Live Producer, YouTube Studio and TikTok LIVE Center to copy a stream key.
+    'expo-web-browser',
     // Release APKs are signed with your own upload key, never the public debug key (see README).
     './plugins/withReleaseSigning',
     // Photo picker for background and foreground uploads (Android's own picker: no storage permission).

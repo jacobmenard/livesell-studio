@@ -1,4 +1,4 @@
-import { checkKey, checkServer, keyHint, streamUrl } from './streamKeys'
+import { checkKey, checkServer, keyHint, readPastedKey, streamUrl } from './streamKeys'
 
 jest.mock('expo-secure-store', () => ({}))
 
@@ -21,6 +21,16 @@ describe('stream keys', () => {
     expect(checkKey('abc def')).toMatch(/no spaces/)
     expect(checkKey('')).toMatch(/Paste/)
     expect(checkKey('FB-1234-ABCD')).toBeUndefined()
+    expect(checkKey('rtmps://live-api-s.facebook.com:443/rtmp/FB-123')).toMatch(/only the stream key/)
+  })
+
+  it('splits a pasted stream URL into server and key', () => {
+    expect(readPastedKey(' rtmps://live-api-s.facebook.com:443/rtmp/FB-123-ABC ')).toEqual({
+      server: 'rtmps://live-api-s.facebook.com:443/rtmp',
+      key: 'FB-123-ABC',
+    })
+    expect(readPastedKey(' FB-123-ABC\n')).toEqual({ key: 'FB-123-ABC' })
+    expect(readPastedKey('stream-123?expire=1&sign=a/b')).toEqual({ key: 'stream-123?expire=1&sign=a/b' })
   })
 
   it('shows only the last 4 characters', () => {

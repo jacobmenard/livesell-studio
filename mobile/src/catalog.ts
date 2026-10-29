@@ -98,16 +98,62 @@ export interface PlatformInfo {
   /** Filled in for the seller; empty means they paste the one their platform shows. */
   server: string
   note: string
+  /** The platform's page with the key, opened in the phone's browser, and how to copy it there. */
+  keyPage?: { label: string; url: string; steps: string[] }
 }
 
+// These pages only show the key in their desktop layout, hence the "Desktop site" step.
+const DESKTOP_SITE = 'Tap ⋮ at the top right and tick Desktop site. If you don’t see it, tap Open in Chrome first.'
+
 export const PLATFORMS: PlatformInfo[] = [
-  { id: 'facebook', label: 'Facebook', server: 'rtmps://live-api-s.facebook.com:443/rtmp/', note: 'Find it in Facebook Live Producer → Streaming software.' },
-  { id: 'youtube', label: 'YouTube', server: 'rtmp://a.rtmp.youtube.com/live2', note: 'Find it in YouTube Studio → Go live → Stream.' },
+  {
+    id: 'facebook',
+    label: 'Facebook',
+    server: 'rtmps://live-api-s.facebook.com:443/rtmp/',
+    note: 'Find it in Facebook Live Producer → Streaming software.',
+    keyPage: {
+      label: 'Open Facebook Live Producer',
+      url: 'https://www.facebook.com/live/producer',
+      steps: [
+        'Tap the button below and log in to Facebook if asked.',
+        DESKTOP_SITE,
+        'Choose Streaming software and copy the stream key. If there’s a persistent stream key option, turn it on so the key keeps working.',
+        'Come back here and tap Paste next to Stream key.',
+      ],
+    },
+  },
+  {
+    id: 'youtube',
+    label: 'YouTube',
+    server: 'rtmp://a.rtmp.youtube.com/live2',
+    note: 'Find it in YouTube Studio → Go live → Stream.',
+    keyPage: {
+      label: 'Open YouTube Studio',
+      url: 'https://studio.youtube.com',
+      steps: [
+        'Tap the button below and log in to YouTube if asked.',
+        DESKTOP_SITE,
+        'Tap Create → Go live, choose Stream, and copy the stream key.',
+        'Come back here and tap Paste next to Stream key.',
+      ],
+    },
+  },
   {
     id: 'tiktok',
     label: 'TikTok',
     server: '',
     note: 'Only TikTok accounts with stream key access get a server URL and key. Copy both from TikTok LIVE Center.',
+    keyPage: {
+      label: 'Open TikTok LIVE Center',
+      url: 'https://livecenter.tiktok.com/producer',
+      steps: [
+        'Tap the button below and log in to TikTok if asked.',
+        DESKTOP_SITE,
+        'Add a title, then tap the button that shows the server URL and stream key.',
+        'Copy the server URL, come back and tap Paste next to Server URL. Do the same for the stream key.',
+        'TikTok often gives a new key for each live. If a live won’t start, get a fresh key here.',
+      ],
+    },
   },
   { id: 'custom', label: 'Other', server: '', note: 'Any RTMP or RTMPS server, like Restream or your own.' },
 ]

@@ -25,6 +25,7 @@ export function checkStreamKey(key: string): string | undefined {
   const k = key.trim()
   if (!k) return 'Paste your stream key.'
   if (/\s/.test(k)) return 'Stream keys have no spaces. Check you copied all of it.'
+  if (/^rtmps?:\/\//i.test(k)) return 'That’s the whole stream URL. Paste only the stream key.'
   return undefined
 }
 

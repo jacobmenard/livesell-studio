@@ -18,6 +18,7 @@ describe('validation', () => {
     expect(checkRtmpServer('rtmps://live-api-s.facebook.com:443/rtmp/')).toBeUndefined()
     expect(checkStreamKey('has space')).toMatch(/no spaces/)
     expect(checkStreamKey('FB-123')).toBeUndefined()
+    expect(checkStreamKey('rtmps://live-api-s.facebook.com:443/rtmp/FB-123')).toMatch(/only the stream key/)
   })
 
   it('compacts and removes errors', () => {

@@ -127,13 +127,34 @@ export function Field({
   error,
   help,
   secret = false,
+  action,
   style,
   ...input
-}: TextInputProps & { label: string; error?: string; help?: string; secret?: boolean }) {
+}: TextInputProps & {
+  label: string
+  error?: string
+  help?: string
+  secret?: boolean
+  /** A text button beside the label, like Paste. */
+  action?: { label: string; onPress: () => void }
+}) {
   const [shown, setShown] = useState(false)
   return (
     <View style={[{ gap: 6 }, style]}>
-      <Text style={styles.label}>{label}</Text>
+      <View style={styles.labelRow}>
+        <Text style={styles.label}>{label}</Text>
+        {action && (
+          <Pressable
+            onPress={action.onPress}
+            accessibilityRole="button"
+            accessibilityLabel={`${action.label} ${label.toLowerCase()}`}
+            hitSlop={8}
+            style={({ pressed }) => [styles.labelAction, pressed && { opacity: 0.6 }]}
+          >
+            <Text style={{ color: colors.link, fontSize: 15, fontWeight: '500' }}>{action.label}</Text>
+          </Pressable>
+        )}
+      </View>
       <View>
         <TextInput
           placeholderTextColor={colors.muted}
@@ -311,6 +332,8 @@ const styles = StyleSheet.create({
   buttonTextMd: { fontSize: 15 },
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#FFFFFF' },
   label: { color: colors.text2, fontSize: 14, fontWeight: '500' },
+  labelRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.sm },
+  labelAction: { minHeight: 32, minWidth: 56, alignItems: 'flex-end', justifyContent: 'center' },
   help: { color: colors.muted, fontSize: 13, lineHeight: 18 },
   input: {
     minHeight: 52,
